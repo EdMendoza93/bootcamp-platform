@@ -1,6 +1,24 @@
 export default function Home() {
   return (
     <main className="min-h-screen bg-gray-50 text-gray-900">
+      <nav className="w-full border-b bg-white">
+  <div className="mx-auto flex max-w-6xl items-center justify-between px-6 py-4">
+    <div className="text-lg font-semibold">
+      Wild Atlantic Bootcamp
+    </div>
+
+    <div className="flex gap-6 text-sm text-gray-600">
+      <a href="#">Program</a>
+      <a href="#">Pricing</a>
+      <a href="#">Testimonials</a>
+      <a href="#">FAQ</a>
+    </div>
+
+    <button className="rounded-lg bg-black px-4 py-2 text-white text-sm">
+      Login
+    </button>
+  </div>
+</nav>
       <section className="mx-auto flex min-h-screen max-w-6xl flex-col items-center justify-center px-6 text-center">
         <p className="mb-4 text-sm font-semibold uppercase tracking-[0.2em] text-gray-500">
           Wild Atlantic Fitness Retreat
