@@ -1,24 +1,10 @@
+import Navbar from "../components/Navbar";
+
 export default function Home() {
   return (
     <main className="min-h-screen bg-gray-50 text-gray-900">
-      <nav className="w-full border-b bg-white">
-  <div className="mx-auto flex max-w-6xl items-center justify-between px-6 py-4">
-    <div className="text-lg font-semibold">
-      Wild Atlantic Bootcamp
-    </div>
+      <Navbar />
 
-    <div className="flex gap-6 text-sm text-gray-600">
-      <a href="#">Program</a>
-      <a href="#">Pricing</a>
-      <a href="#">Testimonials</a>
-      <a href="#">FAQ</a>
-    </div>
-
-    <button className="rounded-lg bg-black px-4 py-2 text-white text-sm">
-      Login
-    </button>
-  </div>
-</nav>
       <section className="mx-auto flex min-h-screen max-w-6xl flex-col items-center justify-center px-6 text-center">
         <p className="mb-4 text-sm font-semibold uppercase tracking-[0.2em] text-gray-500">
           Wild Atlantic Fitness Retreat
@@ -42,6 +28,52 @@ export default function Home() {
           </button>
         </div>
       </section>
+      <section className="bg-white py-20">
+  <div className="mx-auto max-w-6xl px-6 text-center">
+    
+    <h2 className="text-3xl font-bold mb-12">
+      Bootcamp Programs
+    </h2>
+
+    <div className="grid gap-8 md:grid-cols-3">
+
+      <div className="border rounded-xl p-8">
+        <h3 className="text-xl font-semibold mb-4">1 Week Reset</h3>
+        <p className="text-4xl font-bold mb-4">€900</p>
+        <p className="text-gray-600 mb-6">
+          Perfect introduction to the program.
+        </p>
+        <button className="bg-black text-white px-6 py-2 rounded-lg">
+          Apply
+        </button>
+      </div>
+
+      <div className="border rounded-xl p-8">
+        <h3 className="text-xl font-semibold mb-4">2 Week Transformation</h3>
+        <p className="text-4xl font-bold mb-4">€1650</p>
+        <p className="text-gray-600 mb-6">
+          Our most popular program.
+        </p>
+        <button className="bg-black text-white px-6 py-2 rounded-lg">
+          Apply
+        </button>
+      </div>
+
+      <div className="border rounded-xl p-8">
+        <h3 className="text-xl font-semibold mb-4">3 Week Intensive</h3>
+        <p className="text-4xl font-bold mb-4">€2250</p>
+        <p className="text-gray-600 mb-6">
+          Maximum transformation.
+        </p>
+        <button className="bg-black text-white px-6 py-2 rounded-lg">
+          Apply
+        </button>
+      </div>
+
+    </div>
+
+  </div>
+</section>
     </main>
   );
 }
