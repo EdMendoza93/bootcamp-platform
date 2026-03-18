@@ -1,18 +1,32 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { auth } from "@/lib/firebase";
 import {
   signInWithEmailAndPassword,
   createUserWithEmailAndPassword,
   GoogleAuthProvider,
   signInWithPopup,
+  onAuthStateChanged,
 } from "firebase/auth";
 
 export default function LoginPage() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
+  const [checkingAuth, setCheckingAuth] = useState(true);
+
+  useEffect(() => {
+    const unsubscribe = onAuthStateChanged(auth, (user) => {
+      if (user) {
+        window.location.href = "/dashboard";
+      } else {
+        setCheckingAuth(false);
+      }
+    });
+
+    return () => unsubscribe();
+  }, []);
 
   const login = async () => {
     setLoading(true);
@@ -47,6 +61,10 @@ export default function LoginPage() {
     }
     setLoading(false);
   };
+
+  if (checkingAuth) {
+    return <main className="min-h-screen flex items-center justify-center">Loading...</main>;
+  }
 
   return (
     <main className="min-h-screen flex items-center justify-center bg-gray-50">
@@ -86,9 +104,7 @@ export default function LoginPage() {
           Create account
         </button>
 
-        <div className="text-center my-4 text-sm text-gray-500">
-          or
-        </div>
+        <div className="text-center my-4 text-sm text-gray-500">or</div>
 
         <button
           onClick={googleLogin}
