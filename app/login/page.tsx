@@ -1,32 +1,19 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { auth } from "@/lib/firebase";
 import {
   signInWithEmailAndPassword,
   createUserWithEmailAndPassword,
   GoogleAuthProvider,
   signInWithPopup,
-  onAuthStateChanged,
+  signOut,
 } from "firebase/auth";
 
 export default function LoginPage() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
-  const [checkingAuth, setCheckingAuth] = useState(true);
-
-  useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, (user) => {
-      if (user) {
-        window.location.href = "/dashboard";
-      } else {
-        setCheckingAuth(false);
-      }
-    });
-
-    return () => unsubscribe();
-  }, []);
 
   const login = async () => {
     setLoading(true);
@@ -35,8 +22,9 @@ export default function LoginPage() {
       window.location.href = "/dashboard";
     } catch (err: any) {
       alert(err.message);
+    } finally {
+      setLoading(false);
     }
-    setLoading(false);
   };
 
   const signup = async () => {
@@ -46,8 +34,9 @@ export default function LoginPage() {
       window.location.href = "/dashboard";
     } catch (err: any) {
       alert(err.message);
+    } finally {
+      setLoading(false);
     }
-    setLoading(false);
   };
 
   const googleLogin = async () => {
@@ -58,23 +47,23 @@ export default function LoginPage() {
       window.location.href = "/dashboard";
     } catch (err: any) {
       alert(err.message);
+    } finally {
+      setLoading(false);
     }
-    setLoading(false);
   };
 
-  if (checkingAuth) {
-    return <main className="min-h-screen flex items-center justify-center">Loading...</main>;
-  }
+  const resetSession = async () => {
+    await signOut(auth);
+    alert("Session reset. Now try login again.");
+  };
 
   return (
-    <main className="min-h-screen flex items-center justify-center bg-gray-50">
-      <div className="w-full max-w-md p-8 bg-white rounded-xl shadow">
-        <h1 className="text-2xl font-bold mb-6 text-center">
-          Login / Signup
-        </h1>
+    <main className="min-h-screen flex items-center justify-center bg-gray-50 px-6">
+      <div className="w-full max-w-md rounded-2xl bg-white p-8 shadow-sm border">
+        <h1 className="mb-6 text-center text-2xl font-bold">Login / Signup</h1>
 
         <input
-          className="w-full mb-4 p-3 border rounded"
+          className="w-full mb-4 rounded-lg border p-3"
           placeholder="Email"
           value={email}
           onChange={(e) => setEmail(e.target.value)}
@@ -82,7 +71,7 @@ export default function LoginPage() {
 
         <input
           type="password"
-          className="w-full mb-4 p-3 border rounded"
+          className="w-full mb-4 rounded-lg border p-3"
           placeholder="Password"
           value={password}
           onChange={(e) => setPassword(e.target.value)}
@@ -91,7 +80,7 @@ export default function LoginPage() {
         <button
           onClick={login}
           disabled={loading}
-          className="w-full mb-3 bg-black text-white py-3 rounded disabled:opacity-50"
+          className="w-full mb-3 rounded-lg bg-black py-3 text-white disabled:opacity-50"
         >
           {loading ? "Loading..." : "Login"}
         </button>
@@ -99,19 +88,26 @@ export default function LoginPage() {
         <button
           onClick={signup}
           disabled={loading}
-          className="w-full mb-3 border py-3 rounded disabled:opacity-50"
+          className="w-full mb-3 rounded-lg border py-3 disabled:opacity-50"
         >
           Create account
         </button>
 
-        <div className="text-center my-4 text-sm text-gray-500">or</div>
+        <div className="my-4 text-center text-sm text-gray-500">or</div>
 
         <button
           onClick={googleLogin}
           disabled={loading}
-          className="w-full bg-red-500 text-white py-3 rounded disabled:opacity-50"
+          className="w-full rounded-lg bg-red-500 py-3 text-white disabled:opacity-50"
         >
           Continue with Google
+        </button>
+
+        <button
+          onClick={resetSession}
+          className="mt-4 w-full rounded-lg border py-3"
+        >
+          Reset session
         </button>
       </div>
     </main>
