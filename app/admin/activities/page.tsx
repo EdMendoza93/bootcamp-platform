@@ -1,120 +1,183 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { auth, db } from "@/lib/firebase";
-import { onAuthStateChanged } from "firebase/auth";
+import { useEffect, useMemo, useState } from "react";
+import { db } from "@/lib/firebase";
 import {
   addDoc,
   collection,
   deleteDoc,
   doc,
   getDocs,
-  orderBy,
-  query,
-  serverTimestamp,
+  updateDoc,
 } from "firebase/firestore";
+import { useToast } from "@/components/ui/ToastProvider";
 
-type ActivityTemplate = {
+type ActivityItem = {
   id: string;
   title: string;
-  description: string;
-  content: string;
-  category: "activity" | "other";
+  description?: string;
+  content?: string;
 };
 
 export default function AdminActivitiesPage() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [templates, setTemplates] = useState<ActivityTemplate[]>([]);
+  const [items, setItems] = useState<ActivityItem[]>([]);
+  const [search, setSearch] = useState("");
+  const [editingId, setEditingId] = useState<string | null>(null);
 
   const [form, setForm] = useState({
     title: "",
     description: "",
     content: "",
-    category: "activity",
   });
 
-  const loadTemplates = async () => {
-    try {
-      const q = query(
-        collection(db, "activityTemplates"),
-        orderBy("createdAt", "desc")
-      );
+  const { showToast } = useToast();
 
-      const snapshot = await getDocs(q);
+  const loadItems = async () => {
+    const snapshot = await getDocs(collection(db, "activityTemplates"));
 
-      const data: ActivityTemplate[] = snapshot.docs.map((docItem) => ({
+    const data = snapshot.docs
+      .map((docItem) => ({
         id: docItem.id,
-        ...(docItem.data() as Omit<ActivityTemplate, "id">),
-      }));
+        ...(docItem.data() as Omit<ActivityItem, "id">),
+      }))
+      .sort((a, b) => (a.title || "").localeCompare(b.title || "")) as ActivityItem[];
 
-      setTemplates(data);
-    } catch (error) {
-      console.error("Load activity templates error:", error);
-    }
+    setItems(data);
   };
 
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, async (user) => {
-      if (!user) {
-        window.location.replace("/login");
-        return;
-      }
-
+    const init = async () => {
       try {
-        await loadTemplates();
+        await loadItems();
+      } catch (error) {
+        console.error("Load activity items error:", error);
+        showToast({
+          title: "Could not load activities",
+          description: "Please refresh the page.",
+          type: "error",
+        });
       } finally {
         setLoading(false);
       }
+    };
+
+    init();
+  }, [showToast]);
+
+  const filteredItems = useMemo(() => {
+    const queryText = search.trim().toLowerCase();
+
+    return items.filter((item) => {
+      const title = (item.title || "").toLowerCase();
+      const description = (item.description || "").toLowerCase();
+      const content = (item.content || "").toLowerCase();
+
+      return (
+        !queryText ||
+        title.includes(queryText) ||
+        description.includes(queryText) ||
+        content.includes(queryText)
+      );
     });
+  }, [items, search]);
 
-    return () => unsubscribe();
-  }, []);
+  const resetForm = () => {
+    setEditingId(null);
+    setForm({
+      title: "",
+      description: "",
+      content: "",
+    });
+  };
 
-  const createTemplate = async () => {
-    if (!form.title || !form.content) {
-      alert("Title and content are required.");
+  const saveItem = async () => {
+    const payload = {
+      title: form.title.trim(),
+      description: form.description.trim(),
+      content: form.content.trim(),
+    };
+
+    if (!payload.title) {
+      showToast({
+        title: "Title required",
+        description: "Please add a title before saving.",
+        type: "error",
+      });
       return;
     }
 
     setSaving(true);
 
     try {
-      await addDoc(collection(db, "activityTemplates"), {
-        title: form.title,
-        description: form.description,
-        content: form.content,
-        category: form.category,
-        createdAt: serverTimestamp(),
-      });
+      if (editingId) {
+        await updateDoc(doc(db, "activityTemplates", editingId), payload);
 
-      setForm({
-        title: "",
-        description: "",
-        content: "",
-        category: "activity",
-      });
+        showToast({
+          title: "Activity item updated",
+          description: "Changes saved successfully.",
+          type: "success",
+        });
+      } else {
+        await addDoc(collection(db, "activityTemplates"), payload);
 
-      await loadTemplates();
-      alert("Activity template created.");
+        showToast({
+          title: "Activity item created",
+          description: "The new activity item was added.",
+          type: "success",
+        });
+      }
+
+      await loadItems();
+      resetForm();
     } catch (error) {
-      console.error("Create activity template error:", error);
-      alert("Failed to create activity template.");
+      console.error("Save activity item error:", error);
+      showToast({
+        title: "Save failed",
+        description: "Could not save the activity item.",
+        type: "error",
+      });
     } finally {
       setSaving(false);
     }
   };
 
-  const deleteTemplate = async (id: string) => {
-    const confirmed = window.confirm("Delete this activity template?");
+  const startEdit = (item: ActivityItem) => {
+    setEditingId(item.id);
+    setForm({
+      title: item.title || "",
+      description: item.description || "",
+      content: item.content || "",
+    });
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  };
+
+  const deleteItem = async (id: string) => {
+    const confirmed = window.confirm("Delete this activity item?");
     if (!confirmed) return;
 
     try {
       await deleteDoc(doc(db, "activityTemplates", id));
-      await loadTemplates();
+
+      if (editingId === id) {
+        resetForm();
+      }
+
+      await loadItems();
+
+      showToast({
+        title: "Activity item deleted",
+        description: "The item was removed.",
+        type: "success",
+      });
     } catch (error) {
-      console.error("Delete activity template error:", error);
-      alert("Failed to delete template.");
+      console.error("Delete activity item error:", error);
+      showToast({
+        title: "Delete failed",
+        description: "Could not delete the activity item.",
+        type: "error",
+      });
     }
   };
 
@@ -123,99 +186,133 @@ export default function AdminActivitiesPage() {
   }
 
   return (
-    <main className="min-h-screen bg-white p-10">
-      <a
-        href="/admin"
-        className="inline-block rounded border px-4 py-2"
-      >
-        Back to Admin
-      </a>
+    <div className="space-y-8">
+      <div>
+        <h1 className="text-3xl font-bold tracking-tight">Activities</h1>
+        <p className="mt-2 text-gray-600">
+          Manage reusable activity content for the bootcamp.
+        </p>
+      </div>
 
-      <h1 className="mt-6 text-3xl font-bold">Activity Templates</h1>
-      <p className="mt-2 text-gray-600">
-        Create reusable activities and other schedule items.
-      </p>
+      <section className="rounded-3xl border bg-white p-6 shadow-sm">
+        <h2 className="text-xl font-semibold">
+          {editingId ? "Edit Activity Item" : "Create Activity Item"}
+        </h2>
 
-      <div className="mt-8 max-w-3xl rounded-xl border p-6">
-        <h2 className="text-xl font-semibold">Create Activity Template</h2>
-
-        <div className="mt-4 space-y-4">
-          <select
-            className="w-full rounded border p-3"
-            value={form.category}
-            onChange={(e) =>
-              setForm({
-                ...form,
-                category: e.target.value as "activity" | "other",
-              })
-            }
-          >
-            <option value="activity">activity</option>
-            <option value="other">other</option>
-          </select>
-
+        <div className="mt-6 grid gap-4">
           <input
-            className="w-full rounded border p-3"
+            type="text"
             placeholder="Title"
             value={form.title}
-            onChange={(e) => setForm({ ...form, title: e.target.value })}
+            onChange={(e) =>
+              setForm((prev) => ({ ...prev, title: e.target.value }))
+            }
+            className="w-full rounded-xl border p-3"
           />
 
-          <textarea
-            className="min-h-[100px] w-full rounded border p-3"
-            placeholder="Short description"
+          <input
+            type="text"
+            placeholder="Description"
             value={form.description}
             onChange={(e) =>
-              setForm({ ...form, description: e.target.value })
+              setForm((prev) => ({ ...prev, description: e.target.value }))
             }
+            className="w-full rounded-xl border p-3"
           />
 
           <textarea
-            className="min-h-[220px] w-full rounded border p-3"
-            placeholder="Activity details"
+            placeholder="Content"
             value={form.content}
-            onChange={(e) => setForm({ ...form, content: e.target.value })}
+            onChange={(e) =>
+              setForm((prev) => ({ ...prev, content: e.target.value }))
+            }
+            className="min-h-[180px] w-full rounded-xl border p-3"
           />
 
-          <button
-            onClick={createTemplate}
-            disabled={saving}
-            className="rounded bg-black px-6 py-3 text-white disabled:opacity-50"
-          >
-            {saving ? "Saving..." : "Create Activity Template"}
-          </button>
-        </div>
-      </div>
-
-      <div className="mt-10 space-y-4">
-        {templates.map((template) => (
-          <div key={template.id} className="rounded-xl border p-6">
-            <div className="flex items-center gap-3">
-              <h3 className="text-xl font-semibold">{template.title}</h3>
-              <span className="rounded bg-gray-100 px-2 py-1 text-xs uppercase tracking-wide text-gray-600">
-                {template.category}
-              </span>
-            </div>
-
-            {template.description && (
-              <p className="mt-2 text-sm text-gray-600">
-                {template.description}
-              </p>
-            )}
-
-            <p className="mt-4 whitespace-pre-line text-sm text-gray-700">
-              {template.content}
-            </p>
+          <div className="flex flex-wrap gap-3">
+            <button
+              onClick={saveItem}
+              disabled={saving}
+              className="rounded-xl bg-black px-6 py-3 text-sm font-medium text-white disabled:opacity-50"
+            >
+              {saving
+                ? "Saving..."
+                : editingId
+                ? "Save Changes"
+                : "Create Item"}
+            </button>
 
             <button
-              onClick={() => deleteTemplate(template.id)}
-              className="mt-4 rounded border px-4 py-2 text-sm"
+              onClick={resetForm}
+              disabled={saving}
+              className="rounded-xl border bg-white px-6 py-3 text-sm font-medium disabled:opacity-50"
             >
-              Delete
+              Clear
             </button>
           </div>
-        ))}
-      </div>
-    </main>
+        </div>
+      </section>
+
+      <section className="rounded-3xl border bg-white p-6 shadow-sm">
+        <div className="flex flex-col gap-3 md:flex-row md:items-center">
+          <input
+            type="text"
+            placeholder="Search activity items..."
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            className="w-full rounded-xl border px-4 py-3 text-sm outline-none focus:border-black md:flex-1"
+          />
+        </div>
+
+        {filteredItems.length === 0 ? (
+          <div className="mt-6 rounded-2xl border border-dashed p-10 text-center text-sm text-gray-500">
+            No activity items found.
+          </div>
+        ) : (
+          <div className="mt-6 grid gap-4">
+            {filteredItems.map((item) => (
+              <div
+                key={item.id}
+                className="rounded-2xl border bg-gray-50 p-5"
+              >
+                <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+                  <div className="min-w-0 flex-1">
+                    <h3 className="text-lg font-semibold">{item.title}</h3>
+
+                    {item.description && (
+                      <p className="mt-2 text-sm text-gray-600">
+                        {item.description}
+                      </p>
+                    )}
+
+                    {item.content && (
+                      <p className="mt-4 whitespace-pre-wrap text-sm text-gray-700">
+                        {item.content}
+                      </p>
+                    )}
+                  </div>
+
+                  <div className="flex gap-2">
+                    <button
+                      onClick={() => startEdit(item)}
+                      className="rounded-xl border px-4 py-2 text-sm font-medium"
+                    >
+                      Edit
+                    </button>
+
+                    <button
+                      onClick={() => deleteItem(item.id)}
+                      className="rounded-xl border px-4 py-2 text-sm font-medium"
+                    >
+                      Delete
+                    </button>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </section>
+    </div>
   );
 }

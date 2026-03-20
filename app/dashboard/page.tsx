@@ -1,224 +1,324 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { auth, db } from "@/lib/firebase";
 import { signOut } from "firebase/auth";
 import {
   collection,
+  doc,
+  getDoc,
   getDocs,
   query,
   where,
-  doc,
-  getDoc,
 } from "firebase/firestore";
+import { useToast } from "@/components/ui/ToastProvider";
 
 type ApplicationStatus = "none" | "pending" | "approved" | "rejected";
 type OnboardingStatus = "none" | "incomplete" | "active";
+type ScheduleType = "training" | "nutrition" | "activity";
 
 type ScheduleItem = {
   id: string;
   date: string;
   startTime: string;
   endTime?: string;
-  type: "training" | "nutrition" | "activity" | "other";
+  type: ScheduleType;
   templateId?: string;
   title?: string;
   details?: string;
   displayTitle: string;
 };
 
-type ModalData = {
+type ProgressPhoto = {
+  id: string;
+  profileId: string;
+  userId?: string;
+  imageUrl: string;
+  title?: string;
+  note?: string;
+  uploadedByRole: "admin" | "user";
+  createdAt?: {
+    seconds?: number;
+    nanoseconds?: number;
+  };
+};
+
+type ScheduleModalData = {
   open: boolean;
   title: string;
-  type: string;
+  type: ScheduleType | "";
   content: string;
   description: string;
+};
+
+type PhotoModalData = {
+  open: boolean;
+  imageUrl: string;
+  title: string;
+  note: string;
+  uploadedByRole: "admin" | "user" | "";
 };
 
 export default function DashboardPage() {
   const [user, setUser] = useState<any>(null);
   const [loading, setLoading] = useState(true);
-  const [isAdmin, setIsAdmin] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
+
   const [applicationStatus, setApplicationStatus] =
     useState<ApplicationStatus>("none");
   const [hasProfile, setHasProfile] = useState(false);
   const [onboardingStatus, setOnboardingStatus] =
     useState<OnboardingStatus>("none");
   const [paymentStatus, setPaymentStatus] = useState("pending");
-  const [assignedProgram, setAssignedProgram] = useState("");
   const [height, setHeight] = useState("");
   const [weight, setWeight] = useState("");
   const [allergies, setAllergies] = useState("");
   const [injuries, setInjuries] = useState("");
   const [notes, setNotes] = useState("");
-  const [trainingPlanTitle, setTrainingPlanTitle] = useState("");
-  const [trainingPlanDetails, setTrainingPlanDetails] = useState("");
-  const [nutritionPlanTitle, setNutritionPlanTitle] = useState("");
-  const [nutritionPlanDetails, setNutritionPlanDetails] = useState("");
   const [scheduleItems, setScheduleItems] = useState<ScheduleItem[]>([]);
-  const [modalData, setModalData] = useState<ModalData>({
+  const [progressPhotos, setProgressPhotos] = useState<ProgressPhoto[]>([]);
+  const [progressPhotosEnabled, setProgressPhotosEnabled] = useState(true);
+
+  const [scheduleModalData, setScheduleModalData] = useState<ScheduleModalData>({
     open: false,
     title: "",
     type: "",
     content: "",
     description: "",
   });
-  const [modalLoading, setModalLoading] = useState(false);
+  const [scheduleModalLoading, setScheduleModalLoading] = useState(false);
+
+  const [photoModalData, setPhotoModalData] = useState<PhotoModalData>({
+    open: false,
+    imageUrl: "",
+    title: "",
+    note: "",
+    uploadedByRole: "",
+  });
+
+  const { showToast } = useToast();
+
+  const resolveTemplateTitle = async (
+    type: ScheduleType,
+    templateId?: string
+  ) => {
+    if (!templateId) return "";
+
+    let collectionName = "";
+    if (type === "training") collectionName = "trainingTemplates";
+    if (type === "nutrition") collectionName = "nutritionTemplates";
+    if (type === "activity") collectionName = "activityTemplates";
+
+    if (!collectionName) return "";
+
+    try {
+      const snap = await getDoc(doc(db, collectionName, templateId));
+      if (!snap.exists()) return "";
+      const data = snap.data() as { title?: string };
+      return data.title || "";
+    } catch {
+      return "";
+    }
+  };
+
+  const loadDashboard = async () => {
+    const currentUser = auth.currentUser;
+    if (!currentUser) {
+      window.location.replace("/login");
+      return;
+    }
+
+    setUser(currentUser);
+
+    const userRef = doc(db, "users", currentUser.uid);
+    const userSnap = await getDoc(userRef);
+
+    if (userSnap.exists()) {
+      const userData = userSnap.data() as { role?: string };
+      if (userData.role === "admin") {
+        window.location.replace("/admin");
+        return;
+      }
+    }
+
+    const appQuery = await getDocs(
+      query(
+        collection(db, "applications"),
+        where("userId", "==", currentUser.uid)
+      )
+    );
+
+    if (!appQuery.empty) {
+      const appData = appQuery.docs[0].data() as {
+        status?: ApplicationStatus;
+      };
+      setApplicationStatus(appData.status || "none");
+    } else {
+      setApplicationStatus("none");
+    }
+
+    const profileQuery = await getDocs(
+      query(collection(db, "profiles"), where("userId", "==", currentUser.uid))
+    );
+
+    if (!profileQuery.empty) {
+      const profileDoc = profileQuery.docs[0];
+      const profileData = profileDoc.data() as {
+        onboardingStatus?: OnboardingStatus;
+        paymentStatus?: string;
+        height?: string;
+        weight?: string;
+        allergies?: string;
+        injuries?: string;
+        notes?: string;
+        progressPhotosEnabled?: boolean;
+      };
+
+      setHasProfile(true);
+      setOnboardingStatus(profileData.onboardingStatus || "none");
+      setPaymentStatus(profileData.paymentStatus || "pending");
+      setHeight(profileData.height || "");
+      setWeight(profileData.weight || "");
+      setAllergies(profileData.allergies || "");
+      setInjuries(profileData.injuries || "");
+      setNotes(profileData.notes || "");
+      setProgressPhotosEnabled(profileData.progressPhotosEnabled !== false);
+
+      const scheduleQuery = await getDocs(
+        query(
+          collection(db, "scheduleItems"),
+          where("profileId", "==", profileDoc.id)
+        )
+      );
+
+      const rawItems = scheduleQuery.docs
+        .map((docItem) => ({
+          id: docItem.id,
+          ...(docItem.data() as Omit<ScheduleItem, "id" | "displayTitle">),
+        }))
+        .filter(
+          (item) =>
+            item.type === "training" ||
+            item.type === "nutrition" ||
+            item.type === "activity"
+        ) as Array<Omit<ScheduleItem, "id" | "displayTitle">>;
+
+      const resolved = await Promise.all(
+        rawItems.map(async (item) => {
+          const templateTitle = await resolveTemplateTitle(
+            item.type,
+            item.templateId
+          );
+
+          return {
+            ...item,
+            displayTitle: item.title?.trim() || templateTitle || "Session",
+          } as ScheduleItem;
+        })
+      );
+
+      resolved.sort((a, b) => {
+        if (a.date !== b.date) return a.date.localeCompare(b.date);
+        return a.startTime.localeCompare(b.startTime);
+      });
+
+      setScheduleItems(resolved);
+
+      const progressQuery = await getDocs(
+        query(
+          collection(db, "progressPhotos"),
+          where("profileId", "==", profileDoc.id)
+        )
+      );
+
+      const progressData = progressQuery.docs.map((docItem) => ({
+        id: docItem.id,
+        ...(docItem.data() as Omit<ProgressPhoto, "id">),
+      })) as ProgressPhoto[];
+
+      progressData.sort((a, b) => {
+        const aSeconds = a.createdAt?.seconds || 0;
+        const bSeconds = b.createdAt?.seconds || 0;
+        return bSeconds - aSeconds;
+      });
+
+      setProgressPhotos(progressData);
+    } else {
+      setHasProfile(false);
+      setOnboardingStatus("none");
+      setPaymentStatus("pending");
+      setHeight("");
+      setWeight("");
+      setAllergies("");
+      setInjuries("");
+      setNotes("");
+      setScheduleItems([]);
+      setProgressPhotos([]);
+      setProgressPhotosEnabled(false);
+    }
+  };
 
   useEffect(() => {
     let cancelled = false;
 
-    const resolveTemplateTitle = async (
-      type: ScheduleItem["type"],
-      templateId?: string
-    ) => {
-      if (!templateId) return "";
-
-      let collectionName = "";
-      if (type === "training") collectionName = "trainingTemplates";
-      if (type === "nutrition") collectionName = "nutritionTemplates";
-      if (type === "activity" || type === "other") {
-        collectionName = "activityTemplates";
-      }
-      if (!collectionName) return "";
-
-      try {
-        const snap = await getDoc(doc(db, collectionName, templateId));
-        if (!snap.exists()) return "";
-        const data = snap.data() as { title?: string };
-        return data.title || "";
-      } catch {
-        return "";
-      }
-    };
-
-    const loadDashboard = async () => {
+    const init = async () => {
       try {
         await auth.authStateReady();
-
-        const currentUser = auth.currentUser;
-
-        if (!currentUser) {
-          window.location.replace("/login");
-          return;
-        }
-
-        if (cancelled) return;
-        setUser(currentUser);
-
-        const userQuery = await getDocs(
-          query(collection(db, "users"), where("uid", "==", currentUser.uid))
-        );
-
-        if (!userQuery.empty) {
-          const userData = userQuery.docs[0].data() as { role?: string };
-          if (!cancelled) setIsAdmin(userData.role === "admin");
-        }
-
-        const appQuery = await getDocs(
-          query(
-            collection(db, "applications"),
-            where("userId", "==", currentUser.uid)
-          )
-        );
-
-        if (!appQuery.empty) {
-          const appData = appQuery.docs[0].data() as {
-            status?: ApplicationStatus;
-          };
-          if (!cancelled) setApplicationStatus(appData.status || "none");
-        }
-
-        const profileQuery = await getDocs(
-          query(
-            collection(db, "profiles"),
-            where("userId", "==", currentUser.uid)
-          )
-        );
-
-        if (!profileQuery.empty) {
-          const profileDoc = profileQuery.docs[0];
-          const profileData = profileDoc.data() as {
-            onboardingStatus?: OnboardingStatus;
-            paymentStatus?: string;
-            assignedProgram?: string;
-            height?: string;
-            weight?: string;
-            allergies?: string;
-            injuries?: string;
-            notes?: string;
-            trainingPlanTitle?: string;
-            trainingPlanDetails?: string;
-            nutritionPlanTitle?: string;
-            nutritionPlanDetails?: string;
-          };
-
-          if (!cancelled) {
-            setHasProfile(true);
-            setOnboardingStatus(profileData.onboardingStatus || "none");
-            setPaymentStatus(profileData.paymentStatus || "pending");
-            setAssignedProgram(profileData.assignedProgram || "");
-            setHeight(profileData.height || "");
-            setWeight(profileData.weight || "");
-            setAllergies(profileData.allergies || "");
-            setInjuries(profileData.injuries || "");
-            setNotes(profileData.notes || "");
-            setTrainingPlanTitle(profileData.trainingPlanTitle || "");
-            setTrainingPlanDetails(profileData.trainingPlanDetails || "");
-            setNutritionPlanTitle(profileData.nutritionPlanTitle || "");
-            setNutritionPlanDetails(profileData.nutritionPlanDetails || "");
-          }
-
-          const scheduleQuery = await getDocs(
-            query(
-              collection(db, "scheduleItems"),
-              where("profileId", "==", profileDoc.id)
-            )
-          );
-
-          const rawItems = scheduleQuery.docs.map((docItem) => ({
-            id: docItem.id,
-            ...(docItem.data() as Omit<ScheduleItem, "id" | "displayTitle">),
-          }));
-
-          const resolved = await Promise.all(
-            rawItems.map(async (item) => {
-              const templateTitle = await resolveTemplateTitle(
-                item.type,
-                item.templateId
-              );
-              return {
-                ...item,
-                displayTitle:
-                  item.title || templateTitle || "Untitled item",
-              } as ScheduleItem;
-            })
-          );
-
-          resolved.sort((a, b) => {
-            if (a.date !== b.date) return a.date.localeCompare(b.date);
-            return a.startTime.localeCompare(b.startTime);
-          });
-
-          if (!cancelled) setScheduleItems(resolved);
+        if (!cancelled) {
+          await loadDashboard();
         }
       } catch (error) {
         console.error("Dashboard error:", error);
+        if (!cancelled) {
+          showToast({
+            title: "Could not load dashboard",
+            description: "Please refresh and try again.",
+            type: "error",
+          });
+        }
       } finally {
         if (!cancelled) setLoading(false);
       }
     };
 
-    loadDashboard();
+    init();
+
+    const interval = setInterval(() => {
+      loadDashboard().catch((error) => {
+        console.error("Auto refresh dashboard error:", error);
+      });
+    }, 30000);
 
     return () => {
       cancelled = true;
+      clearInterval(interval);
     };
-  }, []);
+  }, [showToast]);
+
+  const refreshDashboard = async () => {
+    setRefreshing(true);
+    try {
+      await loadDashboard();
+      showToast({
+        title: "Dashboard refreshed",
+        description: "Your latest data has been loaded.",
+        type: "success",
+      });
+    } catch (error) {
+      console.error("Refresh dashboard error:", error);
+      showToast({
+        title: "Refresh failed",
+        description: "Could not refresh the dashboard.",
+        type: "error",
+      });
+    } finally {
+      setRefreshing(false);
+    }
+  };
 
   const openScheduleModal = async (item: ScheduleItem) => {
-    setModalLoading(true);
-    setModalData({
+    setScheduleModalLoading(true);
+    setScheduleModalData({
       open: true,
       title: item.displayTitle,
       type: item.type,
@@ -228,7 +328,7 @@ export default function DashboardPage() {
 
     try {
       if (!item.templateId) {
-        setModalData({
+        setScheduleModalData({
           open: true,
           title: item.displayTitle,
           type: item.type,
@@ -241,12 +341,10 @@ export default function DashboardPage() {
       let collectionName = "";
       if (item.type === "training") collectionName = "trainingTemplates";
       if (item.type === "nutrition") collectionName = "nutritionTemplates";
-      if (item.type === "activity" || item.type === "other") {
-        collectionName = "activityTemplates";
-      }
+      if (item.type === "activity") collectionName = "activityTemplates";
 
       if (!collectionName) {
-        setModalData({
+        setScheduleModalData({
           open: true,
           title: item.displayTitle,
           type: item.type,
@@ -259,7 +357,7 @@ export default function DashboardPage() {
       const snap = await getDoc(doc(db, collectionName, item.templateId));
 
       if (!snap.exists()) {
-        setModalData({
+        setScheduleModalData({
           open: true,
           title: item.displayTitle,
           type: item.type,
@@ -275,11 +373,12 @@ export default function DashboardPage() {
         content?: string;
       };
 
-      const combinedContent = item.details
-        ? `${data.content || ""}\n\nExtra notes:\n${item.details}`
-        : data.content || "No details available.";
+      const baseContent = data.content || "No details available.";
+      const combinedContent = item.details?.trim()
+        ? `${baseContent}\n\nExtra notes:\n${item.details}`
+        : baseContent;
 
-      setModalData({
+      setScheduleModalData({
         open: true,
         title: data.title || item.displayTitle,
         type: item.type,
@@ -287,8 +386,8 @@ export default function DashboardPage() {
         content: combinedContent,
       });
     } catch (error) {
-      console.error("Open modal error:", error);
-      setModalData({
+      console.error("Open schedule modal error:", error);
+      setScheduleModalData({
         open: true,
         title: item.displayTitle,
         type: item.type,
@@ -296,12 +395,12 @@ export default function DashboardPage() {
         description: "",
       });
     } finally {
-      setModalLoading(false);
+      setScheduleModalLoading(false);
     }
   };
 
-  const closeModal = () => {
-    setModalData({
+  const closeScheduleModal = () => {
+    setScheduleModalData({
       open: false,
       title: "",
       type: "",
@@ -310,16 +409,96 @@ export default function DashboardPage() {
     });
   };
 
+  const openPhotoModal = (photo: ProgressPhoto) => {
+    setPhotoModalData({
+      open: true,
+      imageUrl: photo.imageUrl,
+      title: photo.title || "Progress update",
+      note: photo.note || "",
+      uploadedByRole: photo.uploadedByRole,
+    });
+  };
+
+  const closePhotoModal = () => {
+    setPhotoModalData({
+      open: false,
+      imageUrl: "",
+      title: "",
+      note: "",
+      uploadedByRole: "",
+    });
+  };
+
   const logout = async () => {
     await signOut(auth);
     window.location.replace("/login");
   };
 
-  const groupedSchedule = scheduleItems.reduce((acc, item) => {
-    if (!acc[item.date]) acc[item.date] = [];
-    acc[item.date].push(item);
-    return acc;
-  }, {} as Record<string, ScheduleItem[]>);
+  const groupedSchedule = useMemo(() => {
+    return scheduleItems.reduce((acc, item) => {
+      if (!acc[item.date]) acc[item.date] = [];
+      acc[item.date].push(item);
+      return acc;
+    }, {} as Record<string, ScheduleItem[]>);
+  }, [scheduleItems]);
+
+  const recentProgressPhotos = useMemo(() => {
+    return progressPhotos.slice(0, 8);
+  }, [progressPhotos]);
+
+  const canSeeProgramContent =
+    applicationStatus === "approved" && hasProfile;
+
+  const canSeeItinerary =
+    applicationStatus === "approved" &&
+    hasProfile &&
+    onboardingStatus === "active";
+
+  const canSeeProgress =
+    canSeeProgramContent && progressPhotosEnabled;
+
+  const showPendingPayment =
+    hasProfile &&
+    applicationStatus === "approved" &&
+    paymentStatus === "pending";
+
+  const showCashMessage =
+    hasProfile &&
+    applicationStatus === "approved" &&
+    paymentStatus === "cash";
+
+  const statusCards = useMemo(() => {
+    return [
+      {
+        label: "Application",
+        value:
+          applicationStatus === "none"
+            ? "Not submitted"
+            : applicationStatus,
+      },
+      {
+        label: "Profile",
+        value: hasProfile ? onboardingStatus : "Not ready",
+      },
+      {
+        label: "Payment",
+        value: hasProfile ? paymentStatus : "Pending",
+      },
+      {
+        label: "Itinerary",
+        value: canSeeItinerary
+          ? `${scheduleItems.length} item${scheduleItems.length === 1 ? "" : "s"}`
+          : "Locked",
+      },
+    ];
+  }, [
+    applicationStatus,
+    hasProfile,
+    onboardingStatus,
+    paymentStatus,
+    canSeeItinerary,
+    scheduleItems.length,
+  ]);
 
   if (loading) {
     return <p className="p-10">Loading...</p>;
@@ -327,272 +506,538 @@ export default function DashboardPage() {
 
   return (
     <>
-      <main className="min-h-screen bg-white p-10">
-        <h1 className="text-3xl font-bold">Dashboard</h1>
-        <p className="mt-2 text-gray-600">{user?.email}</p>
+      <main className="min-h-screen bg-gray-50 p-6 md:p-10">
+        <div className="mx-auto max-w-6xl">
+          <section className="rounded-3xl border bg-white p-6 shadow-sm md:p-8">
+            <div className="flex flex-col gap-6 md:flex-row md:items-start md:justify-between">
+              <div>
+                <p className="text-sm font-medium uppercase tracking-[0.2em] text-gray-500">
+                  Wild Atlantic Bootcamp
+                </p>
+                <h1 className="mt-3 text-3xl font-bold tracking-tight md:text-4xl">
+                  Welcome back
+                </h1>
+                <p className="mt-3 text-gray-600">{user?.email}</p>
+              </div>
 
-        {isAdmin && (
-          <a
-            href="/admin"
-            className="mt-6 inline-block rounded bg-black px-4 py-2 text-white"
-          >
-            Go to Admin
-          </a>
-        )}
+              <div className="flex flex-wrap gap-3">
+                <button
+                  onClick={refreshDashboard}
+                  disabled={refreshing}
+                  className="rounded-xl border bg-white px-4 py-2.5 text-sm font-medium disabled:opacity-50"
+                >
+                  {refreshing ? "Refreshing..." : "Refresh"}
+                </button>
 
-        {!isAdmin && hasProfile && scheduleItems.length > 0 && (
-          <section className="mt-8">
-            <h2 className="text-2xl font-semibold">Your Itinerary</h2>
-            <p className="mt-2 text-gray-600">
-              Your upcoming schedule and activities.
-            </p>
+                <button
+                  onClick={logout}
+                  className="rounded-xl border bg-white px-4 py-2.5 text-sm font-medium"
+                >
+                  Logout
+                </button>
+              </div>
+            </div>
 
-            <div className="mt-6 space-y-6">
-              {Object.entries(groupedSchedule).map(([date, items]) => (
-                <div key={date} className="rounded-xl border p-6">
-                  <h3 className="text-lg font-semibold">{date}</h3>
-
-                  <div className="mt-4 space-y-3">
-                    {items.map((item) => (
-                      <button
-                        key={item.id}
-                        onClick={() => openScheduleModal(item)}
-                        className="w-full rounded-lg border bg-gray-50 p-4 text-left transition hover:bg-gray-100"
-                      >
-                        <div className="flex flex-col gap-1 md:flex-row md:items-center md:justify-between">
-                          <div>
-                            <p className="font-medium">{item.displayTitle}</p>
-                            <p className="text-sm uppercase text-gray-600">
-                              {item.type}
-                            </p>
-                          </div>
-
-                          <p className="text-sm text-gray-700">
-                            {item.startTime}
-                            {item.endTime ? ` - ${item.endTime}` : ""}
-                          </p>
-                        </div>
-                      </button>
-                    ))}
-                  </div>
-                </div>
+            <div className="mt-8 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+              {statusCards.map((card) => (
+                <StatusCard
+                  key={card.label}
+                  label={card.label}
+                  value={card.value}
+                />
               ))}
             </div>
+
+            {applicationStatus === "approved" &&
+              hasProfile &&
+              onboardingStatus === "active" && (
+                <div className="mt-8 rounded-2xl bg-gray-50 p-5">
+                  <h2 className="text-lg font-semibold">Your program is active</h2>
+                  <p className="mt-2 text-sm text-gray-600">
+                    Your itinerary is ready and your profile is up to date.
+                  </p>
+                </div>
+              )}
+
+            {applicationStatus === "approved" &&
+              hasProfile &&
+              onboardingStatus === "incomplete" && (
+                <div className="mt-8 rounded-2xl border border-black/10 bg-gray-50 p-5">
+                  <h2 className="text-lg font-semibold">
+                    Next step: complete your profile
+                  </h2>
+                  <p className="mt-2 text-sm text-gray-600">
+                    Your application is approved, but you still need to complete
+                    your profile before unlocking the full dashboard.
+                  </p>
+
+                  <div className="mt-4">
+                    <a
+                      href="/dashboard/profile"
+                      className="inline-flex rounded-xl bg-black px-4 py-2.5 text-sm font-medium text-white"
+                    >
+                      Complete Profile
+                    </a>
+                  </div>
+                </div>
+              )}
           </section>
-        )}
 
-        {!isAdmin && hasProfile && scheduleItems.length === 0 && (
-          <section className="mt-8 rounded-xl border p-6">
-            <h2 className="text-xl font-semibold">Your Itinerary</h2>
-            <p className="mt-2 text-gray-600">
-              Your schedule has not been added yet.
-            </p>
-          </section>
-        )}
-
-        <p className="mt-8 text-gray-600">
-          Application Status: {applicationStatus}
-        </p>
-
-        {hasProfile && (
-          <>
-            <p className="mt-2 text-gray-600">
-              Profile Status: {onboardingStatus}
-            </p>
-            <p className="mt-2 text-gray-600">
-              Payment Status: {paymentStatus}
-            </p>
-            <p className="mt-2 text-gray-600">
-              Personalized Plan: {assignedProgram || "Not assigned yet"}
-            </p>
-          </>
-        )}
-
-        <div className="mt-4">
-          {!isAdmin &&
-            applicationStatus !== "approved" &&
-            applicationStatus !== "pending" && (
-              <a
-                href="/dashboard/application"
-                className="inline-block rounded border px-4 py-2"
-              >
-                Complete Application
-              </a>
-            )}
-        </div>
-
-        {!isAdmin && applicationStatus === "pending" && (
-          <div className="mt-6 rounded-xl border p-6">
-            <h2 className="text-xl font-semibold">Application submitted</h2>
-            <p className="mt-2 text-gray-600">
-              Your application is under review.
-            </p>
-          </div>
-        )}
-
-        {!isAdmin && applicationStatus === "approved" && !hasProfile && (
-          <div className="mt-6 rounded-xl border p-6">
-            <h2 className="text-xl font-semibold">Approved</h2>
-            <p className="mt-2 text-gray-600">
-              Your application has been approved. Your profile will be prepared
-              shortly by the team.
-            </p>
-          </div>
-        )}
-
-        {!isAdmin &&
-          applicationStatus === "approved" &&
-          hasProfile &&
-          onboardingStatus === "incomplete" && (
-            <div className="mt-6 rounded-xl border p-6">
-              <h2 className="text-xl font-semibold">Complete your profile</h2>
+          {applicationStatus === "none" && (
+            <section className="mt-8 rounded-3xl border bg-white p-6 shadow-sm">
+              <h2 className="text-xl font-semibold">Complete your application</h2>
               <p className="mt-2 text-gray-600">
-                Please complete your participant profile to continue.
+                You need to submit your application before the rest of the
+                program can be prepared for you.
               </p>
 
-              <div className="mt-4 flex gap-3">
+              <div className="mt-4">
                 <a
-                  href="/dashboard/profile"
-                  className="inline-block rounded bg-black px-4 py-2 text-white"
+                  href="/dashboard/application"
+                  className="inline-flex rounded-xl border bg-white px-4 py-2.5 text-sm font-medium"
                 >
-                  Complete Profile
-                </a>
-
-                <a
-                  href="/dashboard/profile"
-                  className="inline-block rounded border px-4 py-2"
-                >
-                  Edit My Profile
+                  Complete Application
                 </a>
               </div>
-            </div>
+            </section>
           )}
 
-        {!isAdmin &&
-          applicationStatus === "approved" &&
-          hasProfile &&
-          onboardingStatus === "active" && (
-            <div className="mt-6 space-y-6">
-              <div className="rounded-xl border p-6">
-                <h2 className="text-xl font-semibold">Welcome to the program</h2>
-                <p className="mt-2 text-gray-600">
-                  You now have access to your next steps, training, nutrition,
-                  and bookings.
+          {applicationStatus === "pending" && (
+            <section className="mt-8 rounded-3xl border bg-white p-6 shadow-sm">
+              <h2 className="text-xl font-semibold">Application submitted</h2>
+              <p className="mt-2 text-gray-600">
+                Your application is under review. You will unlock the full
+                dashboard once approved.
+              </p>
+
+              <div className="mt-4 flex flex-wrap gap-3">
+                <button
+                  onClick={refreshDashboard}
+                  disabled={refreshing}
+                  className="rounded-xl border bg-white px-4 py-2.5 text-sm font-medium disabled:opacity-50"
+                >
+                  {refreshing ? "Refreshing..." : "Refresh"}
+                </button>
+
+                <a
+                  href="/dashboard/application"
+                  className="rounded-xl border bg-white px-4 py-2.5 text-sm font-medium"
+                >
+                  View Application
+                </a>
+              </div>
+            </section>
+          )}
+
+          {applicationStatus === "rejected" && (
+            <section className="mt-8 rounded-3xl border bg-white p-6 shadow-sm">
+              <h2 className="text-xl font-semibold">Application update</h2>
+              <p className="mt-2 text-gray-600">
+                Your application was not approved at this time.
+              </p>
+
+              <div className="mt-4">
+                <a
+                  href="/dashboard/application"
+                  className="inline-flex rounded-xl border bg-white px-4 py-2.5 text-sm font-medium"
+                >
+                  View Application
+                </a>
+              </div>
+            </section>
+          )}
+
+          {applicationStatus === "approved" && !hasProfile && (
+            <section className="mt-8 rounded-3xl border bg-white p-6 shadow-sm">
+              <h2 className="text-xl font-semibold">Approved</h2>
+              <p className="mt-2 text-gray-600">
+                Your application has been approved. Your profile is being
+                prepared by the team.
+              </p>
+
+              <div className="mt-4">
+                <button
+                  onClick={refreshDashboard}
+                  disabled={refreshing}
+                  className="rounded-xl border bg-white px-4 py-2.5 text-sm font-medium disabled:opacity-50"
+                >
+                  {refreshing ? "Refreshing..." : "Refresh"}
+                </button>
+              </div>
+            </section>
+          )}
+
+          {canSeeProgramContent && (
+            <section className="mt-8 rounded-3xl border bg-white p-6 shadow-sm">
+              <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+                <div>
+                  <h2 className="text-xl font-semibold">Profile Overview</h2>
+                  <p className="mt-2 text-sm text-gray-600">
+                    Keep your participant details up to date.
+                  </p>
+                </div>
+
+                <div className="flex flex-wrap gap-3">
+                  <a
+                    href="/dashboard/profile"
+                    className="rounded-xl border bg-white px-4 py-2.5 text-sm font-medium"
+                  >
+                    Edit My Profile
+                  </a>
+
+                  {canSeeProgress && (
+                    <a
+                      href="/dashboard/progress"
+                      className="rounded-xl border bg-white px-4 py-2.5 text-sm font-medium"
+                    >
+                      Progress Photos
+                    </a>
+                  )}
+                </div>
+              </div>
+
+              <div className="mt-6 grid gap-4 md:grid-cols-2">
+                <InfoCard label="Height" value={height || "Not provided"} />
+                <InfoCard label="Weight" value={weight || "Not provided"} />
+                <InfoCard label="Allergies" value={allergies || "None provided"} />
+                <InfoCard label="Injuries" value={injuries || "None provided"} />
+              </div>
+
+              <div className="mt-4 rounded-2xl bg-gray-50 p-4">
+                <p className="text-sm font-medium text-gray-700">Notes</p>
+                <p className="mt-2 text-sm text-gray-600">
+                  {notes || "No notes provided"}
                 </p>
               </div>
+            </section>
+          )}
 
-              <div className="rounded-xl border p-6">
-                <h3 className="text-lg font-semibold">Your Profile Overview</h3>
+          {showPendingPayment && (
+            <section className="mt-8 rounded-3xl border bg-white p-6 shadow-sm">
+              <h2 className="text-xl font-semibold">Payment pending</h2>
+              <p className="mt-2 text-gray-600">
+                Your payment has not been confirmed yet.
+              </p>
+            </section>
+          )}
 
-                <div className="mt-4 space-y-2 text-sm text-gray-700">
-                  <p>
-                    <span className="font-medium">Height:</span>{" "}
-                    {height || "Not provided"}
+          {showCashMessage && (
+            <section className="mt-8 rounded-3xl border bg-white p-6 shadow-sm">
+              <h2 className="text-xl font-semibold">Payment arranged</h2>
+              <p className="mt-2 text-gray-600">
+                Your payment is arranged offline.
+              </p>
+            </section>
+          )}
+
+          {canSeeItinerary && scheduleItems.length > 0 && (
+            <section className="mt-8">
+              <div className="mb-4 flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
+                <div>
+                  <h2 className="text-2xl font-semibold tracking-tight">
+                    Your Itinerary
+                  </h2>
+                  <p className="mt-2 text-gray-600">
+                    Tap any item to see the full details.
                   </p>
-                  <p>
-                    <span className="font-medium">Weight:</span>{" "}
-                    {weight || "Not provided"}
+                </div>
+
+                {canSeeProgress && (
+                  <a
+                    href="/dashboard/progress"
+                    className="inline-flex rounded-xl border bg-white px-4 py-2.5 text-sm font-medium"
+                  >
+                    View Progress Photos
+                  </a>
+                )}
+              </div>
+
+              <div className="space-y-6">
+                {Object.entries(groupedSchedule).map(([date, items]) => (
+                  <div
+                    key={date}
+                    className="rounded-3xl border bg-white p-6 shadow-sm"
+                  >
+                    <div className="border-b pb-4">
+                      <p className="text-sm font-medium uppercase tracking-[0.2em] text-gray-500">
+                        {formatDateLabel(date)}
+                      </p>
+                      <h3 className="mt-2 text-2xl font-bold tracking-tight">
+                        {date}
+                      </h3>
+                    </div>
+
+                    <div className="mt-6 space-y-5">
+                      {items.map((item, index) => (
+                        <div key={item.id} className="flex gap-4">
+                          <div className="flex flex-col items-center">
+                            <div className="mt-2 h-3 w-3 rounded-full bg-black" />
+                            {index !== items.length - 1 && (
+                              <div className="mt-2 h-full w-px bg-gray-200" />
+                            )}
+                          </div>
+
+                          <button
+                            onClick={() => openScheduleModal(item)}
+                            className="flex-1 rounded-2xl border bg-gray-50 p-4 text-left transition hover:bg-gray-100"
+                          >
+                            <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+                              <div>
+                                <div className="flex flex-wrap items-center gap-2">
+                                  <TypeBadge type={item.type} />
+                                </div>
+
+                                <p className="mt-3 text-base font-semibold">
+                                  {item.displayTitle}
+                                </p>
+                              </div>
+
+                              <p className="text-sm font-medium text-gray-700">
+                                {item.startTime}
+                                {item.endTime ? ` - ${item.endTime}` : ""}
+                              </p>
+                            </div>
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </section>
+          )}
+
+          {canSeeItinerary && scheduleItems.length === 0 && (
+            <section className="mt-8 rounded-3xl border bg-white p-6 shadow-sm">
+              <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
+                <div>
+                  <h2 className="text-xl font-semibold">Your Itinerary</h2>
+                  <p className="mt-2 text-gray-600">
+                    Your schedule has not been added yet.
                   </p>
-                  <p>
-                    <span className="font-medium">Allergies:</span>{" "}
-                    {allergies || "None provided"}
-                  </p>
-                  <p>
-                    <span className="font-medium">Injuries:</span>{" "}
-                    {injuries || "None provided"}
-                  </p>
-                  <p>
-                    <span className="font-medium">Notes:</span>{" "}
-                    {notes || "No notes provided"}
+                </div>
+
+                {canSeeProgress && (
+                  <a
+                    href="/dashboard/progress"
+                    className="inline-flex rounded-xl border bg-white px-4 py-2.5 text-sm font-medium"
+                  >
+                    View Progress Photos
+                  </a>
+                )}
+              </div>
+            </section>
+          )}
+
+          {canSeeProgress && recentProgressPhotos.length > 0 && (
+            <section className="mt-8">
+              <div className="mb-4 flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
+                <div>
+                  <h2 className="text-2xl font-semibold tracking-tight">
+                    Your Progress
+                  </h2>
+                  <p className="mt-2 text-gray-600">
+                    Recent uploads from you and your coach.
                   </p>
                 </div>
 
                 <a
-                  href="/dashboard/profile"
-                  className="mt-4 inline-block rounded border px-4 py-2"
+                  href="/dashboard/progress"
+                  className="inline-flex rounded-xl border bg-white px-4 py-2.5 text-sm font-medium"
                 >
-                  Edit My Profile
+                  Open Full Timeline
                 </a>
               </div>
 
-              {(trainingPlanTitle || trainingPlanDetails) && (
-                <div className="rounded-xl border p-6">
-                  <h3 className="text-lg font-semibold">
-                    {trainingPlanTitle || "Training Plan"}
-                  </h3>
-                  <p className="mt-4 whitespace-pre-line text-sm text-gray-700">
-                    {trainingPlanDetails || "No training details yet."}
-                  </p>
-                </div>
-              )}
+              <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+                {recentProgressPhotos.map((photo) => (
+                  <button
+                    key={photo.id}
+                    onClick={() => openPhotoModal(photo)}
+                    className="rounded-2xl border bg-white p-3 text-left shadow-sm transition hover:shadow-md"
+                  >
+                    <div className="flex aspect-[4/5] items-center justify-center overflow-hidden rounded-xl bg-gray-100">
+                      <img
+                        src={photo.imageUrl}
+                        alt={photo.title || "Progress photo"}
+                        className="max-h-full max-w-full object-contain"
+                      />
+                    </div>
 
-              {(nutritionPlanTitle || nutritionPlanDetails) && (
-                <div className="rounded-xl border p-6">
-                  <h3 className="text-lg font-semibold">
-                    {nutritionPlanTitle || "Nutrition Plan"}
-                  </h3>
-                  <p className="mt-4 whitespace-pre-line text-sm text-gray-700">
-                    {nutritionPlanDetails || "No nutrition details yet."}
-                  </p>
-                </div>
-              )}
-            </div>
+                    <div className="mt-3">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <span className="rounded-full border bg-gray-50 px-3 py-1 text-xs font-medium text-gray-700">
+                          {photo.uploadedByRole === "admin"
+                            ? "Coach upload"
+                            : "Your upload"}
+                        </span>
+
+                        <span className="text-xs text-gray-500">
+                          {formatTimestamp(photo.createdAt)}
+                        </span>
+                      </div>
+
+                      <p className="mt-3 line-clamp-1 font-medium">
+                        {photo.title || "Progress update"}
+                      </p>
+
+                      {photo.note && (
+                        <p className="mt-1 line-clamp-2 text-sm text-gray-600">
+                          {photo.note}
+                        </p>
+                      )}
+                    </div>
+                  </button>
+                ))}
+              </div>
+            </section>
           )}
-
-        {!isAdmin && applicationStatus === "rejected" && (
-          <div className="mt-6 rounded-xl border p-6">
-            <h2 className="text-xl font-semibold">Application update</h2>
-            <p className="mt-2 text-gray-600">
-              Your application was not approved at this time.
-            </p>
-          </div>
-        )}
-
-        <button
-          onClick={logout}
-          className="mt-6 block rounded bg-gray-200 px-4 py-2"
-        >
-          Logout
-        </button>
+        </div>
       </main>
 
-      {modalData.open && (
+      {scheduleModalData.open && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-6">
-          <div className="max-h-[85vh] w-full max-w-2xl overflow-y-auto rounded-2xl bg-white p-6 shadow-xl">
+          <div className="max-h-[85vh] w-full max-w-2xl overflow-y-auto rounded-3xl bg-white p-6 shadow-xl md:p-8">
             <div className="flex items-start justify-between gap-4">
               <div>
-                <p className="text-xs uppercase tracking-[0.2em] text-gray-500">
-                  {modalData.type}
-                </p>
-                <h2 className="mt-2 text-2xl font-bold">{modalData.title}</h2>
+                {scheduleModalData.type && (
+                  <TypeBadge type={scheduleModalData.type} />
+                )}
+                <h2 className="mt-3 text-2xl font-bold tracking-tight">
+                  {scheduleModalData.title}
+                </h2>
               </div>
 
               <button
-                onClick={closeModal}
-                className="rounded border px-3 py-2 text-sm"
+                onClick={closeScheduleModal}
+                className="rounded-xl border bg-white px-3 py-2 text-sm font-medium"
               >
                 Close
               </button>
             </div>
 
-            {modalLoading ? (
+            {scheduleModalLoading ? (
               <p className="mt-6 text-gray-600">Loading details...</p>
             ) : (
               <div className="mt-6">
-                {modalData.description && (
+                {scheduleModalData.description && (
                   <p className="mb-4 text-sm text-gray-600">
-                    {modalData.description}
+                    {scheduleModalData.description}
                   </p>
                 )}
 
-                <div className="whitespace-pre-line rounded-xl border bg-gray-50 p-4 text-sm text-gray-800">
-                  {modalData.content}
+                <div className="whitespace-pre-line rounded-2xl bg-gray-50 p-4 text-sm text-gray-800">
+                  {scheduleModalData.content}
                 </div>
               </div>
             )}
           </div>
         </div>
       )}
+
+      {photoModalData.open && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4 md:p-8">
+          <div className="max-h-[90vh] w-full max-w-5xl overflow-y-auto rounded-3xl bg-white p-4 shadow-xl md:p-6">
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <span className="rounded-full border bg-gray-50 px-3 py-1 text-xs font-medium text-gray-700">
+                  {photoModalData.uploadedByRole === "admin"
+                    ? "Coach upload"
+                    : "Your upload"}
+                </span>
+
+                <h2 className="mt-3 text-2xl font-bold tracking-tight">
+                  {photoModalData.title}
+                </h2>
+
+                {photoModalData.note && (
+                  <p className="mt-2 text-sm text-gray-600">
+                    {photoModalData.note}
+                  </p>
+                )}
+              </div>
+
+              <button
+                onClick={closePhotoModal}
+                className="rounded-xl border bg-white px-3 py-2 text-sm font-medium"
+              >
+                Close
+              </button>
+            </div>
+
+            <div className="mt-6 flex justify-center rounded-2xl bg-gray-50 p-4">
+              <img
+                src={photoModalData.imageUrl}
+                alt={photoModalData.title}
+                className="max-h-[72vh] w-auto max-w-full rounded-2xl object-contain"
+              />
+            </div>
+          </div>
+        </div>
+      )}
     </>
   );
+}
+
+function TypeBadge({ type }: { type: ScheduleType }) {
+  return (
+    <span className="inline-flex rounded-full border px-3 py-1 text-xs font-medium uppercase tracking-wide text-gray-800">
+      {type}
+    </span>
+  );
+}
+
+function InfoCard({
+  label,
+  value,
+}: {
+  label: string;
+  value: string;
+}) {
+  return (
+    <div className="rounded-2xl bg-gray-50 p-4">
+      <p className="text-sm font-medium text-gray-700">{label}</p>
+      <p className="mt-2 text-sm text-gray-600">{value}</p>
+    </div>
+  );
+}
+
+function StatusCard({
+  label,
+  value,
+}: {
+  label: string;
+  value: string;
+}) {
+  return (
+    <div className="rounded-2xl bg-gray-50 p-4">
+      <p className="text-sm font-medium text-gray-700">{label}</p>
+      <p className="mt-2 text-sm font-semibold text-gray-900 capitalize">
+        {value}
+      </p>
+    </div>
+  );
+}
+
+function formatDateLabel(date: string) {
+  const parsed = new Date(`${date}T12:00:00`);
+  return parsed.toLocaleDateString("en-US", {
+    weekday: "long",
+    month: "long",
+    day: "numeric",
+  });
+}
+
+function formatTimestamp(
+  createdAt?: { seconds?: number; nanoseconds?: number }
+) {
+  if (!createdAt?.seconds) return "No date";
+
+  const date = new Date(createdAt.seconds * 1000);
+
+  return date.toLocaleDateString("en-US", {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+  });
 }
