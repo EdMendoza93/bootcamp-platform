@@ -199,6 +199,34 @@ export default function AdminPage() {
         <MetricCard label="Active Clients" value={String(activeClients)} />
       </div>
 
+      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+        <QuickLinkCard
+          href="/admin/applications"
+          title="Applications"
+          description="Review incoming applications and move clients forward."
+        />
+        <QuickLinkCard
+          href="/admin/profiles"
+          title="Profiles"
+          description="Manage client profiles, onboarding, payment, and status."
+        />
+        <QuickLinkCard
+          href="/admin/schedule"
+          title="Schedule"
+          description="Create itinerary items using templates or custom notes."
+        />
+        <QuickLinkCard
+          href="/admin/templates"
+          title="Templates"
+          description="Manage reusable training, nutrition, and activity templates."
+        />
+        <QuickLinkCard
+          href="/admin/progress"
+          title="Progress"
+          description="Review client progress photo uploads and status."
+        />
+      </div>
+
       <div className="grid gap-6 xl:grid-cols-2">
         <section className="rounded-2xl border bg-white p-6 shadow-sm">
           <div className="mb-4">
@@ -264,34 +292,6 @@ export default function AdminPage() {
             </div>
           )}
         </section>
-      </div>
-
-      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
-        <QuickLinkCard
-          href="/admin/applications"
-          title="Applications"
-          description="Review incoming applications and move clients forward."
-        />
-        <QuickLinkCard
-          href="/admin/profiles"
-          title="Profiles"
-          description="Manage client profiles, onboarding, payment, and status."
-        />
-        <QuickLinkCard
-          href="/admin/schedule"
-          title="Schedule"
-          description="Create itinerary items using templates or custom notes."
-        />
-        <QuickLinkCard
-          href="/admin/templates"
-          title="Templates"
-          description="Manage reusable training, nutrition, and activity templates."
-        />
-        <QuickLinkCard
-          href="/admin/progress"
-          title="Progress"
-          description="Review client progress photo uploads and status."
-        />
       </div>
     </div>
   );
