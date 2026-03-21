@@ -10,15 +10,19 @@ export default function AdminRoute({
   children: React.ReactNode;
 }) {
   const router = useRouter();
-  const { firebaseUser, appUser, loading } = useAuth();
+  const { firebaseUser, appUser, authLoading, profileLoading } = useAuth();
+
+  const loading = authLoading || profileLoading;
 
   useEffect(() => {
-    if (!loading && !firebaseUser) {
+    if (loading) return;
+
+    if (!firebaseUser) {
       router.replace("/login");
       return;
     }
 
-    if (!loading && firebaseUser && appUser?.role !== "admin") {
+    if (appUser && appUser.role !== "admin") {
       router.replace("/dashboard");
     }
   }, [firebaseUser, appUser, loading, router]);
@@ -27,7 +31,13 @@ export default function AdminRoute({
     return <p className="p-10">Loading...</p>;
   }
 
-  if (!firebaseUser || appUser?.role !== "admin") return null;
+  if (!firebaseUser) {
+    return null;
+  }
+
+  if (!appUser || appUser.role !== "admin") {
+    return null;
+  }
 
   return <>{children}</>;
 }

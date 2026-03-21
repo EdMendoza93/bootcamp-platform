@@ -12,6 +12,7 @@ import {
   signOut,
 } from "firebase/auth";
 import { doc, getDoc } from "firebase/firestore";
+import { useToast } from "@/components/ui/ToastProvider";
 
 async function routeAfterLogin(uid: string) {
   try {
@@ -38,6 +39,7 @@ export default function LoginPage() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
+  const { showToast } = useToast();
 
   const login = async () => {
     setLoading(true);
@@ -45,9 +47,20 @@ export default function LoginPage() {
     try {
       await setPersistence(auth, browserLocalPersistence);
       const credential = await signInWithEmailAndPassword(auth, email, password);
+
+      showToast({
+        title: "Login successful",
+        description: "Redirecting to your account.",
+        type: "success",
+      });
+
       await routeAfterLogin(credential.user.uid);
     } catch (err: any) {
-      alert(err.message);
+      showToast({
+        title: "Login failed",
+        description: err.message || "Something went wrong.",
+        type: "error",
+      });
     } finally {
       setLoading(false);
     }
@@ -64,9 +77,19 @@ export default function LoginPage() {
         password
       );
 
+      showToast({
+        title: "Account created",
+        description: "Redirecting to your account.",
+        type: "success",
+      });
+
       await routeAfterLogin(credential.user.uid);
     } catch (err: any) {
-      alert(err.message);
+      showToast({
+        title: "Signup failed",
+        description: err.message || "Something went wrong.",
+        type: "error",
+      });
     } finally {
       setLoading(false);
     }
@@ -79,9 +102,20 @@ export default function LoginPage() {
       await setPersistence(auth, browserLocalPersistence);
       const provider = new GoogleAuthProvider();
       const credential = await signInWithPopup(auth, provider);
+
+      showToast({
+        title: "Google login successful",
+        description: "Redirecting to your account.",
+        type: "success",
+      });
+
       await routeAfterLogin(credential.user.uid);
     } catch (err: any) {
-      alert(err.message);
+      showToast({
+        title: "Google login failed",
+        description: err.message || "Something went wrong.",
+        type: "error",
+      });
     } finally {
       setLoading(false);
     }
@@ -90,9 +124,17 @@ export default function LoginPage() {
   const resetSession = async () => {
     try {
       await signOut(auth);
-      alert("Session reset");
+      showToast({
+        title: "Session reset",
+        description: "You have been signed out.",
+        type: "success",
+      });
     } catch (err: any) {
-      alert(err.message);
+      showToast({
+        title: "Could not reset session",
+        description: err.message || "Something went wrong.",
+        type: "error",
+      });
     }
   };
 

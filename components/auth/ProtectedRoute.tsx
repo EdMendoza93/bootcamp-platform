@@ -10,20 +10,16 @@ export default function ProtectedRoute({
   children: React.ReactNode;
 }) {
   const router = useRouter();
-  const { firebaseUser, loading } = useAuth();
+  const { firebaseUser, authLoading } = useAuth();
 
   useEffect(() => {
-    if (!loading && !firebaseUser) {
+    if (!authLoading && !firebaseUser) {
       router.replace("/login");
     }
-  }, [firebaseUser, loading, router]);
+  }, [firebaseUser, authLoading, router]);
 
-  if (loading) {
-    return (
-      <div className="flex min-h-screen items-center justify-center">
-        Loading...
-      </div>
-    );
+  if (authLoading) {
+    return <p className="p-10">Loading...</p>;
   }
 
   if (!firebaseUser) return null;
