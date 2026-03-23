@@ -12,7 +12,6 @@ import {
   signInWithEmailAndPassword,
   signInWithPopup,
   signInWithRedirect,
-  signOut,
   User,
 } from "firebase/auth";
 import { doc, getDoc } from "firebase/firestore";
@@ -211,23 +210,6 @@ export default function LoginPage() {
     }
   };
 
-  const resetSession = async () => {
-    try {
-      await signOut(auth);
-      routedRef.current = false;
-      showToast({
-        title: "Session reset",
-        description: "You have been signed out.",
-        type: "success",
-      });
-    } catch (err: any) {
-      showToast({
-        title: "Could not reset session",
-        description: err.message || "Something went wrong.",
-        type: "error",
-      });
-    }
-  };
 
   if (checkingRedirect) {
     return (
@@ -343,12 +325,6 @@ export default function LoginPage() {
                 {loading ? "Loading..." : "Continue with Google"}
               </button>
 
-              <button
-                onClick={resetSession}
-                className="w-full rounded-2xl border border-slate-200 bg-slate-50 py-3.5 text-sm font-medium text-slate-600 transition-all duration-200 hover:-translate-y-0.5 hover:border-slate-300 hover:bg-white hover:shadow-sm"
-              >
-                Reset session
-              </button>
             </div>
           </div>
         </section>
