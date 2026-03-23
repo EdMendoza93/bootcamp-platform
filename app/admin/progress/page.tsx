@@ -33,13 +33,8 @@ export default function ProgressPage() {
   const [uploading, setUploading] = useState(false);
 
   const [progressPhotosEnabled, setProgressPhotosEnabled] = useState(false);
-
-  const [applicationStatus, setApplicationStatus] = useState<
-    "none" | "pending" | "approved" | "rejected"
-  >("none");
-
-  const [onboardingStatus, setOnboardingStatus] = useState<
-    "none" | "incomplete" | "active"
+  const [approvalStatus, setApprovalStatus] = useState<
+    "pending" | "approved" | "rejected" | "none"
   >("none");
 
   useEffect(() => {
@@ -50,19 +45,6 @@ export default function ProgressPage() {
       }
 
       try {
-        // 🔹 GET APPLICATION STATUS
-        const appSnap = await getDocs(
-          query(collection(db, "applications"), where("userId", "==", user.uid))
-        );
-
-        if (!appSnap.empty) {
-          const appData = appSnap.docs[0].data() as {
-            status?: "pending" | "approved" | "rejected";
-          };
-          setApplicationStatus(appData.status || "none");
-        }
-
-        // 🔹 GET PROFILE
         const profileSnap = await getDocs(
           query(collection(db, "profiles"), where("userId", "==", user.uid))
         );
@@ -72,14 +54,13 @@ export default function ProgressPage() {
           const pid = profileDoc.id;
           const data = profileDoc.data() as {
             progressPhotosEnabled?: boolean;
-            onboardingStatus?: "none" | "incomplete" | "active";
+            approvalStatus?: "pending" | "approved" | "rejected";
           };
 
           setProfileId(pid);
           setProgressPhotosEnabled(data.progressPhotosEnabled === true);
-          setOnboardingStatus(data.onboardingStatus || "none");
+          setApprovalStatus(data.approvalStatus || "none");
 
-          // 🔹 GET PHOTOS
           const photosSnap = await getDocs(
             query(collection(db, "progressPhotos"), where("profileId", "==", pid))
           );
@@ -101,8 +82,7 @@ export default function ProgressPage() {
     return () => unsubscribe();
   }, []);
 
-  const uploadsLocked =
-    applicationStatus !== "approved" || onboardingStatus !== "active";
+  const uploadLockedByApproval = approvalStatus !== "approved";
 
   const uploadPhoto = async () => {
     if (!file || !profileId) return;
@@ -145,7 +125,6 @@ export default function ProgressPage() {
 
   return (
     <div className="space-y-8">
-      {/* HEADER */}
       <section className="rounded-[32px] border bg-white p-8 shadow-sm">
         <h1 className="text-3xl font-bold">Your Progress</h1>
         <p className="mt-2 text-gray-600">
@@ -153,8 +132,7 @@ export default function ProgressPage() {
         </p>
       </section>
 
-      {/* 🔒 BLOCKED STATE */}
-      {uploadsLocked ? (
+      {uploadLockedByApproval ? (
         <section className="rounded-[32px] border bg-white p-6 shadow-sm">
           <h2 className="text-xl font-semibold">
             Progress photos will unlock soon
@@ -164,7 +142,6 @@ export default function ProgressPage() {
           </p>
         </section>
       ) : !progressPhotosEnabled ? (
-        /* ⚠️ NOT ENABLED BY ADMIN */
         <section className="rounded-[32px] border bg-white p-6 shadow-sm">
           <h2 className="text-xl font-semibold">Uploads not enabled yet</h2>
           <p className="mt-2 text-gray-600">
@@ -172,74 +149,69 @@ export default function ProgressPage() {
           </p>
         </section>
       ) : (
-        <>
-          {/* UPLOAD */}
-          <section className="rounded-[32px] border bg-white p-6 shadow-sm">
-            <h2 className="text-xl font-semibold">Upload new photo</h2>
+        <section className="rounded-[32px] border bg-white p-6 shadow-sm">
+          <h2 className="text-xl font-semibold">Upload new photo</h2>
 
-            <div className="mt-4 space-y-3">
-              <input
-                type="file"
-                onChange={(e) => setFile(e.target.files?.[0] || null)}
-              />
+          <div className="mt-4 space-y-3">
+            <input
+              type="file"
+              onChange={(e) => setFile(e.target.files?.[0] || null)}
+            />
 
-              <input
-                type="text"
-                placeholder="Title (optional)"
-                value={title}
-                onChange={(e) => setTitle(e.target.value)}
-                className="w-full rounded-xl border p-3"
-              />
+            <input
+              type="text"
+              placeholder="Title (optional)"
+              value={title}
+              onChange={(e) => setTitle(e.target.value)}
+              className="w-full rounded-xl border p-3"
+            />
 
-              <textarea
-                placeholder="Note (optional)"
-                value={note}
-                onChange={(e) => setNote(e.target.value)}
-                className="w-full rounded-xl border p-3"
-              />
+            <textarea
+              placeholder="Note (optional)"
+              value={note}
+              onChange={(e) => setNote(e.target.value)}
+              className="w-full rounded-xl border p-3"
+            />
 
-              <button
-                onClick={uploadPhoto}
-                disabled={uploading}
-                className="rounded-xl bg-black px-6 py-3 text-white"
-              >
-                {uploading ? "Uploading..." : "Upload"}
-              </button>
-            </div>
-          </section>
-
-          {/* GALLERY */}
-          <section className="rounded-[32px] border bg-white p-6 shadow-sm">
-            <h2 className="text-xl font-semibold">Your Photos</h2>
-
-            {photos.length === 0 ? (
-              <p className="mt-4 text-gray-500">
-                No photos yet. Start your journey today.
-              </p>
-            ) : (
-              <div className="mt-6 grid gap-4 md:grid-cols-3">
-                {photos.map((photo) => (
-                  <div key={photo.id} className="rounded-2xl border p-3">
-                    <img
-                      src={photo.imageUrl}
-                      className="rounded-xl"
-                      alt=""
-                    />
-
-                    <p className="mt-2 font-medium">
-                      {photo.title || "Progress"}
-                    </p>
-
-                    {photo.note && (
-                      <p className="text-sm text-gray-600">{photo.note}</p>
-                    )}
-                  </div>
-                ))}
-              </div>
-            )}
-          </section>
-        </>
+            <button
+              onClick={uploadPhoto}
+              disabled={uploading}
+              className="rounded-xl bg-black px-6 py-3 text-white"
+            >
+              {uploading ? "Uploading..." : "Upload"}
+            </button>
+          </div>
+        </section>
       )}
+
+      <section className="rounded-[32px] border bg-white p-6 shadow-sm">
+        <h2 className="text-xl font-semibold">Your Photo Timeline</h2>
+        <p className="mt-2 text-gray-600">
+          A visual timeline of your progress updates.
+        </p>
+
+        {photos.length === 0 ? (
+          <div className="mt-6 rounded-2xl border border-dashed p-10 text-center text-sm text-gray-500">
+            No photos yet. Start your journey today.
+          </div>
+        ) : (
+          <div className="mt-6 grid gap-4 md:grid-cols-3">
+            {photos.map((photo) => (
+              <div key={photo.id} className="rounded-2xl border p-3">
+                <img src={photo.imageUrl} className="rounded-xl" alt="" />
+
+                <p className="mt-2 font-medium">
+                  {photo.title || "Progress"}
+                </p>
+
+                {photo.note && (
+                  <p className="text-sm text-gray-600">{photo.note}</p>
+                )}
+              </div>
+            ))}
+          </div>
+        )}
+      </section>
     </div>
   );
 }
