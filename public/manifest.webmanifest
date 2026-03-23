@@ -1,7 +1,6 @@
 {
   "name": "Wild Atlantic Bootcamp",
   "short_name": "Bootcamp",
-  "description": "Premium fitness bootcamp platform",
   "start_url": "/",
   "display": "standalone",
   "background_color": "#f7fbff",
