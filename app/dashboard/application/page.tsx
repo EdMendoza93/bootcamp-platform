@@ -197,126 +197,114 @@ export default function ApplicationPage() {
 
   if (loading) {
     return (
-      <main className="min-h-screen px-6 py-8 md:px-10 md:py-10">
-        <div className="mx-auto max-w-4xl">
-          <div className="rounded-[28px] border border-white/70 bg-white/90 p-8 shadow-[0_20px_60px_rgba(15,23,42,0.08)] backdrop-blur">
-            <p className="text-sm font-medium text-slate-500">
-              Loading your application...
-            </p>
-          </div>
-        </div>
-      </main>
+      <div className="rounded-[28px] border border-white/70 bg-white/90 p-8 shadow-[0_20px_60px_rgba(15,23,42,0.08)] backdrop-blur">
+        <p className="text-sm font-medium text-slate-500">
+          Loading your application...
+        </p>
+      </div>
     );
   }
 
   return (
-    <main className="min-h-screen px-6 py-8 md:px-10 md:py-10">
-      <div className="mx-auto max-w-4xl space-y-8">
+    <>
+      <div className="mx-auto max-w-4xl space-y-8 pb-28">
         <section className="overflow-hidden rounded-[32px] border border-white/70 bg-white/90 shadow-[0_24px_80px_rgba(15,23,42,0.10)] backdrop-blur">
-          <div className="bg-gradient-to-r from-[#0f172a] via-[#123b76] to-[#2EA0FF] p-[1px]">
+          <div className="bg-gradient-to-r from-[#071120] via-[#123b76] to-[#2EA0FF] p-[1px]">
             <div className="rounded-t-[31px] bg-transparent px-0 py-0" />
           </div>
 
-          <div className="p-6 md:p-8">
-            <div className="inline-flex items-center rounded-full border border-[#bfdbfe] bg-[#eff6ff] px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.2em] text-[#1d4ed8]">
-              Wild Atlantic Bootcamp
+          <div className="relative overflow-hidden p-6 md:p-8">
+            <div className="absolute right-0 top-0 h-40 w-40 rounded-full bg-[#2EA0FF]/10 blur-3xl" />
+            <div className="absolute bottom-0 left-0 h-32 w-32 rounded-full bg-emerald-300/10 blur-3xl" />
+
+            <div className="relative">
+              <div className="inline-flex items-center rounded-full border border-[#bfdbfe] bg-[#eff6ff] px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.2em] text-[#1d4ed8]">
+                Wild Atlantic Bootcamp
+              </div>
+
+              <h1 className="mt-4 text-3xl font-semibold tracking-tight text-slate-950 md:text-4xl">
+                Bootcamp Application
+              </h1>
+
+              <p className="mt-3 max-w-2xl text-sm text-slate-600 md:text-base">
+                Complete your application to join the program. Once submitted,
+                the team will review your details and guide you through the next
+                steps.
+              </p>
             </div>
-
-            <h1 className="mt-4 text-3xl font-semibold tracking-tight text-slate-950 md:text-4xl">
-              Bootcamp Application
-            </h1>
-
-            <p className="mt-3 max-w-2xl text-sm text-slate-600 md:text-base">
-              Complete your application to join the program. Once submitted,
-              the team will review your details and guide you through the next
-              steps.
-            </p>
           </div>
         </section>
 
         {existingApplication ? (
-          <section className="rounded-[28px] border border-white/70 bg-white/90 p-6 shadow-[0_18px_50px_rgba(15,23,42,0.07)] backdrop-blur md:p-8">
-            <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
-              <div className="max-w-2xl">
-                <p className="text-sm font-semibold uppercase tracking-[0.18em] text-[#1d4ed8]">
-                  Current status
-                </p>
+          <>
+            <section className="rounded-[28px] border border-white/70 bg-white/90 p-6 shadow-[0_18px_50px_rgba(15,23,42,0.07)] backdrop-blur md:p-8">
+              <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
+                <div className="max-w-2xl">
+                  <p className="text-sm font-semibold uppercase tracking-[0.18em] text-[#1d4ed8]">
+                    Current status
+                  </p>
 
-                <div className="mt-3 flex flex-wrap items-center gap-3">
-                  <h2 className="text-2xl font-semibold capitalize text-slate-950">
-                    {existingApplication.status}
-                  </h2>
-                  <StatusBadge status={existingApplication.status} />
+                  <div className="mt-3 flex flex-wrap items-center gap-3">
+                    <h2 className="text-2xl font-semibold text-slate-950">
+                      {formatStatusLabel(existingApplication.status)}
+                    </h2>
+                    <StatusBadge status={existingApplication.status} />
+                  </div>
+
+                  <p className="mt-3 text-sm leading-6 text-slate-600">
+                    {statusText}
+                  </p>
                 </div>
 
-                <p className="mt-3 text-sm leading-6 text-slate-600">
-                  {statusText}
+                <a
+                  href="/dashboard"
+                  className="inline-flex items-center justify-center rounded-2xl bg-gradient-to-r from-[#2EA0FF] to-[#1B6EDC] px-5 py-3 text-sm font-medium text-white shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md"
+                >
+                  Go to Dashboard
+                </a>
+              </div>
+            </section>
+
+            <section className="rounded-[28px] border border-white/70 bg-white/90 p-6 shadow-[0_18px_50px_rgba(15,23,42,0.07)] backdrop-blur md:p-8">
+              <SectionHeader
+                eyebrow="Submitted details"
+                title="Application Summary"
+                description="Here is the information currently attached to your application."
+              />
+
+              <div className="mt-6 grid gap-4 md:grid-cols-2">
+                <InfoCard label="Name" value={existingApplication.fullName || "—"} />
+                <InfoCard label="Age" value={existingApplication.age || "—"} />
+                <InfoCard label="Phone" value={existingApplication.phone || "—"} />
+                <InfoCard label="Goal" value={existingApplication.goal || "—"} />
+              </div>
+
+              <div className="mt-4 rounded-[22px] border border-slate-100 bg-gradient-to-br from-slate-50 to-white p-4">
+                <p className="text-sm font-semibold text-slate-700">
+                  Training experience
+                </p>
+                <p className="mt-2 text-sm leading-6 text-slate-600">
+                  {existingApplication.experience || "—"}
                 </p>
               </div>
 
-              <a
-                href="/dashboard"
-                className="inline-flex items-center justify-center rounded-2xl bg-gradient-to-r from-[#2EA0FF] to-[#1B6EDC] px-4 py-2.5 text-sm font-medium text-white shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md"
-              >
-                Go to Dashboard
-              </a>
-            </div>
-
-            <div className="mt-6 grid gap-4 md:grid-cols-2">
-              <InfoCard label="Name" value={existingApplication.fullName || "—"} />
-              <InfoCard label="Age" value={existingApplication.age || "—"} />
-              <InfoCard label="Phone" value={existingApplication.phone || "—"} />
-              <InfoCard label="Goal" value={existingApplication.goal || "—"} />
-            </div>
-
-            <div className="mt-4 rounded-[22px] border border-slate-100 bg-gradient-to-br from-slate-50 to-white p-4">
-              <p className="text-sm font-semibold text-slate-700">
-                Training experience
-              </p>
-              <p className="mt-2 text-sm leading-6 text-slate-600">
-                {existingApplication.experience || "—"}
-              </p>
-            </div>
-
-            <div className="mt-4 rounded-[22px] border border-slate-100 bg-gradient-to-br from-slate-50 to-white p-4">
-              <p className="text-sm font-semibold text-slate-700">
-                Medical notes
-              </p>
-              <p className="mt-2 text-sm leading-6 text-slate-600">
-                {existingApplication.medicalNotes || "None provided"}
-              </p>
-            </div>
-
-            <div className="mt-6 flex flex-wrap gap-3">
-              <button
-                onClick={refreshStatus}
-                disabled={refreshing}
-                className="rounded-2xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-medium text-slate-700 shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:border-slate-300 hover:shadow-md disabled:cursor-not-allowed disabled:opacity-50"
-              >
-                {refreshing ? "Refreshing..." : "Refresh Status"}
-              </button>
-
-              <a
-                href="/dashboard"
-                className="rounded-2xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-medium text-slate-700 shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:border-slate-300 hover:shadow-md"
-              >
-                Back to Dashboard
-              </a>
-            </div>
-          </section>
+              <div className="mt-4 rounded-[22px] border border-slate-100 bg-gradient-to-br from-slate-50 to-white p-4">
+                <p className="text-sm font-semibold text-slate-700">
+                  Medical notes
+                </p>
+                <p className="mt-2 text-sm leading-6 text-slate-600">
+                  {existingApplication.medicalNotes || "None provided"}
+                </p>
+              </div>
+            </section>
+          </>
         ) : (
           <section className="rounded-[28px] border border-white/70 bg-white/90 p-6 shadow-[0_18px_50px_rgba(15,23,42,0.07)] backdrop-blur md:p-8">
-            <div className="max-w-2xl">
-              <p className="text-sm font-semibold uppercase tracking-[0.18em] text-[#1d4ed8]">
-                Application form
-              </p>
-              <h2 className="mt-2 text-2xl font-semibold tracking-tight text-slate-950">
-                Your Details
-              </h2>
-              <p className="mt-2 text-sm leading-6 text-slate-600">
-                Fill in the information below to submit your application.
-              </p>
-            </div>
+            <SectionHeader
+              eyebrow="Application form"
+              title="Your Details"
+              description="Fill in the information below to submit your application."
+            />
 
             <div className="mt-6 grid gap-4 md:grid-cols-2">
               <FieldGroup label="Full name" required>
@@ -382,13 +370,50 @@ export default function ApplicationPage() {
                   placeholder="Injuries, medical notes, or any relevant information"
                   value={form.medicalNotes}
                   onChange={(e) =>
-                    setForm((prev) => ({ ...prev, medicalNotes: e.target.value }))
+                    setForm((prev) => ({
+                      ...prev,
+                      medicalNotes: e.target.value,
+                    }))
                   }
                 />
               </FieldGroup>
             </div>
+          </section>
+        )}
+      </div>
 
-            <div className="mt-6 flex flex-wrap gap-3">
+      <div className="fixed bottom-0 left-0 right-0 z-40 border-t border-white/70 bg-white/85 backdrop-blur">
+        <div className="mx-auto flex max-w-7xl items-center justify-between gap-4 px-4 py-4 md:px-8">
+          <div>
+            <p className="text-sm font-semibold text-slate-900">
+              {existingApplication
+                ? "Check your application status"
+                : "Submit your application"}
+            </p>
+            <p className="text-xs text-slate-500">
+              {existingApplication
+                ? "Refresh to see if anything has changed."
+                : "Make sure your information is complete before submitting."}
+            </p>
+          </div>
+
+          <div className="flex gap-3">
+            <a
+              href="/dashboard"
+              className="rounded-2xl border border-slate-200 bg-white px-5 py-3 text-sm font-medium text-slate-700 shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:border-slate-300 hover:shadow-md"
+            >
+              Back
+            </a>
+
+            {existingApplication ? (
+              <button
+                onClick={refreshStatus}
+                disabled={refreshing}
+                className="rounded-2xl bg-gradient-to-r from-[#2EA0FF] to-[#1B6EDC] px-6 py-3 text-sm font-medium text-white shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                {refreshing ? "Refreshing..." : "Refresh Status"}
+              </button>
+            ) : (
               <button
                 onClick={submitApplication}
                 disabled={submitting}
@@ -396,18 +421,35 @@ export default function ApplicationPage() {
               >
                 {submitting ? "Submitting..." : "Submit Application"}
               </button>
-
-              <a
-                href="/dashboard"
-                className="rounded-2xl border border-slate-200 bg-white px-6 py-3 text-sm font-medium text-slate-700 shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:border-slate-300 hover:shadow-md"
-              >
-                Cancel
-              </a>
-            </div>
-          </section>
-        )}
+            )}
+          </div>
+        </div>
       </div>
-    </main>
+    </>
+  );
+}
+
+function SectionHeader({
+  eyebrow,
+  title,
+  description,
+}: {
+  eyebrow: string;
+  title: string;
+  description?: string;
+}) {
+  return (
+    <div className="max-w-2xl">
+      <p className="text-sm font-semibold uppercase tracking-[0.18em] text-[#1d4ed8]">
+        {eyebrow}
+      </p>
+      <h2 className="mt-2 text-2xl font-semibold tracking-tight text-slate-950">
+        {title}
+      </h2>
+      {description && (
+        <p className="mt-2 text-sm leading-6 text-slate-600">{description}</p>
+      )}
+    </div>
   );
 }
 
@@ -424,9 +466,9 @@ function StatusBadge({
 
   return (
     <span
-      className={`rounded-full border px-3 py-1 text-xs font-semibold capitalize ${styles[status]}`}
+      className={`rounded-full border px-3 py-1 text-xs font-semibold ${styles[status]}`}
     >
-      {status}
+      {formatStatusLabel(status)}
     </span>
   );
 }
@@ -460,4 +502,10 @@ function FieldGroup({
       {children}
     </div>
   );
+}
+
+function formatStatusLabel(status: ApplicationStatus) {
+  if (status === "pending") return "Pending";
+  if (status === "approved") return "Approved";
+  return "Not approved";
 }

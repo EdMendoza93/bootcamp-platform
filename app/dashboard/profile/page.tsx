@@ -208,75 +208,72 @@ export default function DashboardProfilePage() {
 
   if (loading) {
     return (
-      <main className="min-h-screen px-6 py-8 md:px-10 md:py-10">
-        <div className="mx-auto max-w-5xl">
-          <div className="rounded-[28px] border border-white/70 bg-white/90 p-8 shadow-[0_20px_60px_rgba(15,23,42,0.08)] backdrop-blur">
-            <p className="text-sm font-medium text-slate-500">
-              Loading your profile...
-            </p>
-          </div>
-        </div>
-      </main>
+      <div className="rounded-[28px] border border-white/70 bg-white/90 p-8 shadow-[0_20px_60px_rgba(15,23,42,0.08)] backdrop-blur">
+        <p className="text-sm font-medium text-slate-500">
+          Loading your profile...
+        </p>
+      </div>
     );
   }
 
   if (!hasProfile) {
     return (
-      <main className="min-h-screen px-6 py-8 md:px-10 md:py-10">
-        <div className="mx-auto max-w-4xl">
-          <section className="rounded-[28px] border border-white/70 bg-white/90 p-6 shadow-[0_18px_50px_rgba(15,23,42,0.07)] backdrop-blur md:p-8">
-            <div className="inline-flex items-center rounded-full border border-[#bfdbfe] bg-[#eff6ff] px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.2em] text-[#1d4ed8]">
-              Profile
-            </div>
+      <div className="mx-auto max-w-4xl">
+        <section className="rounded-[28px] border border-white/70 bg-white/90 p-6 shadow-[0_18px_50px_rgba(15,23,42,0.07)] backdrop-blur md:p-8">
+          <div className="inline-flex items-center rounded-full border border-[#bfdbfe] bg-[#eff6ff] px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.2em] text-[#1d4ed8]">
+            Profile
+          </div>
 
-            <h1 className="mt-4 text-3xl font-semibold tracking-tight text-slate-950">
-              Your Profile
-            </h1>
+          <h1 className="mt-4 text-3xl font-semibold tracking-tight text-slate-950">
+            Your Profile
+          </h1>
 
-            <p className="mt-3 max-w-2xl text-slate-600">
-              Your profile has not been created yet. Once the team prepares it,
-              you will be able to complete your details here.
-            </p>
+          <p className="mt-3 max-w-2xl text-slate-600">
+            Your profile has not been created yet. Once the team prepares it,
+            you will be able to complete your details here.
+          </p>
 
-            <div className="mt-6 flex flex-wrap gap-3">
-              <a
-                href="/dashboard"
-                className="inline-flex items-center justify-center rounded-2xl bg-gradient-to-r from-[#2EA0FF] to-[#1B6EDC] px-4 py-2.5 text-sm font-medium text-white shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md"
-              >
-                Back to Dashboard
-              </a>
-            </div>
-          </section>
-        </div>
-      </main>
+          <div className="mt-6 flex flex-wrap gap-3">
+            <a
+              href="/dashboard"
+              className="inline-flex items-center justify-center rounded-2xl bg-gradient-to-r from-[#2EA0FF] to-[#1B6EDC] px-4 py-2.5 text-sm font-medium text-white shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md"
+            >
+              Back to Dashboard
+            </a>
+          </div>
+        </section>
+      </div>
     );
   }
 
   return (
-    <main className="min-h-screen px-6 py-8 md:px-10 md:py-10">
-      <div className="mx-auto max-w-5xl space-y-8">
+    <>
+      <div className="mx-auto max-w-5xl space-y-8 pb-28">
         <section className="overflow-hidden rounded-[32px] border border-white/70 bg-white/90 shadow-[0_24px_80px_rgba(15,23,42,0.10)] backdrop-blur">
-          <div className="bg-gradient-to-r from-[#0f172a] via-[#123b76] to-[#2EA0FF] p-[1px]">
+          <div className="bg-gradient-to-r from-[#071120] via-[#123b76] to-[#2EA0FF] p-[1px]">
             <div className="rounded-t-[31px] bg-transparent px-0 py-0" />
           </div>
 
-          <div className="p-6 md:p-8">
-            <div className="flex flex-col gap-6 md:flex-row md:items-start md:justify-between">
+          <div className="relative overflow-hidden p-6 md:p-8">
+            <div className="absolute right-0 top-0 h-40 w-40 rounded-full bg-[#2EA0FF]/10 blur-3xl" />
+            <div className="absolute bottom-0 left-0 h-32 w-32 rounded-full bg-emerald-300/10 blur-3xl" />
+
+            <div className="relative flex flex-col gap-6 md:flex-row md:items-start md:justify-between">
               <div>
                 <div className="inline-flex items-center rounded-full border border-[#bfdbfe] bg-[#eff6ff] px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.2em] text-[#1d4ed8]">
-                  Wild Atlantic Bootcamp
+                  My profile
                 </div>
 
                 <h1 className="mt-4 text-3xl font-semibold tracking-tight text-slate-950 md:text-4xl">
-                  My Profile
+                  Personal Details
                 </h1>
 
-                <p className="mt-3 text-sm text-slate-600 md:text-base">
-                  Keep your participant details up to date so your plan can be
-                  tailored properly.
+                <p className="mt-3 max-w-2xl text-sm text-slate-600 md:text-base">
+                  Keep your information updated so your plan, support, and
+                  guidance can be tailored properly.
                 </p>
 
-                <div className="mt-4 inline-flex items-center rounded-2xl border border-slate-200 bg-slate-50 px-4 py-2 text-sm text-slate-700">
+                <div className="mt-4 inline-flex items-center rounded-2xl border border-slate-200 bg-white px-4 py-2 text-sm text-slate-700 shadow-sm">
                   {userEmail}
                 </div>
               </div>
@@ -290,8 +287,8 @@ export default function DashboardProfilePage() {
             </div>
 
             <div className="mt-8 grid gap-4 sm:grid-cols-3">
-              <StatusCard label="Profile status" value={form.onboardingStatus} />
-              <StatusCard label="Payment" value={form.paymentStatus} />
+              <StatusCard label="Profile status" value={formatProfileStatus(form.onboardingStatus)} />
+              <StatusCard label="Payment" value={formatPaymentStatus(form.paymentStatus)} />
               <StatusCard
                 label="Completion"
                 value={`${completionState.percent}%`}
@@ -305,7 +302,7 @@ export default function DashboardProfilePage() {
                     Profile progress
                   </p>
                   <p className="mt-1 text-sm text-slate-600">
-                    Complete the core details to fully unlock your profile.
+                    Complete the essential details to fully activate your profile.
                   </p>
                 </div>
 
@@ -325,17 +322,11 @@ export default function DashboardProfilePage() {
         </section>
 
         <section className="rounded-[28px] border border-white/70 bg-white/90 p-6 shadow-[0_18px_50px_rgba(15,23,42,0.07)] backdrop-blur md:p-8">
-          <div className="max-w-2xl">
-            <p className="text-sm font-semibold uppercase tracking-[0.18em] text-[#1d4ed8]">
-              Basic information
-            </p>
-            <h2 className="mt-2 text-2xl font-semibold tracking-tight text-slate-950">
-              Personal Details
-            </h2>
-            <p className="mt-2 text-sm text-slate-600">
-              Keep your details updated so the team can plan properly.
-            </p>
-          </div>
+          <SectionHeader
+            eyebrow="Basic information"
+            title="Personal Details"
+            description="These details help the team prepare your experience properly."
+          />
 
           <div className="mt-6 grid gap-4 md:grid-cols-2">
             <FieldGroup label="Full name" required>
@@ -396,18 +387,11 @@ export default function DashboardProfilePage() {
         </section>
 
         <section className="rounded-[28px] border border-white/70 bg-white/90 p-6 shadow-[0_18px_50px_rgba(15,23,42,0.07)] backdrop-blur md:p-8">
-          <div className="max-w-2xl">
-            <p className="text-sm font-semibold uppercase tracking-[0.18em] text-[#1d4ed8]">
-              Health & notes
-            </p>
-            <h2 className="mt-2 text-2xl font-semibold tracking-tight text-slate-950">
-              Additional Information
-            </h2>
-            <p className="mt-2 text-sm text-slate-600">
-              Share anything relevant so your training and support can be adjusted
-              appropriately.
-            </p>
-          </div>
+          <SectionHeader
+            eyebrow="Health & notes"
+            title="Additional Information"
+            description="Share anything relevant so your training and support can be adjusted appropriately."
+          />
 
           <div className="mt-6 grid gap-4 md:grid-cols-2">
             <FieldGroup label="Allergies">
@@ -435,7 +419,7 @@ export default function DashboardProfilePage() {
             <FieldGroup label="Notes" className="md:col-span-2">
               <textarea
                 className="min-h-[170px] w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 shadow-sm outline-none transition focus:border-[#93c5fd] focus:ring-4 focus:ring-[#dbeafe]"
-                placeholder="Notes"
+                placeholder="Anything else your coach should know"
                 value={form.notes}
                 onChange={(e) =>
                   setForm((prev) => ({ ...prev, notes: e.target.value }))
@@ -443,8 +427,28 @@ export default function DashboardProfilePage() {
               />
             </FieldGroup>
           </div>
+        </section>
+      </div>
 
-          <div className="mt-6 flex flex-wrap gap-3">
+      <div className="fixed bottom-0 left-0 right-0 z-40 border-t border-white/70 bg-white/85 backdrop-blur">
+        <div className="mx-auto flex max-w-7xl items-center justify-between gap-4 px-4 py-4 md:px-8">
+          <div>
+            <p className="text-sm font-semibold text-slate-900">
+              Save your profile changes
+            </p>
+            <p className="text-xs text-slate-500">
+              Update your details so your plan stays accurate.
+            </p>
+          </div>
+
+          <div className="flex gap-3">
+            <a
+              href="/dashboard"
+              className="rounded-2xl border border-slate-200 bg-white px-5 py-3 text-sm font-medium text-slate-700 shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:border-slate-300 hover:shadow-md"
+            >
+              Cancel
+            </a>
+
             <button
               onClick={saveProfile}
               disabled={saving}
@@ -452,17 +456,34 @@ export default function DashboardProfilePage() {
             >
               {saving ? "Saving..." : "Save Profile"}
             </button>
-
-            <a
-              href="/dashboard"
-              className="rounded-2xl border border-slate-200 bg-white px-6 py-3 text-sm font-medium text-slate-700 shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:border-slate-300 hover:shadow-md"
-            >
-              Cancel
-            </a>
           </div>
-        </section>
+        </div>
       </div>
-    </main>
+    </>
+  );
+}
+
+function SectionHeader({
+  eyebrow,
+  title,
+  description,
+}: {
+  eyebrow: string;
+  title: string;
+  description?: string;
+}) {
+  return (
+    <div className="max-w-2xl">
+      <p className="text-sm font-semibold uppercase tracking-[0.18em] text-[#1d4ed8]">
+        {eyebrow}
+      </p>
+      <h2 className="mt-2 text-2xl font-semibold tracking-tight text-slate-950">
+        {title}
+      </h2>
+      {description && (
+        <p className="mt-2 text-sm text-slate-600">{description}</p>
+      )}
+    </div>
   );
 }
 
@@ -476,9 +497,7 @@ function StatusCard({
   return (
     <div className="rounded-[22px] border border-slate-100 bg-gradient-to-br from-slate-50 to-white p-4">
       <p className="text-sm font-semibold text-slate-700">{label}</p>
-      <p className="mt-2 text-sm font-semibold capitalize text-slate-900">
-        {value}
-      </p>
+      <p className="mt-2 text-sm font-semibold text-slate-900">{value}</p>
     </div>
   );
 }
@@ -503,4 +522,15 @@ function FieldGroup({
       {children}
     </div>
   );
+}
+
+function formatProfileStatus(value: string) {
+  if (value === "active") return "Complete";
+  if (value === "incomplete") return "Incomplete";
+  return "Not ready";
+}
+
+function formatPaymentStatus(value: string) {
+  if (!value) return "Pending";
+  return value.charAt(0).toUpperCase() + value.slice(1);
 }
