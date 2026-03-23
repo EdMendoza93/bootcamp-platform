@@ -231,24 +231,24 @@ export default function LoginPage() {
 
   if (checkingRedirect) {
     return (
-      <main className="min-h-screen bg-gray-50 px-6 py-10">
-        <div className="mx-auto grid min-h-[80vh] max-w-6xl items-center gap-10 lg:grid-cols-[1.1fr_520px]">
+      <main className="min-h-screen bg-[radial-gradient(circle_at_top_left,_rgba(46,160,255,0.18),_transparent_28%),radial-gradient(circle_at_bottom_right,_rgba(15,23,42,0.10),_transparent_28%),linear-gradient(to_bottom_right,_#f8fbff,_#eef5ff)] px-6 py-10">
+        <div className="mx-auto grid min-h-[80vh] max-w-6xl items-center gap-10 lg:grid-cols-[1.05fr_520px]">
           <section>
-            <p className="text-sm font-semibold uppercase tracking-[0.2em] text-gray-500">
+            <div className="inline-flex items-center rounded-full border border-[#bfdbfe] bg-[#eff6ff] px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.22em] text-[#1d4ed8]">
               Wild Atlantic Bootcamp
-            </p>
+            </div>
 
-            <h1 className="mt-4 max-w-3xl text-4xl font-bold tracking-tight md:text-6xl">
+            <h1 className="mt-5 max-w-3xl text-4xl font-semibold tracking-tight text-slate-950 md:text-6xl">
               Welcome back
             </h1>
 
-            <p className="mt-4 max-w-2xl text-lg text-gray-600">
+            <p className="mt-4 max-w-2xl text-lg leading-8 text-slate-600">
               Checking your login session...
             </p>
           </section>
 
-          <section className="rounded-3xl border bg-white p-8 shadow-sm">
-            <p className="text-sm text-gray-500">Please wait...</p>
+          <section className="rounded-[32px] border border-white/70 bg-white/90 p-8 shadow-[0_24px_80px_rgba(15,23,42,0.10)] backdrop-blur">
+            <p className="text-sm text-slate-500">Please wait...</p>
           </section>
         </div>
       </main>
@@ -256,83 +256,118 @@ export default function LoginPage() {
   }
 
   return (
-    <main className="min-h-screen bg-gray-50 px-6 py-10">
-      <div className="mx-auto grid min-h-[80vh] max-w-6xl items-center gap-10 lg:grid-cols-[1.1fr_520px]">
+    <main className="min-h-screen bg-[radial-gradient(circle_at_top_left,_rgba(46,160,255,0.18),_transparent_28%),radial-gradient(circle_at_bottom_right,_rgba(15,23,42,0.10),_transparent_28%),linear-gradient(to_bottom_right,_#f8fbff,_#eef5ff)] px-6 py-10">
+      <div className="mx-auto grid min-h-[80vh] max-w-6xl items-center gap-10 lg:grid-cols-[1.05fr_520px]">
         <section>
-          <p className="text-sm font-semibold uppercase tracking-[0.2em] text-gray-500">
+          <div className="inline-flex items-center rounded-full border border-[#bfdbfe] bg-[#eff6ff] px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.22em] text-[#1d4ed8]">
             Wild Atlantic Bootcamp
-          </p>
+          </div>
 
-          <h1 className="mt-4 max-w-3xl text-4xl font-bold tracking-tight md:text-6xl">
+          <h1 className="mt-5 max-w-3xl text-4xl font-semibold tracking-tight text-slate-950 md:text-7xl">
             Welcome back
           </h1>
 
-          <p className="mt-4 max-w-2xl text-lg text-gray-600">
-            Login or create your account to continue.
+          <p className="mt-4 max-w-2xl text-lg leading-8 text-slate-600">
+            Login or create your account to continue your program, track your
+            progress, and access your personal dashboard.
           </p>
+
+          <div className="mt-8 grid max-w-xl gap-4 sm:grid-cols-2">
+            <FeaturePill
+              title="Personal dashboard"
+              description="Access your schedule, profile, and updates."
+            />
+            <FeaturePill
+              title="Progress tracking"
+              description="Keep your journey organized in one place."
+            />
+          </div>
         </section>
 
-        <section className="rounded-3xl border bg-white p-8 shadow-sm">
-          <h2 className="text-2xl font-semibold">Access your account</h2>
-          <p className="mt-2 text-sm text-gray-500">
-            Use email/password or continue with Google.
-          </p>
+        <section className="overflow-hidden rounded-[32px] border border-white/70 bg-white/90 shadow-[0_24px_80px_rgba(15,23,42,0.10)] backdrop-blur">
+          <div className="bg-gradient-to-r from-[#071120] via-[#123b76] to-[#2EA0FF] p-[1px]">
+            <div className="rounded-t-[31px] bg-transparent px-0 py-0" />
+          </div>
 
-          <div className="mt-6 space-y-4">
-            <input
-              className="w-full rounded-xl border p-4"
-              placeholder="Email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-            />
+          <div className="p-8">
+            <h2 className="text-3xl font-semibold tracking-tight text-slate-950">
+              Access your account
+            </h2>
+            <p className="mt-2 text-sm leading-6 text-slate-500">
+              Use email/password or continue with Google.
+            </p>
 
-            <input
-              type="password"
-              className="w-full rounded-xl border p-4"
-              placeholder="Password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-            />
+            <div className="mt-6 space-y-4">
+              <input
+                className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-4 text-base text-slate-900 shadow-sm outline-none transition placeholder:text-slate-400 focus:border-[#93c5fd] focus:ring-4 focus:ring-[#dbeafe]"
+                placeholder="Email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+              />
 
-            <button
-              onClick={login}
-              disabled={loading}
-              className="w-full rounded-xl bg-black py-3 text-sm font-medium text-white disabled:opacity-50"
-            >
-              {loading ? "Loading..." : "Login"}
-            </button>
+              <input
+                type="password"
+                className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-4 text-base text-slate-900 shadow-sm outline-none transition placeholder:text-slate-400 focus:border-[#93c5fd] focus:ring-4 focus:ring-[#dbeafe]"
+                placeholder="Password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+              />
 
-            <button
-              onClick={signup}
-              disabled={loading}
-              className="w-full rounded-xl border py-3 text-sm font-medium disabled:opacity-50"
-            >
-              Create account
-            </button>
+              <button
+                onClick={login}
+                disabled={loading}
+                className="w-full rounded-2xl bg-slate-950 py-3.5 text-sm font-medium text-white shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:bg-slate-800 hover:shadow-md disabled:opacity-50"
+              >
+                {loading ? "Loading..." : "Login"}
+              </button>
 
-            <div className="flex items-center gap-3 py-1">
-              <div className="h-px flex-1 bg-gray-200" />
-              <span className="text-sm text-gray-400">OR</span>
-              <div className="h-px flex-1 bg-gray-200" />
+              <button
+                onClick={signup}
+                disabled={loading}
+                className="w-full rounded-2xl border border-slate-200 bg-white py-3.5 text-sm font-medium text-slate-700 shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:border-slate-300 hover:shadow-md disabled:opacity-50"
+              >
+                Create account
+              </button>
+
+              <div className="flex items-center gap-3 py-1">
+                <div className="h-px flex-1 bg-slate-200" />
+                <span className="text-sm text-slate-400">OR</span>
+                <div className="h-px flex-1 bg-slate-200" />
+              </div>
+
+              <button
+                onClick={googleLogin}
+                disabled={loading}
+                className="w-full rounded-2xl border border-slate-200 bg-white py-3.5 text-sm font-medium text-slate-700 shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:border-slate-300 hover:shadow-md disabled:opacity-50"
+              >
+                {loading ? "Loading..." : "Continue with Google"}
+              </button>
+
+              <button
+                onClick={resetSession}
+                className="w-full rounded-2xl border border-slate-200 bg-slate-50 py-3.5 text-sm font-medium text-slate-600 transition-all duration-200 hover:-translate-y-0.5 hover:border-slate-300 hover:bg-white hover:shadow-sm"
+              >
+                Reset session
+              </button>
             </div>
-
-            <button
-              onClick={googleLogin}
-              disabled={loading}
-              className="w-full rounded-xl border py-3 text-sm font-medium disabled:opacity-50"
-            >
-              {loading ? "Loading..." : "Continue with Google"}
-            </button>
-
-            <button
-              onClick={resetSession}
-              className="w-full rounded-xl border py-3 text-sm font-medium text-gray-600"
-            >
-              Reset session
-            </button>
           </div>
         </section>
       </div>
     </main>
+  );
+}
+
+function FeaturePill({
+  title,
+  description,
+}: {
+  title: string;
+  description: string;
+}) {
+  return (
+    <div className="rounded-[24px] border border-white/70 bg-white/80 p-4 shadow-[0_14px_40px_rgba(15,23,42,0.06)] backdrop-blur">
+      <p className="text-sm font-semibold text-slate-900">{title}</p>
+      <p className="mt-1 text-sm leading-6 text-slate-600">{description}</p>
+    </div>
   );
 }
