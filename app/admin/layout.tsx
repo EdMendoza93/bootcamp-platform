@@ -5,5 +5,11 @@ export default function AdminLayout({
 }: {
   children: React.ReactNode;
 }) {
-  return <AdminShell>{children}</AdminShell>;
+  return (
+    <div className="min-h-screen">
+      <AdminShell>
+        <div className="p-6 md:p-8">{children}</div>
+      </AdminShell>
+    </div>
+  );
 }

@@ -95,7 +95,10 @@ export default function DashboardProgressPage() {
 
   const loadPhotos = async (targetProfileId: string) => {
     const snapshot = await getDocs(
-      query(collection(db, "progressPhotos"), where("profileId", "==", targetProfileId))
+      query(
+        collection(db, "progressPhotos"),
+        where("profileId", "==", targetProfileId)
+      )
     );
 
     const data = snapshot.docs.map((docItem) => ({
@@ -152,7 +155,9 @@ export default function DashboardProgressPage() {
         }
 
         const profileDoc = profileSnapshot.docs[0];
-        const profileData = profileDoc.data() as { progressPhotosEnabled?: boolean };
+        const profileData = profileDoc.data() as {
+          progressPhotosEnabled?: boolean;
+        };
 
         setProfileId(profileDoc.id);
         setProgressPhotosEnabled(profileData.progressPhotosEnabled === true);
@@ -356,16 +361,33 @@ export default function DashboardProgressPage() {
   );
 
   if (loading) {
-    return <p className="p-10">Loading...</p>;
+    return (
+      <main className="min-h-screen px-6 py-8 md:px-10 md:py-10">
+        <div className="mx-auto max-w-6xl">
+          <div className="rounded-[28px] border border-white/70 bg-white/90 p-8 shadow-[0_20px_60px_rgba(15,23,42,0.08)] backdrop-blur">
+            <p className="text-sm font-medium text-slate-500">
+              Loading your progress timeline...
+            </p>
+          </div>
+        </div>
+      </main>
+    );
   }
 
   if (!profileId) {
     return (
-      <main className="min-h-screen bg-gray-50 p-6 md:p-10">
+      <main className="min-h-screen px-6 py-8 md:px-10 md:py-10">
         <div className="mx-auto max-w-5xl">
-          <section className="rounded-3xl border bg-white p-6 shadow-sm md:p-8">
-            <h1 className="text-3xl font-bold tracking-tight">Progress Photos</h1>
-            <p className="mt-3 text-gray-600">
+          <section className="rounded-[28px] border border-white/70 bg-white/90 p-6 shadow-[0_18px_50px_rgba(15,23,42,0.07)] backdrop-blur md:p-8">
+            <div className="inline-flex items-center rounded-full border border-[#bfdbfe] bg-[#eff6ff] px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.2em] text-[#1d4ed8]">
+              Progress
+            </div>
+
+            <h1 className="mt-4 text-3xl font-semibold tracking-tight text-slate-950">
+              Progress Photos
+            </h1>
+
+            <p className="mt-3 max-w-2xl text-slate-600">
               Your profile is not ready yet. Once it has been created, you will
               be able to use this section.
             </p>
@@ -373,7 +395,7 @@ export default function DashboardProgressPage() {
             <div className="mt-6">
               <a
                 href="/dashboard"
-                className="rounded-xl bg-black px-4 py-2.5 text-sm font-medium text-white"
+                className="inline-flex items-center justify-center rounded-2xl bg-gradient-to-r from-[#2EA0FF] to-[#1B6EDC] px-4 py-2.5 text-sm font-medium text-white shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md"
               >
                 Back to Dashboard
               </a>
@@ -386,79 +408,108 @@ export default function DashboardProgressPage() {
 
   return (
     <>
-      <main className="min-h-screen bg-gray-50 p-6 md:p-10">
+      <main className="min-h-screen px-6 py-8 md:px-10 md:py-10">
         <div className="mx-auto max-w-6xl space-y-8">
-          <section className="rounded-3xl border bg-white p-6 shadow-sm md:p-8">
-            <div className="flex flex-col gap-6 md:flex-row md:items-start md:justify-between">
-              <div>
-                <h1 className="text-3xl font-bold tracking-tight">
-                  Progress Photos
-                </h1>
-                <p className="mt-3 text-gray-600">
-                  Upload your updates and review your timeline.
-                </p>
-              </div>
-
-              <a
-                href="/dashboard"
-                className="rounded-xl border bg-white px-4 py-2.5 text-sm font-medium"
-              >
-                Back to Dashboard
-              </a>
+          <section className="overflow-hidden rounded-[32px] border border-white/70 bg-white/90 shadow-[0_24px_80px_rgba(15,23,42,0.10)] backdrop-blur">
+            <div className="bg-gradient-to-r from-[#0f172a] via-[#123b76] to-[#2EA0FF] p-[1px]">
+              <div className="rounded-t-[31px] bg-transparent px-0 py-0" />
             </div>
 
-            <div className="mt-8 grid gap-4 sm:grid-cols-3">
-              <StatusCard
-                label="Uploads enabled"
-                value={progressPhotosEnabled ? "Yes" : "No"}
-              />
-              <StatusCard label="Total photos" value={String(photos.length)} />
-              <StatusCard
-                label="Your uploads"
-                value={String(userUploadsCount)}
-              />
+            <div className="p-6 md:p-8">
+              <div className="flex flex-col gap-6 md:flex-row md:items-start md:justify-between">
+                <div>
+                  <div className="inline-flex items-center rounded-full border border-[#bfdbfe] bg-[#eff6ff] px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.2em] text-[#1d4ed8]">
+                    Progress Tracking
+                  </div>
+
+                  <h1 className="mt-4 text-3xl font-semibold tracking-tight text-slate-950 md:text-4xl">
+                    Progress Photos
+                  </h1>
+
+                  <p className="mt-3 text-sm text-slate-600 md:text-base">
+                    Upload your updates, track your timeline, and keep your coach
+                    informed.
+                  </p>
+                </div>
+
+                <a
+                  href="/dashboard"
+                  className="rounded-2xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-medium text-slate-700 shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:border-slate-300 hover:shadow-md"
+                >
+                  Back to Dashboard
+                </a>
+              </div>
+
+              <div className="mt-8 grid gap-4 sm:grid-cols-3">
+                <StatusCard
+                  label="Uploads enabled"
+                  value={progressPhotosEnabled ? "Yes" : "No"}
+                  tone={progressPhotosEnabled ? "success" : "neutral"}
+                />
+                <StatusCard
+                  label="Total photos"
+                  value={String(photos.length)}
+                  tone="neutral"
+                />
+                <StatusCard
+                  label="Your uploads"
+                  value={String(userUploadsCount)}
+                  tone="blue"
+                />
+              </div>
             </div>
           </section>
 
           {progressPhotosEnabled ? (
-            <section className="rounded-3xl border bg-white p-6 shadow-sm md:p-8">
-              <h2 className="text-xl font-semibold">
-                {editingPhotoId ? "Edit photo details" : "Upload new photo"}
-              </h2>
-              <p className="mt-2 text-sm text-gray-600">
-                Share progress updates with your coach.
-              </p>
+            <section className="rounded-[28px] border border-white/70 bg-white/90 p-6 shadow-[0_18px_50px_rgba(15,23,42,0.07)] backdrop-blur md:p-8">
+              <div className="max-w-2xl">
+                <p className="text-sm font-semibold uppercase tracking-[0.18em] text-[#1d4ed8]">
+                  Upload
+                </p>
+                <h2 className="mt-2 text-2xl font-semibold tracking-tight text-slate-950">
+                  {editingPhotoId ? "Edit photo details" : "Upload new photo"}
+                </h2>
+                <p className="mt-2 text-sm text-slate-600">
+                  Share progress updates with your coach.
+                </p>
+              </div>
 
               <div className="mt-6 grid gap-4">
                 {!editingPhotoId && (
-                  <input
-                    type="file"
-                    accept="image/*"
-                    onChange={(e) => setImageFile(e.target.files?.[0] || null)}
-                    className="w-full rounded-xl border p-3"
-                  />
+                  <FieldGroup label="Choose image">
+                    <input
+                      type="file"
+                      accept="image/*"
+                      onChange={(e) => setImageFile(e.target.files?.[0] || null)}
+                      className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700 shadow-sm outline-none transition file:mr-4 file:rounded-xl file:border-0 file:bg-[#eff6ff] file:px-4 file:py-2 file:text-sm file:font-medium file:text-[#1d4ed8] focus:border-[#93c5fd] focus:ring-4 focus:ring-[#dbeafe]"
+                    />
+                  </FieldGroup>
                 )}
 
-                <input
-                  type="text"
-                  placeholder="Title (optional)"
-                  value={title}
-                  onChange={(e) => setTitle(e.target.value)}
-                  className="w-full rounded-xl border p-3"
-                />
+                <FieldGroup label="Title">
+                  <input
+                    type="text"
+                    placeholder="Title (optional)"
+                    value={title}
+                    onChange={(e) => setTitle(e.target.value)}
+                    className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 shadow-sm outline-none transition focus:border-[#93c5fd] focus:ring-4 focus:ring-[#dbeafe]"
+                  />
+                </FieldGroup>
 
-                <textarea
-                  placeholder="Note (optional)"
-                  value={note}
-                  onChange={(e) => setNote(e.target.value)}
-                  className="min-h-[140px] w-full rounded-xl border p-3"
-                />
+                <FieldGroup label="Note">
+                  <textarea
+                    placeholder="Note (optional)"
+                    value={note}
+                    onChange={(e) => setNote(e.target.value)}
+                    className="min-h-[150px] w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 shadow-sm outline-none transition focus:border-[#93c5fd] focus:ring-4 focus:ring-[#dbeafe]"
+                  />
+                </FieldGroup>
 
                 <div className="flex flex-wrap gap-3">
                   <button
                     onClick={savePhoto}
                     disabled={saving}
-                    className="rounded-xl bg-black px-6 py-3 text-sm font-medium text-white disabled:opacity-50"
+                    className="rounded-2xl bg-gradient-to-r from-[#2EA0FF] to-[#1B6EDC] px-6 py-3 text-sm font-medium text-white shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md disabled:cursor-not-allowed disabled:opacity-50"
                   >
                     {saving
                       ? "Saving..."
@@ -470,7 +521,7 @@ export default function DashboardProgressPage() {
                   <button
                     onClick={resetForm}
                     disabled={saving}
-                    className="rounded-xl border bg-white px-6 py-3 text-sm font-medium disabled:opacity-50"
+                    className="rounded-2xl border border-slate-200 bg-white px-6 py-3 text-sm font-medium text-slate-700 shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:border-slate-300 hover:shadow-md disabled:cursor-not-allowed disabled:opacity-50"
                   >
                     Clear
                   </button>
@@ -478,22 +529,31 @@ export default function DashboardProgressPage() {
               </div>
             </section>
           ) : (
-            <section className="rounded-3xl border bg-white p-6 shadow-sm md:p-8">
-              <h2 className="text-xl font-semibold">Uploads not enabled yet</h2>
-              <p className="mt-2 text-gray-600">
+            <section className="rounded-[28px] border border-white/70 bg-white/90 p-6 shadow-[0_18px_50px_rgba(15,23,42,0.07)] backdrop-blur md:p-8">
+              <h2 className="text-2xl font-semibold tracking-tight text-slate-950">
+                Uploads not enabled yet
+              </h2>
+              <p className="mt-2 text-slate-600">
                 Your coach has not enabled progress photos for your profile yet.
               </p>
             </section>
           )}
 
-          <section className="rounded-3xl border bg-white p-6 shadow-sm md:p-8">
-            <h2 className="text-xl font-semibold">Timeline</h2>
-            <p className="mt-2 text-sm text-gray-600">
-              Recent uploads from you and your coach.
-            </p>
+          <section className="rounded-[28px] border border-white/70 bg-white/90 p-6 shadow-[0_18px_50px_rgba(15,23,42,0.07)] backdrop-blur md:p-8">
+            <div className="max-w-2xl">
+              <p className="text-sm font-semibold uppercase tracking-[0.18em] text-[#1d4ed8]">
+                Timeline
+              </p>
+              <h2 className="mt-2 text-2xl font-semibold tracking-tight text-slate-950">
+                Recent Uploads
+              </h2>
+              <p className="mt-2 text-sm text-slate-600">
+                Recent uploads from you and your coach.
+              </p>
+            </div>
 
             {photos.length === 0 ? (
-              <div className="mt-6 rounded-2xl border border-dashed p-10 text-center text-sm text-gray-500">
+              <div className="mt-6 rounded-[22px] border border-dashed border-slate-200 bg-slate-50/70 p-10 text-center text-sm text-slate-500">
                 No progress photos yet.
               </div>
             ) : (
@@ -501,13 +561,13 @@ export default function DashboardProgressPage() {
                 {photos.map((photo) => (
                   <div
                     key={photo.id}
-                    className="rounded-2xl border bg-white p-3 shadow-sm"
+                    className="rounded-[24px] border border-white/80 bg-white/95 p-3 shadow-[0_14px_40px_rgba(15,23,42,0.07)] transition-all duration-200 hover:-translate-y-1 hover:shadow-[0_20px_45px_rgba(15,23,42,0.10)]"
                   >
                     <button
                       onClick={() => openPhotoModal(photo)}
                       className="w-full text-left"
                     >
-                      <div className="flex aspect-[4/5] items-center justify-center overflow-hidden rounded-xl bg-gray-100">
+                      <div className="flex aspect-[4/5] items-center justify-center overflow-hidden rounded-[18px] bg-slate-100">
                         <img
                           src={photo.imageUrl}
                           alt={photo.title || "Progress photo"}
@@ -518,22 +578,29 @@ export default function DashboardProgressPage() {
 
                     <div className="mt-3">
                       <div className="flex flex-wrap items-center gap-2">
-                        <span className="rounded-full border bg-gray-50 px-3 py-1 text-xs font-medium text-gray-700">
+                        <span
+                          className={`rounded-full border px-3 py-1 text-[11px] font-semibold ${
+                            photo.uploadedByRole === "admin"
+                              ? "border-slate-200 bg-slate-50 text-slate-700"
+                              : "border-[#bfdbfe] bg-[#eff6ff] text-[#1d4ed8]"
+                          }`}
+                        >
                           {photo.uploadedByRole === "admin"
                             ? "Coach upload"
                             : "Your upload"}
                         </span>
-                        <span className="text-xs text-gray-500">
+
+                        <span className="text-xs text-slate-500">
                           {formatTimestamp(photo.createdAt)}
                         </span>
                       </div>
 
-                      <p className="mt-3 line-clamp-1 font-medium">
+                      <p className="mt-3 line-clamp-1 font-semibold text-slate-900">
                         {photo.title || "Progress update"}
                       </p>
 
                       {photo.note && (
-                        <p className="mt-1 line-clamp-2 text-sm text-gray-600">
+                        <p className="mt-1 line-clamp-2 text-sm text-slate-600">
                           {photo.note}
                         </p>
                       )}
@@ -543,14 +610,14 @@ export default function DashboardProgressPage() {
                           <>
                             <button
                               onClick={() => startEdit(photo)}
-                              className="rounded-xl border px-3 py-2 text-sm font-medium"
+                              className="rounded-2xl border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-700 shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:border-slate-300 hover:shadow-md"
                             >
                               Edit
                             </button>
 
                             <button
                               onClick={() => deletePhoto(photo)}
-                              className="rounded-xl border px-3 py-2 text-sm font-medium"
+                              className="rounded-2xl border border-rose-200 bg-rose-50 px-3 py-2 text-sm font-medium text-rose-700 shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md"
                             >
                               Delete
                             </button>
@@ -567,22 +634,28 @@ export default function DashboardProgressPage() {
       </main>
 
       {photoModalData.open && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4 md:p-8">
-          <div className="max-h-[90vh] w-full max-w-5xl overflow-y-auto rounded-3xl bg-white p-4 shadow-xl md:p-6">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/75 p-4 backdrop-blur-sm md:p-8">
+          <div className="max-h-[90vh] w-full max-w-5xl overflow-y-auto rounded-[30px] border border-white/70 bg-white p-4 shadow-[0_30px_100px_rgba(15,23,42,0.25)] md:p-6">
             <div className="flex items-start justify-between gap-4">
               <div>
-                <span className="rounded-full border bg-gray-50 px-3 py-1 text-xs font-medium text-gray-700">
+                <span
+                  className={`rounded-full border px-3 py-1 text-[11px] font-semibold ${
+                    photoModalData.uploadedByRole === "admin"
+                      ? "border-slate-200 bg-slate-50 text-slate-700"
+                      : "border-[#bfdbfe] bg-[#eff6ff] text-[#1d4ed8]"
+                  }`}
+                >
                   {photoModalData.uploadedByRole === "admin"
                     ? "Coach upload"
                     : "Your upload"}
                 </span>
 
-                <h2 className="mt-3 text-2xl font-bold tracking-tight">
+                <h2 className="mt-3 text-2xl font-semibold tracking-tight text-slate-950">
                   {photoModalData.title}
                 </h2>
 
                 {photoModalData.note && (
-                  <p className="mt-2 text-sm text-gray-600">
+                  <p className="mt-2 text-sm text-slate-600">
                     {photoModalData.note}
                   </p>
                 )}
@@ -590,17 +663,17 @@ export default function DashboardProgressPage() {
 
               <button
                 onClick={closePhotoModal}
-                className="rounded-xl border bg-white px-3 py-2 text-sm font-medium"
+                className="rounded-2xl border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-700 transition-all duration-200 hover:border-slate-300 hover:shadow-sm"
               >
                 Close
               </button>
             </div>
 
-            <div className="mt-6 flex justify-center rounded-2xl bg-gray-50 p-4">
+            <div className="mt-6 flex justify-center rounded-[22px] border border-slate-100 bg-gradient-to-br from-slate-50 to-white p-4">
               <img
                 src={photoModalData.imageUrl}
                 alt={photoModalData.title}
-                className="max-h-[72vh] w-auto max-w-full rounded-2xl object-contain"
+                className="max-h-[72vh] w-auto max-w-full rounded-[20px] object-contain"
               />
             </div>
           </div>
@@ -613,14 +686,39 @@ export default function DashboardProgressPage() {
 function StatusCard({
   label,
   value,
+  tone,
 }: {
   label: string;
   value: string;
+  tone: "blue" | "success" | "neutral";
+}) {
+  const styles = {
+    blue: "border-[#bfdbfe] bg-gradient-to-br from-[#eff6ff] to-white",
+    success: "border-emerald-200 bg-gradient-to-br from-emerald-50 to-white",
+    neutral: "border-slate-100 bg-gradient-to-br from-slate-50 to-white",
+  };
+
+  return (
+    <div className={`rounded-[22px] border p-4 ${styles[tone]}`}>
+      <p className="text-sm font-semibold text-slate-700">{label}</p>
+      <p className="mt-2 text-sm font-semibold text-slate-900">{value}</p>
+    </div>
+  );
+}
+
+function FieldGroup({
+  label,
+  children,
+}: {
+  label: string;
+  children: React.ReactNode;
 }) {
   return (
-    <div className="rounded-2xl bg-gray-50 p-4">
-      <p className="text-sm font-medium text-gray-700">{label}</p>
-      <p className="mt-2 text-sm font-semibold text-gray-900">{value}</p>
+    <div>
+      <label className="mb-2 block text-sm font-semibold text-slate-700">
+        {label}
+      </label>
+      {children}
     </div>
   );
 }

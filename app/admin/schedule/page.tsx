@@ -368,52 +368,70 @@ export default function AdminSchedulePage() {
   };
 
   if (loading) {
-    return <p className="p-10">Loading...</p>;
+    return (
+      <div className="rounded-[28px] border border-white/70 bg-white/90 p-8 shadow-[0_20px_60px_rgba(15,23,42,0.08)] backdrop-blur">
+        <p className="text-sm font-medium text-slate-500">
+          Loading schedule...
+        </p>
+      </div>
+    );
   }
 
   return (
     <div className="space-y-8">
-      <div>
-        <h1 className="text-3xl font-bold tracking-tight">Schedule</h1>
-        <p className="mt-2 text-gray-600">
-          Create, edit, and manage client itinerary items with template support.
-        </p>
-      </div>
+      <section className="overflow-hidden rounded-[32px] border border-white/70 bg-white/90 shadow-[0_24px_80px_rgba(15,23,42,0.10)] backdrop-blur">
+        <div className="bg-gradient-to-r from-[#0f172a] via-[#123b76] to-[#2EA0FF] p-[1px]">
+          <div className="rounded-t-[31px] bg-transparent px-0 py-0" />
+        </div>
+
+        <div className="p-6 md:p-8">
+          <div className="inline-flex items-center rounded-full border border-[#bfdbfe] bg-[#eff6ff] px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.2em] text-[#1d4ed8]">
+            Scheduling
+          </div>
+
+          <h1 className="mt-4 text-3xl font-semibold tracking-tight text-slate-950 md:text-4xl">
+            Schedule
+          </h1>
+
+          <p className="mt-3 max-w-2xl text-sm text-slate-600 md:text-base">
+            Create, edit, and manage client itinerary items with template support.
+          </p>
+        </div>
+      </section>
 
       <div className="grid gap-8 xl:grid-cols-[430px_1fr]">
-        <section className="rounded-2xl border bg-white p-6 shadow-sm">
-          <h2 className="text-xl font-semibold">
-            {editingItemId ? "Edit Schedule Item" : "Create Schedule Item"}
-          </h2>
-          <p className="mt-1 text-sm text-gray-500">
-            Build the client itinerary using templates or custom notes.
-          </p>
+        <section className="rounded-[28px] border border-white/70 bg-white/90 p-6 shadow-[0_18px_50px_rgba(15,23,42,0.07)] backdrop-blur">
+          <div className="max-w-2xl">
+            <p className="text-sm font-semibold uppercase tracking-[0.18em] text-[#1d4ed8]">
+              {editingItemId ? "Edit item" : "Create item"}
+            </p>
+            <h2 className="mt-2 text-2xl font-semibold tracking-tight text-slate-950">
+              {editingItemId ? "Edit Schedule Item" : "Create Schedule Item"}
+            </h2>
+            <p className="mt-2 text-sm text-slate-600">
+              Build the client itinerary using templates or custom notes.
+            </p>
+          </div>
 
           <div className="mt-6 space-y-4">
-            <div>
-              <label className="mb-1 block text-sm font-medium text-gray-700">
-                Find client
-              </label>
+            <FieldGroup label="Find client">
               <input
                 type="text"
                 value={profileSearch}
                 onChange={(e) => setProfileSearch(e.target.value)}
                 placeholder="Search by client name or program..."
-                className="w-full rounded-xl border px-4 py-3 text-sm outline-none focus:border-black"
+                className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 shadow-sm outline-none transition focus:border-[#93c5fd] focus:ring-4 focus:ring-[#dbeafe]"
               />
-            </div>
+            </FieldGroup>
 
-            <div>
-              <label className="mb-1 block text-sm font-medium text-gray-700">
-                Client
-              </label>
+            <FieldGroup label="Client">
               <select
                 value={selectedProfileId}
                 onChange={(e) => {
                   setSelectedProfileId(e.target.value);
                   resetForm();
                 }}
-                className="w-full rounded-xl border px-4 py-3 text-sm outline-none focus:border-black"
+                className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 shadow-sm outline-none transition focus:border-[#93c5fd] focus:ring-4 focus:ring-[#dbeafe]"
               >
                 <option value="">Select client</option>
                 {filteredProfiles.map((profile) => (
@@ -425,44 +443,38 @@ export default function AdminSchedulePage() {
                   </option>
                 ))}
               </select>
-            </div>
+            </FieldGroup>
 
             {selectedProfile ? (
-              <div className="rounded-2xl border bg-gray-50 p-4">
-                <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">
+              <div className="rounded-[22px] border border-slate-100 bg-gradient-to-br from-slate-50 to-white p-4">
+                <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">
                   Selected client
                 </p>
-                <p className="mt-2 font-medium text-gray-900">
+                <p className="mt-2 font-semibold text-slate-900">
                   {selectedProfile.fullName || "Unnamed profile"}
                 </p>
-                <p className="mt-1 text-sm text-gray-600">
+                <p className="mt-1 text-sm text-slate-600">
                   Status: {selectedProfile.clientStatus || "active"}
                 </p>
-                <p className="mt-1 text-sm text-gray-600">
+                <p className="mt-1 text-sm text-slate-600">
                   Program: {selectedProfile.assignedProgram || "Not assigned"}
                 </p>
               </div>
             ) : null}
 
             <div className="grid gap-4 sm:grid-cols-2">
-              <div>
-                <label className="mb-1 block text-sm font-medium text-gray-700">
-                  Date
-                </label>
+              <FieldGroup label="Date">
                 <input
                   type="date"
                   value={form.date}
                   onChange={(e) =>
                     setForm((prev) => ({ ...prev, date: e.target.value }))
                   }
-                  className="w-full rounded-xl border px-4 py-3 text-sm outline-none focus:border-black"
+                  className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 shadow-sm outline-none transition focus:border-[#93c5fd] focus:ring-4 focus:ring-[#dbeafe]"
                 />
-              </div>
+              </FieldGroup>
 
-              <div>
-                <label className="mb-1 block text-sm font-medium text-gray-700">
-                  Type
-                </label>
+              <FieldGroup label="Type">
                 <select
                   value={form.type}
                   onChange={(e) =>
@@ -471,55 +483,46 @@ export default function AdminSchedulePage() {
                       type: e.target.value as ScheduleType,
                     }))
                   }
-                  className="w-full rounded-xl border px-4 py-3 text-sm outline-none focus:border-black"
+                  className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 shadow-sm outline-none transition focus:border-[#93c5fd] focus:ring-4 focus:ring-[#dbeafe]"
                 >
                   <option value="training">Training</option>
                   <option value="nutrition">Nutrition</option>
                   <option value="activity">Activity</option>
                 </select>
-              </div>
+              </FieldGroup>
             </div>
 
             <div className="grid gap-4 sm:grid-cols-2">
-              <div>
-                <label className="mb-1 block text-sm font-medium text-gray-700">
-                  Start time
-                </label>
+              <FieldGroup label="Start time">
                 <input
                   type="time"
                   value={form.startTime}
                   onChange={(e) =>
                     setForm((prev) => ({ ...prev, startTime: e.target.value }))
                   }
-                  className="w-full rounded-xl border px-4 py-3 text-sm outline-none focus:border-black"
+                  className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 shadow-sm outline-none transition focus:border-[#93c5fd] focus:ring-4 focus:ring-[#dbeafe]"
                 />
-              </div>
+              </FieldGroup>
 
-              <div>
-                <label className="mb-1 block text-sm font-medium text-gray-700">
-                  End time
-                </label>
+              <FieldGroup label="End time">
                 <input
                   type="time"
                   value={form.endTime}
                   onChange={(e) =>
                     setForm((prev) => ({ ...prev, endTime: e.target.value }))
                   }
-                  className="w-full rounded-xl border px-4 py-3 text-sm outline-none focus:border-black"
+                  className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 shadow-sm outline-none transition focus:border-[#93c5fd] focus:ring-4 focus:ring-[#dbeafe]"
                 />
-              </div>
+              </FieldGroup>
             </div>
 
-            <div>
-              <label className="mb-1 block text-sm font-medium text-gray-700">
-                Template
-              </label>
+            <FieldGroup label="Template">
               <select
                 value={form.templateId}
                 onChange={(e) =>
                   setForm((prev) => ({ ...prev, templateId: e.target.value }))
                 }
-                className="w-full rounded-xl border px-4 py-3 text-sm outline-none focus:border-black"
+                className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 shadow-sm outline-none transition focus:border-[#93c5fd] focus:ring-4 focus:ring-[#dbeafe]"
               >
                 <option value="">No template</option>
                 {activeTemplates.map((template) => (
@@ -528,33 +531,30 @@ export default function AdminSchedulePage() {
                   </option>
                 ))}
               </select>
-            </div>
+            </FieldGroup>
 
             {selectedTemplate ? (
-              <div className="rounded-2xl border bg-gray-50 p-4">
-                <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">
+              <div className="rounded-[22px] border border-slate-100 bg-gradient-to-br from-slate-50 to-white p-4">
+                <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">
                   Template preview
                 </p>
-                <p className="mt-2 font-medium text-gray-900">
+                <p className="mt-2 font-semibold text-slate-900">
                   {selectedTemplate.title}
                 </p>
                 {selectedTemplate.description ? (
-                  <p className="mt-1 text-sm text-gray-600">
+                  <p className="mt-1 text-sm text-slate-600">
                     {selectedTemplate.description}
                   </p>
                 ) : null}
                 {selectedTemplate.content ? (
-                  <p className="mt-3 whitespace-pre-wrap text-sm text-gray-700">
+                  <p className="mt-3 whitespace-pre-wrap text-sm leading-6 text-slate-700">
                     {selectedTemplate.content}
                   </p>
                 ) : null}
               </div>
             ) : null}
 
-            <div>
-              <label className="mb-1 block text-sm font-medium text-gray-700">
-                Custom title
-              </label>
+            <FieldGroup label="Custom title">
               <input
                 type="text"
                 value={form.title}
@@ -562,14 +562,11 @@ export default function AdminSchedulePage() {
                   setForm((prev) => ({ ...prev, title: e.target.value }))
                 }
                 placeholder="Overrides template title if filled"
-                className="w-full rounded-xl border px-4 py-3 text-sm outline-none focus:border-black"
+                className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 shadow-sm outline-none transition focus:border-[#93c5fd] focus:ring-4 focus:ring-[#dbeafe]"
               />
-            </div>
+            </FieldGroup>
 
-            <div>
-              <label className="mb-1 block text-sm font-medium text-gray-700">
-                Extra details
-              </label>
+            <FieldGroup label="Extra details">
               <textarea
                 rows={5}
                 value={form.details}
@@ -577,16 +574,16 @@ export default function AdminSchedulePage() {
                   setForm((prev) => ({ ...prev, details: e.target.value }))
                 }
                 placeholder="Optional notes for this schedule item"
-                className="w-full rounded-xl border px-4 py-3 text-sm outline-none focus:border-black"
+                className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 shadow-sm outline-none transition focus:border-[#93c5fd] focus:ring-4 focus:ring-[#dbeafe]"
               />
-            </div>
+            </FieldGroup>
 
             <div className="flex flex-wrap gap-3 pt-2">
               <button
                 type="button"
                 onClick={saveScheduleItem}
                 disabled={saving}
-                className="rounded-xl bg-black px-5 py-3 text-sm font-medium text-white disabled:opacity-50"
+                className="rounded-2xl bg-gradient-to-r from-[#2EA0FF] to-[#1B6EDC] px-5 py-3 text-sm font-medium text-white shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md disabled:cursor-not-allowed disabled:opacity-50"
               >
                 {saving
                   ? "Saving..."
@@ -599,7 +596,7 @@ export default function AdminSchedulePage() {
                 type="button"
                 onClick={resetForm}
                 disabled={saving}
-                className="rounded-xl border px-5 py-3 text-sm font-medium disabled:opacity-50"
+                className="rounded-2xl border border-slate-200 bg-white px-5 py-3 text-sm font-medium text-slate-700 shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:border-slate-300 hover:shadow-md disabled:cursor-not-allowed disabled:opacity-50"
               >
                 Clear
               </button>
@@ -607,11 +604,16 @@ export default function AdminSchedulePage() {
           </div>
         </section>
 
-        <section className="rounded-2xl border bg-white p-6 shadow-sm">
-          <div className="flex flex-col gap-3 border-b pb-4 md:flex-row md:items-end md:justify-between">
+        <section className="rounded-[28px] border border-white/70 bg-white/90 p-6 shadow-[0_18px_50px_rgba(15,23,42,0.07)] backdrop-blur">
+          <div className="flex flex-col gap-3 border-b border-slate-100 pb-4 md:flex-row md:items-end md:justify-between">
             <div>
-              <h2 className="text-xl font-semibold">Client Schedule</h2>
-              <p className="mt-1 text-sm text-gray-500">
+              <p className="text-sm font-semibold uppercase tracking-[0.18em] text-[#1d4ed8]">
+                Client schedule
+              </p>
+              <h2 className="mt-2 text-2xl font-semibold tracking-tight text-slate-950">
+                Schedule Items
+              </h2>
+              <p className="mt-2 text-sm text-slate-600">
                 {selectedProfile
                   ? `Viewing schedule for ${selectedProfile.fullName || "client"}`
                   : "Choose a client to view and manage schedule items."}
@@ -619,46 +621,48 @@ export default function AdminSchedulePage() {
             </div>
 
             {selectedProfile ? (
-              <div className="rounded-xl bg-gray-50 px-4 py-3 text-sm text-gray-700">
+              <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-medium text-slate-700">
                 {scheduleItems.length} item{scheduleItems.length === 1 ? "" : "s"}
               </div>
             ) : null}
           </div>
 
           {!selectedProfileId ? (
-            <div className="mt-6 rounded-2xl border border-dashed p-10 text-center text-sm text-gray-500">
+            <div className="mt-6 rounded-[22px] border border-dashed border-slate-200 p-10 text-center text-sm text-slate-500">
               Select a client to load schedule items.
             </div>
           ) : scheduleLoading ? (
-            <p className="mt-6 text-sm text-gray-500">Loading schedule...</p>
+            <p className="mt-6 text-sm text-slate-500">Loading schedule...</p>
           ) : scheduleItems.length === 0 ? (
-            <div className="mt-6 rounded-2xl border border-dashed p-10 text-center text-sm text-gray-500">
+            <div className="mt-6 rounded-[22px] border border-dashed border-slate-200 p-10 text-center text-sm text-slate-500">
               No schedule items added yet for this client.
             </div>
           ) : (
             <div className="mt-6 space-y-6">
               {Object.entries(groupedSchedule).map(([date, items]) => (
                 <div key={date}>
-                  <div className="mb-3 border-b pb-2">
-                    <p className="text-sm font-medium uppercase tracking-wide text-gray-500">
+                  <div className="mb-3 border-b border-slate-100 pb-2">
+                    <p className="text-sm font-semibold uppercase tracking-[0.16em] text-slate-500">
                       {formatDateLabel(date)}
                     </p>
-                    <h3 className="mt-1 text-base font-semibold">{date}</h3>
+                    <h3 className="mt-1 text-base font-semibold text-slate-950">
+                      {date}
+                    </h3>
                   </div>
 
                   <div className="grid gap-3 lg:grid-cols-2">
                     {items.map((item) => (
                       <div
                         key={item.id}
-                        className="rounded-2xl border bg-gray-50 p-4"
+                        className="rounded-[24px] border border-slate-100 bg-gradient-to-br from-white to-[#f8fbff] p-4 shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:border-[#bfdbfe] hover:shadow-md"
                       >
                         <div className="flex items-start justify-between gap-3">
                           <div>
                             <TypeBadge type={item.type} />
-                            <p className="mt-3 text-base font-semibold">
+                            <p className="mt-3 text-base font-semibold text-slate-900">
                               {getDisplayTitle(item)}
                             </p>
-                            <p className="mt-1 text-sm text-gray-600">
+                            <p className="mt-1 text-sm font-medium text-slate-600">
                               {item.startTime}
                               {item.endTime ? ` - ${item.endTime}` : ""}
                             </p>
@@ -668,14 +672,14 @@ export default function AdminSchedulePage() {
                             <button
                               type="button"
                               onClick={() => startEdit(item)}
-                              className="rounded-lg border px-3 py-2 text-sm font-medium"
+                              className="rounded-2xl border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-700 shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:border-slate-300 hover:shadow-md"
                             >
                               Edit
                             </button>
                             <button
                               type="button"
                               onClick={() => deleteScheduleItem(item.id)}
-                              className="rounded-lg border px-3 py-2 text-sm font-medium"
+                              className="rounded-2xl border border-rose-200 bg-rose-50 px-3 py-2 text-sm font-medium text-rose-700 shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md"
                             >
                               Delete
                             </button>
@@ -683,13 +687,13 @@ export default function AdminSchedulePage() {
                         </div>
 
                         {item.templateId ? (
-                          <p className="mt-3 text-sm text-gray-500">
+                          <p className="mt-3 text-sm text-slate-500">
                             Template: {getTemplateTitle(item.type, item.templateId) || "—"}
                           </p>
                         ) : null}
 
                         {item.details?.trim() ? (
-                          <p className="mt-3 whitespace-pre-wrap text-sm text-gray-700">
+                          <p className="mt-3 whitespace-pre-wrap text-sm leading-6 text-slate-700">
                             {item.details}
                           </p>
                         ) : null}
@@ -706,7 +710,30 @@ export default function AdminSchedulePage() {
   );
 }
 
+function FieldGroup({
+  label,
+  children,
+}: {
+  label: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <div>
+      <label className="mb-2 block text-sm font-semibold text-slate-700">
+        {label}
+      </label>
+      {children}
+    </div>
+  );
+}
+
 function TypeBadge({ type }: { type: ScheduleType }) {
+  const styles: Record<ScheduleType, string> = {
+    training: "border-[#bfdbfe] bg-[#eff6ff] text-[#1d4ed8]",
+    nutrition: "border-emerald-200 bg-emerald-50 text-emerald-700",
+    activity: "border-violet-200 bg-violet-50 text-violet-700",
+  };
+
   const label =
     type === "training"
       ? "Training"
@@ -715,7 +742,9 @@ function TypeBadge({ type }: { type: ScheduleType }) {
       : "Activity";
 
   return (
-    <span className="inline-flex rounded-full border bg-white px-3 py-1 text-xs font-medium uppercase tracking-wide text-gray-800">
+    <span
+      className={`inline-flex rounded-full border px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.18em] ${styles[type]}`}
+    >
       {label}
     </span>
   );

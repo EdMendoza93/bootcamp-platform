@@ -432,71 +432,111 @@ export default function DashboardPage() {
     hasProfile && applicationStatus === "approved" && paymentStatus === "cash";
 
   if (loading) {
-    return <p className="p-10">Loading...</p>;
+    return (
+      <main className="min-h-screen bg-[radial-gradient(circle_at_top,_rgba(46,160,255,0.16),_transparent_34%),linear-gradient(to_bottom_right,_#f8fbff,_#eef5ff)] px-6 py-10 md:px-10">
+        <div className="mx-auto max-w-6xl">
+          <div className="rounded-[28px] border border-white/70 bg-white/85 p-8 shadow-[0_20px_60px_rgba(15,23,42,0.08)] backdrop-blur">
+            <p className="text-sm font-medium text-slate-500">Loading your dashboard...</p>
+          </div>
+        </div>
+      </main>
+    );
   }
 
   return (
     <>
-      <main className="min-h-screen bg-gray-50 p-6 md:p-10">
-        <div className="mx-auto max-w-6xl">
-          <section className="rounded-3xl border bg-white p-6 shadow-sm md:p-8">
-            <div className="flex flex-col gap-6 md:flex-row md:items-start md:justify-between">
-              <div>
-                <p className="text-sm font-medium uppercase tracking-[0.2em] text-gray-500">
-                  Wild Atlantic Bootcamp
-                </p>
-                <h1 className="mt-3 text-3xl font-bold tracking-tight md:text-4xl">
-                  Welcome back
-                </h1>
-                <p className="mt-3 text-gray-600">{user?.email}</p>
-              </div>
-
-              <div className="flex flex-wrap gap-3">
-                <button
-                  onClick={refreshDashboard}
-                  disabled={refreshing}
-                  className="rounded-xl border bg-white px-4 py-2.5 text-sm font-medium disabled:opacity-50"
-                >
-                  {refreshing ? "Refreshing..." : "Refresh"}
-                </button>
-
-                <button
-                  onClick={logout}
-                  className="rounded-xl border bg-white px-4 py-2.5 text-sm font-medium"
-                >
-                  Logout
-                </button>
-              </div>
+      <main className="min-h-screen bg-[radial-gradient(circle_at_top,_rgba(46,160,255,0.16),_transparent_34%),linear-gradient(to_bottom_right,_#f8fbff,_#eef5ff)] px-6 py-8 md:px-10 md:py-10">
+        <div className="mx-auto max-w-6xl space-y-8">
+          <section className="overflow-hidden rounded-[32px] border border-white/70 bg-white/90 shadow-[0_24px_80px_rgba(15,23,42,0.10)] backdrop-blur">
+            <div className="bg-gradient-to-r from-[#0f172a] via-[#123b76] to-[#2EA0FF] p-[1px]">
+              <div className="rounded-t-[31px] bg-transparent px-0 py-0" />
             </div>
 
-            {applicationStatus === "approved" &&
-              hasProfile &&
-              onboardingStatus === "active" && (
-                <div className="mt-8 rounded-2xl bg-gray-50 p-5">
-                  <h2 className="text-lg font-semibold">Your program is active</h2>
-                  <p className="mt-2 text-sm text-gray-600">
-                    Your itinerary is ready and your profile is up to date.
+            <div className="p-6 md:p-8">
+              <div className="flex flex-col gap-6 md:flex-row md:items-start md:justify-between">
+                <div className="max-w-2xl">
+                  <div className="inline-flex items-center rounded-full border border-[#bfdbfe] bg-[#eff6ff] px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.2em] text-[#1d4ed8]">
+                    Wild Atlantic Bootcamp
+                  </div>
+
+                  <h1 className="mt-4 text-3xl font-semibold tracking-tight text-slate-950 md:text-4xl">
+                    Welcome back
+                  </h1>
+
+                  <p className="mt-3 text-sm text-slate-600 md:text-base">
+                    Your training plan, progress updates, and participant profile
+                    are all in one place.
                   </p>
+
+                  <div className="mt-5 inline-flex items-center rounded-2xl border border-slate-200 bg-slate-50 px-4 py-2 text-sm text-slate-700">
+                    {user?.email}
+                  </div>
                 </div>
-              )}
+
+                <div className="flex flex-wrap gap-3">
+                  <button
+                    onClick={refreshDashboard}
+                    disabled={refreshing}
+                    className="inline-flex items-center justify-center rounded-2xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-medium text-slate-700 shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:border-slate-300 hover:shadow-md disabled:cursor-not-allowed disabled:opacity-50"
+                  >
+                    {refreshing ? "Refreshing..." : "Refresh"}
+                  </button>
+
+                  <button
+                    onClick={logout}
+                    className="inline-flex items-center justify-center rounded-2xl bg-slate-950 px-4 py-2.5 text-sm font-medium text-white shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:bg-slate-800 hover:shadow-md"
+                  >
+                    Logout
+                  </button>
+                </div>
+              </div>
+
+              {applicationStatus === "approved" &&
+                hasProfile &&
+                onboardingStatus === "active" && (
+                  <div className="mt-8 rounded-[24px] border border-[#bfdbfe] bg-gradient-to-br from-[#eff6ff] to-white p-5 shadow-sm">
+                    <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+                      <div>
+                        <p className="text-sm font-semibold text-[#1d4ed8]">
+                          Program status
+                        </p>
+                        <h2 className="mt-1 text-lg font-semibold text-slate-950">
+                          Your program is active
+                        </h2>
+                        <p className="mt-2 text-sm text-slate-600">
+                          Your itinerary is ready and your profile is up to date.
+                        </p>
+                      </div>
+
+                      <div className="inline-flex w-fit rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-xs font-semibold uppercase tracking-wide text-emerald-700">
+                        Active
+                      </div>
+                    </div>
+                  </div>
+                )}
+            </div>
           </section>
 
           {hasProfile && scheduleItems.length > 0 && (
-            <section className="mt-8">
-              <div className="mb-4 flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
+            <section className="space-y-5">
+              <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
                 <div>
-                  <h2 className="text-2xl font-semibold tracking-tight">
-                    Your Itinerary
+                  <p className="text-sm font-semibold uppercase tracking-[0.18em] text-[#1d4ed8]">
+                    Itinerary
+                  </p>
+                  <h2 className="mt-2 text-2xl font-semibold tracking-tight text-slate-950">
+                    Your Schedule
                   </h2>
-                  <p className="mt-2 text-gray-600">
-                    Tap any item to see the full details.
+                  <p className="mt-2 text-slate-600">
+                    Open any item to view the full training, nutrition, or activity
+                    details.
                   </p>
                 </div>
 
                 {progressPhotosEnabled && (
                   <a
                     href="/dashboard/progress"
-                    className="inline-flex rounded-xl border bg-white px-4 py-2.5 text-sm font-medium"
+                    className="inline-flex items-center justify-center rounded-2xl border border-[#bfdbfe] bg-white px-4 py-2.5 text-sm font-medium text-[#1d4ed8] shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:border-[#93c5fd] hover:bg-[#f8fbff] hover:shadow-md"
                   >
                     View Progress Photos
                   </a>
@@ -507,13 +547,13 @@ export default function DashboardPage() {
                 {Object.entries(groupedSchedule).map(([date, items]) => (
                   <div
                     key={date}
-                    className="rounded-3xl border bg-white p-6 shadow-sm"
+                    className="rounded-[28px] border border-white/70 bg-white/90 p-6 shadow-[0_18px_50px_rgba(15,23,42,0.07)] backdrop-blur"
                   >
-                    <div className="border-b pb-4">
-                      <p className="text-sm font-medium uppercase tracking-[0.2em] text-gray-500">
+                    <div className="border-b border-slate-100 pb-4">
+                      <p className="text-sm font-semibold uppercase tracking-[0.18em] text-slate-500">
                         {formatDateLabel(date)}
                       </p>
-                      <h3 className="mt-2 text-2xl font-bold tracking-tight">
+                      <h3 className="mt-2 text-2xl font-semibold tracking-tight text-slate-950">
                         {date}
                       </h3>
                     </div>
@@ -522,15 +562,15 @@ export default function DashboardPage() {
                       {items.map((item, index) => (
                         <div key={item.id} className="flex gap-4">
                           <div className="flex flex-col items-center">
-                            <div className="mt-2 h-3 w-3 rounded-full bg-black" />
+                            <div className="mt-2 h-3 w-3 rounded-full bg-gradient-to-br from-[#2EA0FF] to-[#1B6EDC]" />
                             {index !== items.length - 1 && (
-                              <div className="mt-2 h-full w-px bg-gray-200" />
+                              <div className="mt-2 h-full w-px bg-gradient-to-b from-[#bfdbfe] to-slate-200" />
                             )}
                           </div>
 
                           <button
                             onClick={() => openScheduleModal(item)}
-                            className="flex-1 rounded-2xl border bg-gray-50 p-4 text-left transition hover:bg-gray-100"
+                            className="flex-1 rounded-[22px] border border-slate-100 bg-gradient-to-br from-white to-[#f8fbff] p-4 text-left shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:border-[#bfdbfe] hover:shadow-md"
                           >
                             <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
                               <div>
@@ -538,12 +578,12 @@ export default function DashboardPage() {
                                   <TypeBadge type={item.type} />
                                 </div>
 
-                                <p className="mt-3 text-base font-semibold">
+                                <p className="mt-3 text-base font-semibold text-slate-900">
                                   {item.displayTitle}
                                 </p>
                               </div>
 
-                              <p className="text-sm font-medium text-gray-700">
+                              <p className="text-sm font-semibold text-slate-700">
                                 {item.startTime}
                                 {item.endTime ? ` - ${item.endTime}` : ""}
                               </p>
@@ -559,11 +599,16 @@ export default function DashboardPage() {
           )}
 
           {hasProfile && scheduleItems.length === 0 && (
-            <section className="mt-8 rounded-3xl border bg-white p-6 shadow-sm">
+            <section className="rounded-[28px] border border-white/70 bg-white/90 p-6 shadow-[0_18px_50px_rgba(15,23,42,0.07)] backdrop-blur">
               <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
                 <div>
-                  <h2 className="text-xl font-semibold">Your Itinerary</h2>
-                  <p className="mt-2 text-gray-600">
+                  <p className="text-sm font-semibold uppercase tracking-[0.18em] text-[#1d4ed8]">
+                    Itinerary
+                  </p>
+                  <h2 className="mt-2 text-2xl font-semibold tracking-tight text-slate-950">
+                    Your Schedule
+                  </h2>
+                  <p className="mt-2 text-slate-600">
                     Your schedule has not been added yet.
                   </p>
                 </div>
@@ -571,7 +616,7 @@ export default function DashboardPage() {
                 {progressPhotosEnabled && (
                   <a
                     href="/dashboard/progress"
-                    className="inline-flex rounded-xl border bg-white px-4 py-2.5 text-sm font-medium"
+                    className="inline-flex items-center justify-center rounded-2xl border border-[#bfdbfe] bg-white px-4 py-2.5 text-sm font-medium text-[#1d4ed8] shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:border-[#93c5fd] hover:bg-[#f8fbff] hover:shadow-md"
                   >
                     View Progress Photos
                   </a>
@@ -581,20 +626,23 @@ export default function DashboardPage() {
           )}
 
           {progressPhotosEnabled && recentProgressPhotos.length > 0 && (
-            <section className="mt-8">
-              <div className="mb-4 flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
+            <section className="space-y-5">
+              <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
                 <div>
-                  <h2 className="text-2xl font-semibold tracking-tight">
+                  <p className="text-sm font-semibold uppercase tracking-[0.18em] text-[#1d4ed8]">
+                    Progress
+                  </p>
+                  <h2 className="mt-2 text-2xl font-semibold tracking-tight text-slate-950">
                     Your Progress
                   </h2>
-                  <p className="mt-2 text-gray-600">
+                  <p className="mt-2 text-slate-600">
                     Recent uploads from you and your coach.
                   </p>
                 </div>
 
                 <a
                   href="/dashboard/progress"
-                  className="inline-flex rounded-xl border bg-white px-4 py-2.5 text-sm font-medium"
+                  className="inline-flex items-center justify-center rounded-2xl border border-[#bfdbfe] bg-white px-4 py-2.5 text-sm font-medium text-[#1d4ed8] shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:border-[#93c5fd] hover:bg-[#f8fbff] hover:shadow-md"
                 >
                   Open Full Timeline
                 </a>
@@ -605,9 +653,9 @@ export default function DashboardPage() {
                   <button
                     key={photo.id}
                     onClick={() => openPhotoModal(photo)}
-                    className="rounded-2xl border bg-white p-3 text-left shadow-sm transition hover:shadow-md"
+                    className="rounded-[24px] border border-white/80 bg-white/95 p-3 text-left shadow-[0_14px_40px_rgba(15,23,42,0.07)] transition-all duration-200 hover:-translate-y-1 hover:shadow-[0_20px_45px_rgba(15,23,42,0.10)]"
                   >
-                    <div className="flex aspect-[4/5] items-center justify-center overflow-hidden rounded-xl bg-gray-100">
+                    <div className="flex aspect-[4/5] items-center justify-center overflow-hidden rounded-[18px] bg-slate-100">
                       <img
                         src={photo.imageUrl}
                         alt={photo.title || "Progress photo"}
@@ -617,23 +665,23 @@ export default function DashboardPage() {
 
                     <div className="mt-3">
                       <div className="flex flex-wrap items-center gap-2">
-                        <span className="rounded-full border bg-gray-50 px-3 py-1 text-xs font-medium text-gray-700">
+                        <span className="rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-[11px] font-semibold text-slate-700">
                           {photo.uploadedByRole === "admin"
                             ? "Coach upload"
                             : "Your upload"}
                         </span>
 
-                        <span className="text-xs text-gray-500">
+                        <span className="text-xs text-slate-500">
                           {formatTimestamp(photo.createdAt)}
                         </span>
                       </div>
 
-                      <p className="mt-3 line-clamp-1 font-medium">
+                      <p className="mt-3 line-clamp-1 font-semibold text-slate-900">
                         {photo.title || "Progress update"}
                       </p>
 
                       {photo.note && (
-                        <p className="mt-1 line-clamp-2 text-sm text-gray-600">
+                        <p className="mt-1 line-clamp-2 text-sm text-slate-600">
                           {photo.note}
                         </p>
                       )}
@@ -645,29 +693,32 @@ export default function DashboardPage() {
           )}
 
           {showPendingPayment && (
-            <section className="mt-8 rounded-3xl border bg-white p-6 shadow-sm">
-              <h2 className="text-xl font-semibold">Payment pending</h2>
-              <p className="mt-2 text-gray-600">
-                Your payment has not been confirmed yet.
-              </p>
-            </section>
+            <StatusCard
+              title="Payment pending"
+              description="Your payment has not been confirmed yet."
+              tone="warning"
+            />
           )}
 
           {showCashMessage && (
-            <section className="mt-8 rounded-3xl border bg-white p-6 shadow-sm">
-              <h2 className="text-xl font-semibold">Payment arranged</h2>
-              <p className="mt-2 text-gray-600">
-                Your payment is arranged offline.
-              </p>
-            </section>
+            <StatusCard
+              title="Payment arranged"
+              description="Your payment is arranged offline."
+              tone="success"
+            />
           )}
 
           {hasProfile && (
-            <section className="mt-8 rounded-3xl border bg-white p-6 shadow-sm">
+            <section className="rounded-[28px] border border-white/70 bg-white/90 p-6 shadow-[0_18px_50px_rgba(15,23,42,0.07)] backdrop-blur">
               <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
                 <div>
-                  <h2 className="text-xl font-semibold">Profile Overview</h2>
-                  <p className="mt-2 text-sm text-gray-600">
+                  <p className="text-sm font-semibold uppercase tracking-[0.18em] text-[#1d4ed8]">
+                    Profile
+                  </p>
+                  <h2 className="mt-2 text-2xl font-semibold tracking-tight text-slate-950">
+                    Profile Overview
+                  </h2>
+                  <p className="mt-2 text-sm text-slate-600">
                     Keep your participant details up to date.
                   </p>
                 </div>
@@ -675,7 +726,7 @@ export default function DashboardPage() {
                 <div className="flex flex-wrap gap-3">
                   <a
                     href="/dashboard/profile"
-                    className="rounded-xl border bg-white px-4 py-2.5 text-sm font-medium"
+                    className="rounded-2xl bg-gradient-to-r from-[#2EA0FF] to-[#1B6EDC] px-4 py-2.5 text-sm font-medium text-white shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md"
                   >
                     Edit My Profile
                   </a>
@@ -683,7 +734,7 @@ export default function DashboardPage() {
                   {progressPhotosEnabled && (
                     <a
                       href="/dashboard/progress"
-                      className="rounded-xl border bg-white px-4 py-2.5 text-sm font-medium"
+                      className="rounded-2xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-medium text-slate-700 shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:border-slate-300 hover:shadow-md"
                     >
                       Progress Photos
                     </a>
@@ -698,9 +749,9 @@ export default function DashboardPage() {
                 <InfoCard label="Injuries" value={injuries || "None provided"} />
               </div>
 
-              <div className="mt-4 rounded-2xl bg-gray-50 p-4">
-                <p className="text-sm font-medium text-gray-700">Notes</p>
-                <p className="mt-2 text-sm text-gray-600">
+              <div className="mt-4 rounded-[22px] border border-slate-100 bg-gradient-to-br from-slate-50 to-white p-4">
+                <p className="text-sm font-semibold text-slate-700">Notes</p>
+                <p className="mt-2 text-sm leading-6 text-slate-600">
                   {notes || "No notes provided"}
                 </p>
               </div>
@@ -708,10 +759,10 @@ export default function DashboardPage() {
           )}
 
           {applicationStatus === "none" && (
-            <div className="mt-8">
+            <div className="pt-2">
               <a
                 href="/dashboard/application"
-                className="inline-block rounded-xl border bg-white px-4 py-2.5 text-sm font-medium"
+                className="inline-flex items-center justify-center rounded-2xl bg-gradient-to-r from-[#2EA0FF] to-[#1B6EDC] px-4 py-2.5 text-sm font-medium text-white shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md"
               >
                 Complete Application
               </a>
@@ -719,64 +770,68 @@ export default function DashboardPage() {
           )}
 
           {applicationStatus === "pending" && (
-            <div className="mt-8 rounded-3xl border bg-white p-6 shadow-sm">
-              <h2 className="text-xl font-semibold">Application submitted</h2>
-              <p className="mt-2 text-gray-600">
+            <section className="rounded-[28px] border border-white/70 bg-white/90 p-6 shadow-[0_18px_50px_rgba(15,23,42,0.07)] backdrop-blur">
+              <h2 className="text-xl font-semibold text-slate-950">
+                Application submitted
+              </h2>
+              <p className="mt-2 text-slate-600">
                 Your application is under review.
               </p>
 
-              <div className="mt-4 flex flex-wrap gap-3">
+              <div className="mt-5 flex flex-wrap gap-3">
                 <button
                   onClick={refreshDashboard}
                   disabled={refreshing}
-                  className="rounded-xl border bg-white px-4 py-2.5 text-sm font-medium disabled:opacity-50"
+                  className="rounded-2xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-medium text-slate-700 shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:border-slate-300 hover:shadow-md disabled:cursor-not-allowed disabled:opacity-50"
                 >
                   {refreshing ? "Refreshing..." : "Refresh"}
                 </button>
 
                 <a
                   href="/dashboard/application"
-                  className="rounded-xl border bg-white px-4 py-2.5 text-sm font-medium"
+                  className="rounded-2xl border border-[#bfdbfe] bg-[#f8fbff] px-4 py-2.5 text-sm font-medium text-[#1d4ed8] shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:border-[#93c5fd] hover:shadow-md"
                 >
                   View Application
                 </a>
               </div>
-            </div>
+            </section>
           )}
 
           {applicationStatus === "approved" && !hasProfile && (
-            <div className="mt-8 rounded-3xl border bg-white p-6 shadow-sm">
-              <h2 className="text-xl font-semibold">Approved</h2>
-              <p className="mt-2 text-gray-600">
+            <section className="rounded-[28px] border border-white/70 bg-white/90 p-6 shadow-[0_18px_50px_rgba(15,23,42,0.07)] backdrop-blur">
+              <h2 className="text-xl font-semibold text-slate-950">Approved</h2>
+              <p className="mt-2 text-slate-600">
                 Your application has been approved. Your profile will be prepared
                 shortly by the team.
               </p>
 
-              <div className="mt-4">
+              <div className="mt-5">
                 <button
                   onClick={refreshDashboard}
                   disabled={refreshing}
-                  className="rounded-xl border bg-white px-4 py-2.5 text-sm font-medium disabled:opacity-50"
+                  className="rounded-2xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-medium text-slate-700 shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:border-slate-300 hover:shadow-md disabled:cursor-not-allowed disabled:opacity-50"
                 >
                   {refreshing ? "Refreshing..." : "Refresh"}
                 </button>
               </div>
-            </div>
+            </section>
           )}
 
           {applicationStatus === "approved" &&
             hasProfile &&
             onboardingStatus === "incomplete" && (
-              <div className="mt-8 rounded-3xl border bg-white p-6 shadow-sm">
-                <h2 className="text-xl font-semibold">Complete your profile</h2>
-                <p className="mt-2 text-gray-600">
+              <section className="rounded-[28px] border border-white/70 bg-white/90 p-6 shadow-[0_18px_50px_rgba(15,23,42,0.07)] backdrop-blur">
+                <h2 className="text-xl font-semibold text-slate-950">
+                  Complete your profile
+                </h2>
+                <p className="mt-2 text-slate-600">
                   Please complete your participant profile to continue.
                 </p>
 
-                <div className="mt-4 flex flex-wrap gap-3">
+                <div className="mt-5 flex flex-wrap gap-3">
                   <a
                     href="/dashboard/profile"
-                    className="inline-block rounded-xl bg-black px-4 py-2.5 text-sm font-medium text-white"
+                    className="inline-flex items-center justify-center rounded-2xl bg-gradient-to-r from-[#2EA0FF] to-[#1B6EDC] px-4 py-2.5 text-sm font-medium text-white shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md"
                   >
                     Complete Profile
                   </a>
@@ -784,66 +839,68 @@ export default function DashboardPage() {
                   <button
                     onClick={refreshDashboard}
                     disabled={refreshing}
-                    className="rounded-xl border bg-white px-4 py-2.5 text-sm font-medium disabled:opacity-50"
+                    className="rounded-2xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-medium text-slate-700 shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:border-slate-300 hover:shadow-md disabled:cursor-not-allowed disabled:opacity-50"
                   >
                     {refreshing ? "Refreshing..." : "Refresh"}
                   </button>
                 </div>
-              </div>
+              </section>
             )}
 
           {applicationStatus === "rejected" && (
-            <div className="mt-8 rounded-3xl border bg-white p-6 shadow-sm">
-              <h2 className="text-xl font-semibold">Application update</h2>
-              <p className="mt-2 text-gray-600">
+            <section className="rounded-[28px] border border-white/70 bg-white/90 p-6 shadow-[0_18px_50px_rgba(15,23,42,0.07)] backdrop-blur">
+              <h2 className="text-xl font-semibold text-slate-950">
+                Application update
+              </h2>
+              <p className="mt-2 text-slate-600">
                 Your application was not approved at this time.
               </p>
 
-              <div className="mt-4">
+              <div className="mt-5">
                 <a
                   href="/dashboard/application"
-                  className="inline-block rounded-xl border bg-white px-4 py-2.5 text-sm font-medium"
+                  className="inline-flex items-center justify-center rounded-2xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-medium text-slate-700 shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:border-slate-300 hover:shadow-md"
                 >
                   View Application
                 </a>
               </div>
-            </div>
+            </section>
           )}
         </div>
       </main>
 
       {scheduleModalData.open && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-6">
-          <div className="max-h-[85vh] w-full max-w-2xl overflow-y-auto rounded-3xl bg-white p-6 shadow-xl md:p-8">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/60 p-6 backdrop-blur-sm">
+          <div className="max-h-[85vh] w-full max-w-2xl overflow-y-auto rounded-[30px] border border-white/70 bg-white p-6 shadow-[0_30px_100px_rgba(15,23,42,0.20)] md:p-8">
             <div className="flex items-start justify-between gap-4">
               <div>
                 {scheduleModalData.type && (
                   <TypeBadge type={scheduleModalData.type} />
                 )}
-                <h2 className="mt-3 text-2xl font-bold tracking-tight">
+                <h2 className="mt-3 text-2xl font-semibold tracking-tight text-slate-950">
                   {scheduleModalData.title}
                 </h2>
               </div>
 
               <button
                 onClick={closeScheduleModal}
-                className="rounded-xl border bg-white px-3 py-2 text-sm font-medium"
+                className="rounded-2xl border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-700 transition-all duration-200 hover:border-slate-300 hover:shadow-sm"
               >
                 Close
               </button>
             </div>
 
             {scheduleModalLoading ? (
-              <p className="mt-6 text-gray-600">Loading details...</p>
+              <p className="mt-6 text-slate-600">Loading details...</p>
             ) : (
               <div className="mt-6">
                 {scheduleModalData.description && (
-                  <p className="mb-4 text-sm text-gray-600">
+                  <p className="mb-4 text-sm text-slate-600">
                     {scheduleModalData.description}
                   </p>
                 )}
 
-                <div className="whitespace-pre-line rounded-2xl bg-gray-50 p-4 text-sm text-gray-800">
+                <div className="whitespace-pre-line rounded-[22px] border border-slate-100 bg-gradient-to-br from-slate-50 to-white p-4 text-sm leading-6 text-slate-800">
                   {scheduleModalData.content}
                 </div>
               </div>
@@ -853,22 +910,22 @@ export default function DashboardPage() {
       )}
 
       {photoModalData.open && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4 md:p-8">
-          <div className="max-h-[90vh] w-full max-w-5xl overflow-y-auto rounded-3xl bg-white p-4 shadow-xl md:p-6">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/75 p-4 backdrop-blur-sm md:p-8">
+          <div className="max-h-[90vh] w-full max-w-5xl overflow-y-auto rounded-[30px] border border-white/70 bg-white p-4 shadow-[0_30px_100px_rgba(15,23,42,0.25)] md:p-6">
             <div className="flex items-start justify-between gap-4">
               <div>
-                <span className="rounded-full border bg-gray-50 px-3 py-1 text-xs font-medium text-gray-700">
+                <span className="rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-[11px] font-semibold text-slate-700">
                   {photoModalData.uploadedByRole === "admin"
                     ? "Coach upload"
                     : "Your upload"}
                 </span>
 
-                <h2 className="mt-3 text-2xl font-bold tracking-tight">
+                <h2 className="mt-3 text-2xl font-semibold tracking-tight text-slate-950">
                   {photoModalData.title}
                 </h2>
 
                 {photoModalData.note && (
-                  <p className="mt-2 text-sm text-gray-600">
+                  <p className="mt-2 text-sm text-slate-600">
                     {photoModalData.note}
                   </p>
                 )}
@@ -876,17 +933,17 @@ export default function DashboardPage() {
 
               <button
                 onClick={closePhotoModal}
-                className="rounded-xl border bg-white px-3 py-2 text-sm font-medium"
+                className="rounded-2xl border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-700 transition-all duration-200 hover:border-slate-300 hover:shadow-sm"
               >
                 Close
               </button>
             </div>
 
-            <div className="mt-6 flex justify-center rounded-2xl bg-gray-50 p-4">
+            <div className="mt-6 flex justify-center rounded-[22px] border border-slate-100 bg-gradient-to-br from-slate-50 to-white p-4">
               <img
                 src={photoModalData.imageUrl}
                 alt={photoModalData.title}
-                className="max-h-[72vh] w-auto max-w-full rounded-2xl object-contain"
+                className="max-h-[72vh] w-auto max-w-full rounded-[20px] object-contain"
               />
             </div>
           </div>
@@ -897,8 +954,19 @@ export default function DashboardPage() {
 }
 
 function TypeBadge({ type }: { type: ScheduleType }) {
+  const styles: Record<ScheduleType, string> = {
+    training:
+      "border-[#bfdbfe] bg-[#eff6ff] text-[#1d4ed8]",
+    nutrition:
+      "border-emerald-200 bg-emerald-50 text-emerald-700",
+    activity:
+      "border-violet-200 bg-violet-50 text-violet-700",
+  };
+
   return (
-    <span className="inline-flex rounded-full border px-3 py-1 text-xs font-medium uppercase tracking-wide text-gray-800">
+    <span
+      className={`inline-flex rounded-full border px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.18em] ${styles[type]}`}
+    >
       {type}
     </span>
   );
@@ -912,10 +980,34 @@ function InfoCard({
   value: string;
 }) {
   return (
-    <div className="rounded-2xl bg-gray-50 p-4">
-      <p className="text-sm font-medium text-gray-700">{label}</p>
-      <p className="mt-2 text-sm text-gray-600">{value}</p>
+    <div className="rounded-[22px] border border-slate-100 bg-gradient-to-br from-slate-50 to-white p-4">
+      <p className="text-sm font-semibold text-slate-700">{label}</p>
+      <p className="mt-2 text-sm leading-6 text-slate-600">{value}</p>
     </div>
+  );
+}
+
+function StatusCard({
+  title,
+  description,
+  tone,
+}: {
+  title: string;
+  description: string;
+  tone: "warning" | "success";
+}) {
+  const toneStyles =
+    tone === "success"
+      ? "border-emerald-200 bg-gradient-to-br from-emerald-50 to-white"
+      : "border-amber-200 bg-gradient-to-br from-amber-50 to-white";
+
+  return (
+    <section
+      className={`rounded-[28px] border p-6 shadow-[0_18px_50px_rgba(15,23,42,0.07)] ${toneStyles}`}
+    >
+      <h2 className="text-xl font-semibold text-slate-950">{title}</h2>
+      <p className="mt-2 text-slate-600">{description}</p>
+    </section>
   );
 }
 

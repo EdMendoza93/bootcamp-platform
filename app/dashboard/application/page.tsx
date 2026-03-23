@@ -196,44 +196,67 @@ export default function ApplicationPage() {
   }, [existingApplication]);
 
   if (loading) {
-    return <p className="p-10">Loading...</p>;
+    return (
+      <main className="min-h-screen px-6 py-8 md:px-10 md:py-10">
+        <div className="mx-auto max-w-4xl">
+          <div className="rounded-[28px] border border-white/70 bg-white/90 p-8 shadow-[0_20px_60px_rgba(15,23,42,0.08)] backdrop-blur">
+            <p className="text-sm font-medium text-slate-500">
+              Loading your application...
+            </p>
+          </div>
+        </div>
+      </main>
+    );
   }
 
   return (
-    <main className="min-h-screen bg-gray-50 p-6 md:p-10">
-      <div className="mx-auto max-w-4xl">
-        <div className="rounded-3xl border bg-white p-6 shadow-sm md:p-8">
-          <p className="text-sm font-medium uppercase tracking-[0.2em] text-gray-500">
-            Wild Atlantic Bootcamp
-          </p>
-          <h1 className="mt-3 text-3xl font-bold tracking-tight">
-            Bootcamp Application
-          </h1>
-          <p className="mt-3 text-gray-600">
-            Complete your application to join the program.
-          </p>
-        </div>
+    <main className="min-h-screen px-6 py-8 md:px-10 md:py-10">
+      <div className="mx-auto max-w-4xl space-y-8">
+        <section className="overflow-hidden rounded-[32px] border border-white/70 bg-white/90 shadow-[0_24px_80px_rgba(15,23,42,0.10)] backdrop-blur">
+          <div className="bg-gradient-to-r from-[#0f172a] via-[#123b76] to-[#2EA0FF] p-[1px]">
+            <div className="rounded-t-[31px] bg-transparent px-0 py-0" />
+          </div>
+
+          <div className="p-6 md:p-8">
+            <div className="inline-flex items-center rounded-full border border-[#bfdbfe] bg-[#eff6ff] px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.2em] text-[#1d4ed8]">
+              Wild Atlantic Bootcamp
+            </div>
+
+            <h1 className="mt-4 text-3xl font-semibold tracking-tight text-slate-950 md:text-4xl">
+              Bootcamp Application
+            </h1>
+
+            <p className="mt-3 max-w-2xl text-sm text-slate-600 md:text-base">
+              Complete your application to join the program. Once submitted,
+              the team will review your details and guide you through the next
+              steps.
+            </p>
+          </div>
+        </section>
 
         {existingApplication ? (
-          <div className="mt-8 rounded-3xl border bg-white p-6 shadow-sm md:p-8">
+          <section className="rounded-[28px] border border-white/70 bg-white/90 p-6 shadow-[0_18px_50px_rgba(15,23,42,0.07)] backdrop-blur md:p-8">
             <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
-              <div>
-                <p className="text-sm font-medium uppercase tracking-[0.2em] text-gray-500">
+              <div className="max-w-2xl">
+                <p className="text-sm font-semibold uppercase tracking-[0.18em] text-[#1d4ed8]">
                   Current status
                 </p>
+
                 <div className="mt-3 flex flex-wrap items-center gap-3">
-                  <h2 className="text-2xl font-bold capitalize">
+                  <h2 className="text-2xl font-semibold capitalize text-slate-950">
                     {existingApplication.status}
                   </h2>
                   <StatusBadge status={existingApplication.status} />
                 </div>
 
-                <p className="mt-3 text-sm text-gray-600">{statusText}</p>
+                <p className="mt-3 text-sm leading-6 text-slate-600">
+                  {statusText}
+                </p>
               </div>
 
               <a
                 href="/dashboard"
-                className="inline-flex rounded-xl bg-black px-4 py-2.5 text-sm font-medium text-white"
+                className="inline-flex items-center justify-center rounded-2xl bg-gradient-to-r from-[#2EA0FF] to-[#1B6EDC] px-4 py-2.5 text-sm font-medium text-white shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md"
               >
                 Go to Dashboard
               </a>
@@ -246,20 +269,20 @@ export default function ApplicationPage() {
               <InfoCard label="Goal" value={existingApplication.goal || "—"} />
             </div>
 
-            <div className="mt-4 rounded-2xl bg-gray-50 p-4">
-              <p className="text-sm font-medium text-gray-700">
+            <div className="mt-4 rounded-[22px] border border-slate-100 bg-gradient-to-br from-slate-50 to-white p-4">
+              <p className="text-sm font-semibold text-slate-700">
                 Training experience
               </p>
-              <p className="mt-2 text-sm text-gray-600">
+              <p className="mt-2 text-sm leading-6 text-slate-600">
                 {existingApplication.experience || "—"}
               </p>
             </div>
 
-            <div className="mt-4 rounded-2xl bg-gray-50 p-4">
-              <p className="text-sm font-medium text-gray-700">
+            <div className="mt-4 rounded-[22px] border border-slate-100 bg-gradient-to-br from-slate-50 to-white p-4">
+              <p className="text-sm font-semibold text-slate-700">
                 Medical notes
               </p>
-              <p className="mt-2 text-sm text-gray-600">
+              <p className="mt-2 text-sm leading-6 text-slate-600">
                 {existingApplication.medicalNotes || "None provided"}
               </p>
             </div>
@@ -268,101 +291,120 @@ export default function ApplicationPage() {
               <button
                 onClick={refreshStatus}
                 disabled={refreshing}
-                className="rounded-xl border bg-white px-4 py-2.5 text-sm font-medium disabled:opacity-50"
+                className="rounded-2xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-medium text-slate-700 shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:border-slate-300 hover:shadow-md disabled:cursor-not-allowed disabled:opacity-50"
               >
                 {refreshing ? "Refreshing..." : "Refresh Status"}
               </button>
 
               <a
                 href="/dashboard"
-                className="rounded-xl border bg-white px-4 py-2.5 text-sm font-medium"
+                className="rounded-2xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-medium text-slate-700 shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:border-slate-300 hover:shadow-md"
               >
                 Back to Dashboard
               </a>
             </div>
-          </div>
+          </section>
         ) : (
-          <div className="mt-8 rounded-3xl border bg-white p-6 shadow-sm md:p-8">
-            <h2 className="text-xl font-semibold">Your details</h2>
-            <p className="mt-2 text-sm text-gray-600">
-              Fill in the information below to submit your application.
-            </p>
+          <section className="rounded-[28px] border border-white/70 bg-white/90 p-6 shadow-[0_18px_50px_rgba(15,23,42,0.07)] backdrop-blur md:p-8">
+            <div className="max-w-2xl">
+              <p className="text-sm font-semibold uppercase tracking-[0.18em] text-[#1d4ed8]">
+                Application form
+              </p>
+              <h2 className="mt-2 text-2xl font-semibold tracking-tight text-slate-950">
+                Your Details
+              </h2>
+              <p className="mt-2 text-sm leading-6 text-slate-600">
+                Fill in the information below to submit your application.
+              </p>
+            </div>
 
             <div className="mt-6 grid gap-4 md:grid-cols-2">
-              <input
-                className="w-full rounded-xl border p-3"
-                placeholder="Full name"
-                value={form.fullName}
-                onChange={(e) =>
-                  setForm((prev) => ({ ...prev, fullName: e.target.value }))
-                }
-              />
+              <FieldGroup label="Full name" required>
+                <input
+                  className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 shadow-sm outline-none transition focus:border-[#93c5fd] focus:ring-4 focus:ring-[#dbeafe]"
+                  placeholder="Your full name"
+                  value={form.fullName}
+                  onChange={(e) =>
+                    setForm((prev) => ({ ...prev, fullName: e.target.value }))
+                  }
+                />
+              </FieldGroup>
 
-              <input
-                className="w-full rounded-xl border p-3"
-                placeholder="Age"
-                value={form.age}
-                onChange={(e) =>
-                  setForm((prev) => ({ ...prev, age: e.target.value }))
-                }
-              />
+              <FieldGroup label="Age" required>
+                <input
+                  className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 shadow-sm outline-none transition focus:border-[#93c5fd] focus:ring-4 focus:ring-[#dbeafe]"
+                  placeholder="Your age"
+                  value={form.age}
+                  onChange={(e) =>
+                    setForm((prev) => ({ ...prev, age: e.target.value }))
+                  }
+                />
+              </FieldGroup>
 
-              <input
-                className="w-full rounded-xl border p-3 md:col-span-2"
-                placeholder="Phone"
-                value={form.phone}
-                onChange={(e) =>
-                  setForm((prev) => ({ ...prev, phone: e.target.value }))
-                }
-              />
+              <FieldGroup label="Phone" required className="md:col-span-2">
+                <input
+                  className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 shadow-sm outline-none transition focus:border-[#93c5fd] focus:ring-4 focus:ring-[#dbeafe]"
+                  placeholder="Phone number"
+                  value={form.phone}
+                  onChange={(e) =>
+                    setForm((prev) => ({ ...prev, phone: e.target.value }))
+                  }
+                />
+              </FieldGroup>
 
-              <input
-                className="w-full rounded-xl border p-3 md:col-span-2"
-                placeholder="Main goal"
-                value={form.goal}
-                onChange={(e) =>
-                  setForm((prev) => ({ ...prev, goal: e.target.value }))
-                }
-              />
+              <FieldGroup label="Main goal" required className="md:col-span-2">
+                <input
+                  className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 shadow-sm outline-none transition focus:border-[#93c5fd] focus:ring-4 focus:ring-[#dbeafe]"
+                  placeholder="What would you like to achieve?"
+                  value={form.goal}
+                  onChange={(e) =>
+                    setForm((prev) => ({ ...prev, goal: e.target.value }))
+                  }
+                />
+              </FieldGroup>
             </div>
 
             <div className="mt-4 grid gap-4">
-              <textarea
-                className="min-h-[140px] w-full rounded-xl border p-3"
-                placeholder="Training experience"
-                value={form.experience}
-                onChange={(e) =>
-                  setForm((prev) => ({ ...prev, experience: e.target.value }))
-                }
-              />
+              <FieldGroup label="Training experience" required>
+                <textarea
+                  className="min-h-[150px] w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 shadow-sm outline-none transition focus:border-[#93c5fd] focus:ring-4 focus:ring-[#dbeafe]"
+                  placeholder="Tell us about your previous training experience"
+                  value={form.experience}
+                  onChange={(e) =>
+                    setForm((prev) => ({ ...prev, experience: e.target.value }))
+                  }
+                />
+              </FieldGroup>
 
-              <textarea
-                className="min-h-[140px] w-full rounded-xl border p-3"
-                placeholder="Medical notes / injuries / relevant info"
-                value={form.medicalNotes}
-                onChange={(e) =>
-                  setForm((prev) => ({ ...prev, medicalNotes: e.target.value }))
-                }
-              />
+              <FieldGroup label="Medical notes">
+                <textarea
+                  className="min-h-[150px] w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 shadow-sm outline-none transition focus:border-[#93c5fd] focus:ring-4 focus:ring-[#dbeafe]"
+                  placeholder="Injuries, medical notes, or any relevant information"
+                  value={form.medicalNotes}
+                  onChange={(e) =>
+                    setForm((prev) => ({ ...prev, medicalNotes: e.target.value }))
+                  }
+                />
+              </FieldGroup>
             </div>
 
             <div className="mt-6 flex flex-wrap gap-3">
               <button
                 onClick={submitApplication}
                 disabled={submitting}
-                className="rounded-xl bg-black px-6 py-3 text-sm font-medium text-white disabled:opacity-50"
+                className="rounded-2xl bg-gradient-to-r from-[#2EA0FF] to-[#1B6EDC] px-6 py-3 text-sm font-medium text-white shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md disabled:cursor-not-allowed disabled:opacity-50"
               >
                 {submitting ? "Submitting..." : "Submit Application"}
               </button>
 
               <a
                 href="/dashboard"
-                className="rounded-xl border bg-white px-6 py-3 text-sm font-medium"
+                className="rounded-2xl border border-slate-200 bg-white px-6 py-3 text-sm font-medium text-slate-700 shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:border-slate-300 hover:shadow-md"
               >
                 Cancel
               </a>
             </div>
-          </div>
+          </section>
         )}
       </div>
     </main>
@@ -374,8 +416,16 @@ function StatusBadge({
 }: {
   status: ApplicationStatus;
 }) {
+  const styles: Record<ApplicationStatus, string> = {
+    pending: "border-amber-200 bg-amber-50 text-amber-700",
+    approved: "border-emerald-200 bg-emerald-50 text-emerald-700",
+    rejected: "border-rose-200 bg-rose-50 text-rose-700",
+  };
+
   return (
-    <span className="rounded-full border bg-gray-50 px-3 py-1 text-xs font-medium capitalize text-gray-700">
+    <span
+      className={`rounded-full border px-3 py-1 text-xs font-semibold capitalize ${styles[status]}`}
+    >
       {status}
     </span>
   );
@@ -383,9 +433,31 @@ function StatusBadge({
 
 function InfoCard({ label, value }: { label: string; value: string }) {
   return (
-    <div className="rounded-2xl bg-gray-50 p-4">
-      <p className="text-sm font-medium text-gray-700">{label}</p>
-      <p className="mt-2 text-sm text-gray-600">{value}</p>
+    <div className="rounded-[22px] border border-slate-100 bg-gradient-to-br from-slate-50 to-white p-4">
+      <p className="text-sm font-semibold text-slate-700">{label}</p>
+      <p className="mt-2 text-sm leading-6 text-slate-600">{value}</p>
+    </div>
+  );
+}
+
+function FieldGroup({
+  label,
+  required,
+  className = "",
+  children,
+}: {
+  label: string;
+  required?: boolean;
+  className?: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <div className={className}>
+      <label className="mb-2 block text-sm font-semibold text-slate-700">
+        {label}
+        {required && <span className="ml-1 text-[#1d4ed8]">*</span>}
+      </label>
+      {children}
     </div>
   );
 }

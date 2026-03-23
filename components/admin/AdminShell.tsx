@@ -8,25 +8,36 @@ export default function AdminShell({
   children: React.ReactNode;
 }) {
   return (
-    <div className="h-screen bg-gray-50">
-      <div className="grid h-full md:grid-cols-[280px_1fr]">
-        {/* Sidebar */}
-        <div className="hidden md:block border-r bg-white">
-          <AdminSideBar />
-        </div>
+    <div className="min-h-screen bg-[radial-gradient(circle_at_top,_rgba(46,160,255,0.14),_transparent_28%),linear-gradient(to_bottom_right,_#f8fbff,_#eef5ff)]">
+      <div className="grid min-h-screen md:grid-cols-[300px_1fr]">
+        <aside className="hidden border-r border-white/70 bg-white/80 backdrop-blur md:block">
+          <div className="sticky top-0 h-screen">
+            <AdminSideBar />
+          </div>
+        </aside>
 
-        {/* Main content */}
-        <div className="flex h-full flex-col">
-          {/* Optional future header */}
-          <header className="flex h-[64px] items-center justify-between border-b bg-white px-6">
-            <div className="text-sm font-medium text-gray-500">
-              Admin Panel
+        <div className="flex min-h-screen flex-col">
+          <header className="sticky top-0 z-20 border-b border-white/70 bg-white/75 backdrop-blur">
+            <div className="mx-auto flex h-[72px] w-full max-w-7xl items-center justify-between px-6 md:px-8">
+              <div>
+                <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-[#1d4ed8]">
+                  Wild Atlantic Bootcamp
+                </p>
+                <h1 className="mt-1 text-sm font-semibold text-slate-900">
+                  Admin Panel
+                </h1>
+              </div>
+
+              <div className="hidden items-center gap-2 md:flex">
+                <div className="rounded-full border border-[#bfdbfe] bg-[#eff6ff] px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.18em] text-[#1d4ed8]">
+                  Rivcor Platform
+                </div>
+              </div>
             </div>
           </header>
 
-          {/* Scroll area */}
-          <main className="flex-1 overflow-y-auto p-6 md:p-10">
-            <div className="mx-auto max-w-6xl">{children}</div>
+          <main className="flex-1 px-4 py-4 md:px-8 md:py-8">
+            <div className="mx-auto max-w-7xl">{children}</div>
           </main>
         </div>
       </div>
