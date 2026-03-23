@@ -15,7 +15,12 @@ import {
   updateDoc,
   where,
 } from "firebase/firestore";
-import { getDownloadURL, ref, uploadBytes } from "firebase/storage";
+import {
+  deleteObject,
+  getDownloadURL,
+  ref,
+  uploadBytes,
+} from "firebase/storage";
 import { useToast } from "@/components/ui/ToastProvider";
 
 type ScheduleType = "training" | "nutrition" | "activity";
@@ -25,6 +30,7 @@ type ProgressPhoto = {
   profileId: string;
   userId?: string;
   imageUrl: string;
+  storagePath?: string;
   title?: string;
   note?: string;
   uploadedByRole: "admin" | "user";
@@ -311,20 +317,20 @@ export default function AdminProfileDetailPage() {
 
     try {
       await updateDoc(doc(db, "profiles", profileId), {
-        fullName: form.fullName,
-        age: form.age,
-        goal: form.goal,
-        assignedProgram: form.assignedProgram,
+        fullName: form.fullName.trim(),
+        age: form.age.trim(),
+        goal: form.goal.trim(),
+        assignedProgram: form.assignedProgram.trim(),
         paymentStatus: form.paymentStatus,
         approvalStatus: form.approvalStatus,
         onboardingStatus: form.onboardingStatus,
         clientStatus: form.clientStatus,
-        height: form.height,
-        weight: form.weight,
-        allergies: form.allergies,
-        injuries: form.injuries,
-        notes: form.notes,
-        internalNotes: form.internalNotes,
+        height: form.height.trim(),
+        weight: form.weight.trim(),
+        allergies: form.allergies.trim(),
+        injuries: form.injuries.trim(),
+        notes: form.notes.trim(),
+        internalNotes: form.internalNotes.trim(),
         progressPhotosEnabled: form.progressPhotosEnabled,
       });
 
@@ -348,22 +354,59 @@ export default function AdminProfileDetailPage() {
   const deleteClient = async () => {
     if (!profileId) return;
 
-    const confirmed = window.confirm(
-      "Delete this client completely?\n\nThis will permanently remove the profile, application, schedule items, and progress photos."
+    const firstConfirm = window.confirm(
+      "Delete this client completely?\n\nThis will permanently remove the profile, application, schedule items, progress photos, and photo files from storage."
     );
-    if (!confirmed) return;
+    if (!firstConfirm) return;
+
+    const typed = window.prompt(
+      'Type DELETE to confirm permanent removal of this client.'
+    );
+    if (typed !== "DELETE") {
+      showToast({
+        title: "Delete cancelled",
+        description: 'Client was not deleted because "DELETE" was not entered.',
+        type: "info",
+      });
+      return;
+    }
 
     setDeletingClient(true);
 
     try {
       const [scheduleSnap, progressSnap] = await Promise.all([
         getDocs(
-          query(collection(db, "scheduleItems"), where("profileId", "==", profileId))
+          query(
+            collection(db, "scheduleItems"),
+            where("profileId", "==", profileId)
+          )
         ),
         getDocs(
-          query(collection(db, "progressPhotos"), where("profileId", "==", profileId))
+          query(
+            collection(db, "progressPhotos"),
+            where("profileId", "==", profileId)
+          )
         ),
       ]);
+
+      await Promise.all(
+        progressSnap.docs.map(async (docItem) => {
+          const data = docItem.data() as {
+            imageUrl?: string;
+            storagePath?: string;
+          };
+
+          try {
+            if (data.storagePath) {
+              await deleteObject(ref(storage, data.storagePath));
+            } else if (data.imageUrl) {
+              await deleteObject(ref(storage, data.imageUrl));
+            }
+          } catch (storageError) {
+            console.error("Storage delete error:", storageError);
+          }
+        })
+      );
 
       const deletions: Promise<void>[] = [];
 
@@ -379,7 +422,10 @@ export default function AdminProfileDetailPage() {
         deletions.push(deleteDoc(doc(db, "applications", applicationId)));
       } else if (profileUserId) {
         const applicationSnap = await getDocs(
-          query(collection(db, "applications"), where("userId", "==", profileUserId))
+          query(
+            collection(db, "applications"),
+            where("userId", "==", profileUserId)
+          )
         );
 
         applicationSnap.docs.forEach((docItem) => {
@@ -394,7 +440,7 @@ export default function AdminProfileDetailPage() {
       showToast({
         title: "Client deleted",
         description:
-          "The profile, application, schedule, and progress photos were removed.",
+          "The profile, application, schedule, progress photos, and storage files were removed.",
         type: "success",
       });
 
@@ -529,6 +575,7 @@ export default function AdminProfileDetailPage() {
         profileId,
         userId: profileUserId || "",
         imageUrl,
+        storagePath: fileRef.fullPath,
         title: progressTitle.trim(),
         note: progressNote.trim(),
         uploadedByRole: "admin",
@@ -560,6 +607,20 @@ export default function AdminProfileDetailPage() {
     if (!confirmed) return;
 
     try {
+      const photo = progressPhotos.find((item) => item.id === photoId);
+
+      if (photo) {
+        try {
+          if (photo.storagePath) {
+            await deleteObject(ref(storage, photo.storagePath));
+          } else if (photo.imageUrl) {
+            await deleteObject(ref(storage, photo.imageUrl));
+          }
+        } catch (storageError) {
+          console.error("Storage delete progress photo error:", storageError);
+        }
+      }
+
       await deleteDoc(doc(db, "progressPhotos", photoId));
 
       if (editingPhotoId === photoId) {
@@ -589,34 +650,104 @@ export default function AdminProfileDetailPage() {
 
   return (
     <>
-      <div className="mx-auto max-w-5xl">
+      <div className="mx-auto max-w-6xl space-y-6">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <a
             href="/admin/profiles"
-            className="inline-flex rounded-xl border bg-white px-4 py-2 text-sm font-medium shadow-sm"
+            className="inline-flex rounded-2xl border bg-white px-4 py-2.5 text-sm font-medium shadow-sm transition hover:-translate-y-0.5 hover:shadow-md"
           >
             Back to Profiles
           </a>
 
-          <button
-            onClick={deleteClient}
-            disabled={deletingClient}
-            className="rounded-xl border border-red-200 bg-red-50 px-4 py-2 text-sm font-medium text-red-700 shadow-sm transition hover:bg-red-100 disabled:opacity-50"
-          >
-            {deletingClient ? "Deleting..." : "Delete Client"}
-          </button>
+          <div className="flex flex-wrap gap-3">
+            <a
+              href="/admin/schedule"
+              className="rounded-2xl border bg-white px-4 py-2.5 text-sm font-medium shadow-sm transition hover:-translate-y-0.5 hover:shadow-md"
+            >
+              Open Schedule
+            </a>
+            <a
+              href="/admin/progress"
+              className="rounded-2xl border bg-white px-4 py-2.5 text-sm font-medium shadow-sm transition hover:-translate-y-0.5 hover:shadow-md"
+            >
+              View All Progress
+            </a>
+            <button
+              onClick={saveProfile}
+              disabled={saving}
+              className="rounded-2xl bg-black px-5 py-2.5 text-sm font-medium text-white shadow-sm transition hover:-translate-y-0.5 hover:shadow-md disabled:opacity-50"
+            >
+              {saving ? "Saving..." : "Save Profile"}
+            </button>
+            <button
+              onClick={deleteClient}
+              disabled={deletingClient}
+              className="rounded-2xl border border-red-200 bg-red-50 px-5 py-2.5 text-sm font-medium text-red-700 shadow-sm transition hover:-translate-y-0.5 hover:bg-red-100 hover:shadow-md disabled:opacity-50"
+            >
+              {deletingClient ? "Deleting..." : "Delete Client"}
+            </button>
+          </div>
         </div>
 
-        <div className="mt-6">
-          <h1 className="text-3xl font-bold tracking-tight">Edit Profile</h1>
-          <p className="mt-2 text-gray-600">
-            Update client details, payment, profile completion, schedule, and
-            progress.
-          </p>
-        </div>
+        <section className="overflow-hidden rounded-[32px] border border-white/70 bg-white/90 shadow-[0_24px_80px_rgba(15,23,42,0.10)] backdrop-blur">
+          <div className="bg-gradient-to-r from-[#071120] via-[#123b76] to-[#2EA0FF] p-[1px]">
+            <div className="rounded-t-[31px] bg-transparent px-0 py-0" />
+          </div>
 
-        <section className="mt-5 rounded-2xl border bg-white p-4 shadow-sm">
-          <h2 className="text-sm font-semibold uppercase tracking-wide text-gray-500">
+          <div className="p-6 md:p-8">
+            <div className="flex flex-col gap-6 xl:flex-row xl:items-start xl:justify-between">
+              <div>
+                <div className="inline-flex items-center rounded-full border border-[#bfdbfe] bg-[#eff6ff] px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.2em] text-[#1d4ed8]">
+                  Client profile
+                </div>
+
+                <h1 className="mt-4 text-3xl font-semibold tracking-tight text-slate-950 md:text-4xl">
+                  {form.fullName || "Edit Profile"}
+                </h1>
+                <p className="mt-3 max-w-2xl text-sm text-slate-600 md:text-base">
+                  Update client details, payment, profile completion, schedule,
+                  and progress from one place.
+                </p>
+              </div>
+
+              <div className="grid gap-3 sm:grid-cols-2 xl:w-[360px]">
+                <StatusBadge
+                  label="Approval"
+                  value={form.approvalStatus}
+                  tone={
+                    form.approvalStatus === "approved" ? "success" : "neutral"
+                  }
+                />
+                <StatusBadge
+                  label="Payment"
+                  value={form.paymentStatus}
+                  tone={
+                    form.paymentStatus === "paid"
+                      ? "success"
+                      : form.paymentStatus === "cash"
+                      ? "warning"
+                      : "danger"
+                  }
+                />
+                <StatusBadge
+                  label="Onboarding"
+                  value={form.onboardingStatus}
+                  tone={
+                    form.onboardingStatus === "active" ? "success" : "warning"
+                  }
+                />
+                <StatusBadge
+                  label="Client"
+                  value={form.clientStatus}
+                  tone={form.clientStatus === "active" ? "success" : "neutral"}
+                />
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <section className="rounded-[28px] border border-white/70 bg-white/90 p-5 shadow-[0_18px_50px_rgba(15,23,42,0.07)] backdrop-blur">
+          <h2 className="text-sm font-semibold uppercase tracking-wide text-slate-500">
             Summary
           </h2>
 
@@ -648,34 +779,36 @@ export default function AdminProfileDetailPage() {
           </div>
         </section>
 
-        <div className="mt-5 grid gap-5 xl:grid-cols-2">
-          <section className="rounded-2xl border bg-white p-4 shadow-sm">
-            <h2 className="text-base font-semibold">Basic Information</h2>
+        <div className="grid gap-5 xl:grid-cols-2">
+          <section className="rounded-[28px] border border-white/70 bg-white/90 p-5 shadow-[0_18px_50px_rgba(15,23,42,0.07)] backdrop-blur">
+            <h2 className="text-base font-semibold text-slate-950">
+              Basic Information
+            </h2>
 
             <div className="mt-4 grid gap-3 sm:grid-cols-2">
               <input
-                className="rounded-xl border p-3"
+                className="rounded-2xl border border-slate-200 p-3"
                 placeholder="Full name"
                 value={form.fullName}
                 onChange={(e) => setForm({ ...form, fullName: e.target.value })}
               />
 
               <input
-                className="rounded-xl border p-3"
+                className="rounded-2xl border border-slate-200 p-3"
                 placeholder="Age"
                 value={form.age}
                 onChange={(e) => setForm({ ...form, age: e.target.value })}
               />
 
               <input
-                className="rounded-xl border p-3"
+                className="rounded-2xl border border-slate-200 p-3"
                 placeholder="Height"
                 value={form.height}
                 onChange={(e) => setForm({ ...form, height: e.target.value })}
               />
 
               <input
-                className="rounded-xl border p-3"
+                className="rounded-2xl border border-slate-200 p-3"
                 placeholder="Weight"
                 value={form.weight}
                 onChange={(e) => setForm({ ...form, weight: e.target.value })}
@@ -683,25 +816,27 @@ export default function AdminProfileDetailPage() {
             </div>
 
             <textarea
-              className="mt-3 min-h-[90px] w-full rounded-xl border p-3"
+              className="mt-3 min-h-[100px] w-full rounded-2xl border border-slate-200 p-3"
               placeholder="Goal"
               value={form.goal}
               onChange={(e) => setForm({ ...form, goal: e.target.value })}
             />
           </section>
 
-          <section className="rounded-2xl border bg-white p-4 shadow-sm">
-            <h2 className="text-base font-semibold">Program & Status</h2>
-            <p className="mt-1 text-sm text-gray-500">
+          <section className="rounded-[28px] border border-white/70 bg-white/90 p-5 shadow-[0_18px_50px_rgba(15,23,42,0.07)] backdrop-blur">
+            <h2 className="text-base font-semibold text-slate-950">
+              Program & Status
+            </h2>
+            <p className="mt-1 text-sm text-slate-500">
               Manage assignment, payment, approval, and client state.
             </p>
 
             <div className="mt-4">
-              <label className="mb-1 block text-sm font-medium text-gray-700">
+              <label className="mb-1 block text-sm font-medium text-slate-700">
                 Assigned Program
               </label>
               <input
-                className="w-full rounded-xl border p-3"
+                className="w-full rounded-2xl border border-slate-200 p-3"
                 placeholder="e.g. 1 week plan T1"
                 value={form.assignedProgram}
                 onChange={(e) =>
@@ -712,11 +847,11 @@ export default function AdminProfileDetailPage() {
 
             <div className="mt-3 grid gap-3 sm:grid-cols-2">
               <div>
-                <label className="mb-1 block text-sm font-medium text-gray-700">
+                <label className="mb-1 block text-sm font-medium text-slate-700">
                   Payment
                 </label>
                 <select
-                  className="w-full rounded-xl border p-3"
+                  className="w-full rounded-2xl border border-slate-200 p-3"
                   value={form.paymentStatus}
                   onChange={(e) =>
                     setForm({ ...form, paymentStatus: e.target.value })
@@ -729,11 +864,11 @@ export default function AdminProfileDetailPage() {
               </div>
 
               <div>
-                <label className="mb-1 block text-sm font-medium text-gray-700">
+                <label className="mb-1 block text-sm font-medium text-slate-700">
                   Approval
                 </label>
                 <select
-                  className="w-full rounded-xl border p-3"
+                  className="w-full rounded-2xl border border-slate-200 p-3"
                   value={form.approvalStatus}
                   onChange={(e) =>
                     setForm({ ...form, approvalStatus: e.target.value })
@@ -745,11 +880,11 @@ export default function AdminProfileDetailPage() {
               </div>
 
               <div>
-                <label className="mb-1 block text-sm font-medium text-gray-700">
+                <label className="mb-1 block text-sm font-medium text-slate-700">
                   Profile completion
                 </label>
                 <select
-                  className="w-full rounded-xl border p-3"
+                  className="w-full rounded-2xl border border-slate-200 p-3"
                   value={form.onboardingStatus}
                   onChange={(e) =>
                     setForm({ ...form, onboardingStatus: e.target.value })
@@ -761,11 +896,11 @@ export default function AdminProfileDetailPage() {
               </div>
 
               <div>
-                <label className="mb-1 block text-sm font-medium text-gray-700">
+                <label className="mb-1 block text-sm font-medium text-slate-700">
                   Client status
                 </label>
                 <select
-                  className="w-full rounded-xl border p-3"
+                  className="w-full rounded-2xl border border-slate-200 p-3"
                   value={form.clientStatus}
                   onChange={(e) =>
                     setForm({ ...form, clientStatus: e.target.value })
@@ -779,17 +914,19 @@ export default function AdminProfileDetailPage() {
           </section>
         </div>
 
-        <section className="mt-5 rounded-2xl border bg-white p-4 shadow-sm">
-          <h2 className="text-base font-semibold">Client Schedule</h2>
-          <p className="mt-1 text-sm text-gray-500">
+        <section className="rounded-[28px] border border-white/70 bg-white/90 p-5 shadow-[0_18px_50px_rgba(15,23,42,0.07)] backdrop-blur">
+          <h2 className="text-base font-semibold text-slate-950">
+            Client Schedule
+          </h2>
+          <p className="mt-1 text-sm text-slate-500">
             Upcoming items shown in compact cards.
           </p>
 
           <div className="mt-5">
             {scheduleLoading ? (
-              <p className="text-sm text-gray-500">Loading schedule...</p>
+              <p className="text-sm text-slate-500">Loading schedule...</p>
             ) : scheduleItems.length === 0 ? (
-              <div className="rounded-2xl border border-dashed p-8 text-center text-sm text-gray-500">
+              <div className="rounded-2xl border border-dashed p-8 text-center text-sm text-slate-500">
                 No schedule items added yet.
               </div>
             ) : (
@@ -797,30 +934,34 @@ export default function AdminProfileDetailPage() {
                 {Object.entries(groupedSchedule).map(([date, items]) => (
                   <div key={date}>
                     <div className="mb-3 border-b pb-2">
-                      <p className="text-sm font-medium uppercase tracking-wide text-gray-500">
+                      <p className="text-sm font-medium uppercase tracking-wide text-slate-500">
                         {formatDateLabel(date)}
                       </p>
-                      <h3 className="mt-1 text-base font-semibold">{date}</h3>
+                      <h3 className="mt-1 text-base font-semibold text-slate-950">
+                        {date}
+                      </h3>
                     </div>
 
                     <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
                       {items.map((item) => (
                         <div
                           key={item.id}
-                          className="rounded-2xl border bg-gray-50 p-4"
+                          className="rounded-2xl border bg-slate-50 p-4"
                         >
                           <div className="flex items-center justify-between gap-3">
                             <TypeBadge type={item.type} />
-                            <p className="text-sm font-medium text-gray-700">
+                            <p className="text-sm font-medium text-slate-700">
                               {item.startTime}
                               {item.endTime ? ` - ${item.endTime}` : ""}
                             </p>
                           </div>
 
-                          <p className="mt-3 font-medium">{item.displayTitle}</p>
+                          <p className="mt-3 font-medium text-slate-950">
+                            {item.displayTitle}
+                          </p>
 
                           {item.details?.trim() && (
-                            <p className="mt-2 line-clamp-2 text-sm text-gray-600">
+                            <p className="mt-2 line-clamp-2 text-sm text-slate-600">
                               {item.details}
                             </p>
                           )}
@@ -834,33 +975,35 @@ export default function AdminProfileDetailPage() {
           </div>
         </section>
 
-        <section className="mt-5 rounded-2xl border bg-white p-4 shadow-sm">
-          <h2 className="text-base font-semibold">Health & Notes</h2>
+        <section className="rounded-[28px] border border-white/70 bg-white/90 p-5 shadow-[0_18px_50px_rgba(15,23,42,0.07)] backdrop-blur">
+          <h2 className="text-base font-semibold text-slate-950">
+            Health & Notes
+          </h2>
 
           <div className="mt-4 grid gap-3 md:grid-cols-2">
             <textarea
-              className="min-h-[100px] rounded-xl border p-3"
+              className="min-h-[110px] rounded-2xl border border-slate-200 p-3"
               placeholder="Allergies"
               value={form.allergies}
               onChange={(e) => setForm({ ...form, allergies: e.target.value })}
             />
 
             <textarea
-              className="min-h-[100px] rounded-xl border p-3"
+              className="min-h-[110px] rounded-2xl border border-slate-200 p-3"
               placeholder="Injuries"
               value={form.injuries}
               onChange={(e) => setForm({ ...form, injuries: e.target.value })}
             />
 
             <textarea
-              className="min-h-[120px] rounded-xl border p-3"
+              className="min-h-[130px] rounded-2xl border border-slate-200 p-3"
               placeholder="Client notes"
               value={form.notes}
               onChange={(e) => setForm({ ...form, notes: e.target.value })}
             />
 
             <textarea
-              className="min-h-[120px] rounded-xl border p-3"
+              className="min-h-[130px] rounded-2xl border border-slate-200 p-3"
               placeholder="Internal admin notes"
               value={form.internalNotes}
               onChange={(e) =>
@@ -869,7 +1012,7 @@ export default function AdminProfileDetailPage() {
             />
           </div>
 
-          <label className="mt-3 flex items-center gap-3 rounded-xl border p-4">
+          <label className="mt-3 flex items-center gap-3 rounded-2xl border border-slate-200 p-4">
             <input
               type="checkbox"
               checked={form.progressPhotosEnabled}
@@ -880,17 +1023,21 @@ export default function AdminProfileDetailPage() {
                 })
               }
             />
-            <span className="text-sm font-medium">Progress photos enabled</span>
+            <span className="text-sm font-medium text-slate-800">
+              Progress photos enabled
+            </span>
           </label>
         </section>
 
-        <section className="mt-5 rounded-2xl border bg-white p-4 shadow-sm">
-          <h2 className="text-base font-semibold">Progress Photos</h2>
-          <p className="mt-1 text-sm text-gray-500">
+        <section className="rounded-[28px] border border-white/70 bg-white/90 p-5 shadow-[0_18px_50px_rgba(15,23,42,0.07)] backdrop-blur">
+          <h2 className="text-base font-semibold text-slate-950">
+            Progress Photos
+          </h2>
+          <p className="mt-1 text-sm text-slate-500">
             Upload, edit, and manage this client's progress updates.
           </p>
 
-          <div className="mt-5 grid gap-8 xl:grid-cols-[300px_1fr]">
+          <div className="mt-5 grid gap-8 xl:grid-cols-[320px_1fr]">
             <div className="space-y-4">
               {!editingPhotoId && (
                 <input
@@ -899,7 +1046,7 @@ export default function AdminProfileDetailPage() {
                   onChange={(e) =>
                     setProgressImageFile(e.target.files?.[0] || null)
                   }
-                  className="w-full rounded-xl border p-3"
+                  className="w-full rounded-2xl border border-slate-200 p-3"
                 />
               )}
 
@@ -908,21 +1055,21 @@ export default function AdminProfileDetailPage() {
                 placeholder="Title (optional)"
                 value={progressTitle}
                 onChange={(e) => setProgressTitle(e.target.value)}
-                className="w-full rounded-xl border p-3"
+                className="w-full rounded-2xl border border-slate-200 p-3"
               />
 
               <textarea
                 placeholder="Note (optional)"
                 value={progressNote}
                 onChange={(e) => setProgressNote(e.target.value)}
-                className="min-h-[120px] w-full rounded-xl border p-3"
+                className="min-h-[120px] w-full rounded-2xl border border-slate-200 p-3"
               />
 
               <div className="flex gap-3">
                 <button
                   onClick={saveProgressPhoto}
                   disabled={progressSaving}
-                  className="rounded-xl bg-black px-5 py-3 text-sm font-medium text-white disabled:opacity-50"
+                  className="rounded-2xl bg-black px-5 py-3 text-sm font-medium text-white disabled:opacity-50"
                 >
                   {progressSaving
                     ? "Saving..."
@@ -934,7 +1081,7 @@ export default function AdminProfileDetailPage() {
                 {editingPhotoId && (
                   <button
                     onClick={resetProgressForm}
-                    className="rounded-xl border px-5 py-3 text-sm font-medium"
+                    className="rounded-2xl border border-slate-200 px-5 py-3 text-sm font-medium"
                   >
                     Cancel
                   </button>
@@ -944,9 +1091,9 @@ export default function AdminProfileDetailPage() {
 
             <div>
               {progressLoading ? (
-                <p className="text-sm text-gray-500">Loading photos...</p>
+                <p className="text-sm text-slate-500">Loading photos...</p>
               ) : progressPhotos.length === 0 ? (
-                <div className="rounded-2xl border border-dashed p-8 text-center text-sm text-gray-500">
+                <div className="rounded-2xl border border-dashed p-8 text-center text-sm text-slate-500">
                   No progress photos uploaded yet.
                 </div>
               ) : (
@@ -960,7 +1107,7 @@ export default function AdminProfileDetailPage() {
                         onClick={() => openPhotoModal(photo)}
                         className="w-full text-left"
                       >
-                        <div className="flex aspect-[4/5] items-center justify-center overflow-hidden rounded-xl bg-gray-100">
+                        <div className="flex aspect-[4/5] items-center justify-center overflow-hidden rounded-xl bg-slate-100">
                           <img
                             src={photo.imageUrl}
                             alt={photo.title || "Progress photo"}
@@ -970,18 +1117,18 @@ export default function AdminProfileDetailPage() {
                       </button>
 
                       <div className="mt-3">
-                        <span className="rounded-full border bg-gray-50 px-3 py-1 text-xs font-medium text-gray-700">
+                        <span className="rounded-full border bg-slate-50 px-3 py-1 text-xs font-medium text-slate-700">
                           {photo.uploadedByRole === "admin"
                             ? "Coach upload"
                             : "User upload"}
                         </span>
 
-                        <p className="mt-3 line-clamp-1 font-medium">
+                        <p className="mt-3 line-clamp-1 font-medium text-slate-950">
                           {photo.title || "Progress update"}
                         </p>
 
                         {photo.note && (
-                          <p className="mt-1 line-clamp-2 text-sm text-gray-600">
+                          <p className="mt-1 line-clamp-2 text-sm text-slate-600">
                             {photo.note}
                           </p>
                         )}
@@ -989,14 +1136,14 @@ export default function AdminProfileDetailPage() {
                         <div className="mt-4 flex gap-2">
                           <button
                             onClick={() => startEditPhoto(photo)}
-                            className="rounded-xl border px-3 py-2 text-sm font-medium"
+                            className="rounded-xl border border-slate-200 px-3 py-2 text-sm font-medium"
                           >
                             Edit
                           </button>
 
                           <button
                             onClick={() => deleteProgressPhoto(photo.id)}
-                            className="rounded-xl border px-3 py-2 text-sm font-medium"
+                            className="rounded-xl border border-slate-200 px-3 py-2 text-sm font-medium"
                           >
                             Delete
                           </button>
@@ -1010,11 +1157,11 @@ export default function AdminProfileDetailPage() {
           </div>
         </section>
 
-        <div className="mt-5">
+        <div className="pb-2">
           <button
             onClick={saveProfile}
             disabled={saving}
-            className="rounded-xl bg-black px-6 py-3 text-sm font-medium text-white disabled:opacity-50"
+            className="rounded-2xl bg-black px-6 py-3 text-sm font-medium text-white shadow-sm transition hover:-translate-y-0.5 hover:shadow-md disabled:opacity-50"
           >
             {saving ? "Saving..." : "Save Profile"}
           </button>
@@ -1026,18 +1173,18 @@ export default function AdminProfileDetailPage() {
           <div className="max-h-[90vh] w-full max-w-5xl overflow-y-auto rounded-3xl bg-white p-4 shadow-xl md:p-6">
             <div className="flex items-start justify-between gap-4">
               <div>
-                <span className="rounded-full border bg-gray-50 px-3 py-1 text-xs font-medium text-gray-700">
+                <span className="rounded-full border bg-slate-50 px-3 py-1 text-xs font-medium text-slate-700">
                   {photoModalData.uploadedByRole === "admin"
                     ? "Coach upload"
                     : "User upload"}
                 </span>
 
-                <h2 className="mt-3 text-2xl font-bold tracking-tight">
+                <h2 className="mt-3 text-2xl font-bold tracking-tight text-slate-950">
                   {photoModalData.title}
                 </h2>
 
                 {photoModalData.note && (
-                  <p className="mt-2 text-sm text-gray-600">
+                  <p className="mt-2 text-sm text-slate-600">
                     {photoModalData.note}
                   </p>
                 )}
@@ -1045,13 +1192,13 @@ export default function AdminProfileDetailPage() {
 
               <button
                 onClick={closePhotoModal}
-                className="rounded-xl border bg-white px-3 py-2 text-sm font-medium"
+                className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-medium"
               >
                 Close
               </button>
             </div>
 
-            <div className="mt-6 flex justify-center rounded-2xl bg-gray-50 p-4">
+            <div className="mt-6 flex justify-center rounded-2xl bg-slate-50 p-4">
               <img
                 src={photoModalData.imageUrl}
                 alt={photoModalData.title}
@@ -1073,20 +1220,46 @@ function CompactSummaryPill({
   value: string;
 }) {
   return (
-    <div className="rounded-xl border bg-gray-50 px-3 py-2">
-      <p className="text-[11px] font-semibold uppercase tracking-wide text-gray-500">
+    <div className="rounded-xl border bg-slate-50 px-3 py-2">
+      <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">
         {label}
       </p>
-      <p className="mt-1 text-sm text-gray-700">{value}</p>
+      <p className="mt-1 text-sm text-slate-700">{value}</p>
     </div>
   );
 }
 
 function TypeBadge({ type }: { type: ScheduleType }) {
   return (
-    <span className="inline-flex rounded-full border px-3 py-1 text-xs font-medium uppercase tracking-wide text-gray-800">
+    <span className="inline-flex rounded-full border px-3 py-1 text-xs font-medium uppercase tracking-wide text-slate-800">
       {type}
     </span>
+  );
+}
+
+function StatusBadge({
+  label,
+  value,
+  tone,
+}: {
+  label: string;
+  value: string;
+  tone: "success" | "warning" | "danger" | "neutral";
+}) {
+  const styles = {
+    success: "border-emerald-200 bg-emerald-50 text-emerald-700",
+    warning: "border-amber-200 bg-amber-50 text-amber-700",
+    danger: "border-rose-200 bg-rose-50 text-rose-700",
+    neutral: "border-slate-200 bg-slate-50 text-slate-700",
+  };
+
+  return (
+    <div className={`rounded-2xl border px-4 py-3 ${styles[tone]}`}>
+      <p className="text-[11px] font-semibold uppercase tracking-[0.18em] opacity-80">
+        {label}
+      </p>
+      <p className="mt-1 text-sm font-semibold capitalize">{value}</p>
+    </div>
   );
 }
 
