@@ -170,8 +170,14 @@ export default function AdminPage() {
     [profiles]
   );
 
-  const recentSchedule = useMemo(() => scheduleItems.slice(0, 6), [scheduleItems]);
-  const recentUploads = useMemo(() => progressPhotos.slice(0, 6), [progressPhotos]);
+  const recentSchedule = useMemo(
+    () => scheduleItems.slice(0, 6),
+    [scheduleItems]
+  );
+  const recentUploads = useMemo(
+    () => progressPhotos.slice(0, 6),
+    [progressPhotos]
+  );
 
   const profileNameMap = useMemo(() => {
     const map: Record<string, string> = {};
@@ -193,8 +199,11 @@ export default function AdminPage() {
 
     if (pendingApplications > 0) {
       actions.push({
-        title: `${pendingApplications} application${pendingApplications === 1 ? "" : "s"} pending review`,
-        description: "Approve or reject new applicants and move them into the onboarding flow.",
+        title: `${pendingApplications} application${
+          pendingApplications === 1 ? "" : "s"
+        } pending review`,
+        description:
+          "Approve or reject new applicants and move them into the onboarding flow.",
         href: "/admin/applications",
         tone: "blue",
       });
@@ -202,8 +211,11 @@ export default function AdminPage() {
 
     if (pendingPayments > 0) {
       actions.push({
-        title: `${pendingPayments} client${pendingPayments === 1 ? "" : "s"} with payment pending`,
-        description: "Check profiles that still need payment confirmation before full access.",
+        title: `${pendingPayments} client${
+          pendingPayments === 1 ? "" : "s"
+        } with payment pending`,
+        description:
+          "Check profiles that still need payment confirmation before full access.",
         href: "/admin/profiles",
         tone: "amber",
       });
@@ -212,7 +224,8 @@ export default function AdminPage() {
     if (actions.length === 0) {
       actions.push({
         title: "System ready",
-        description: "Applications, client profiles, and schedule are currently under control.",
+        description:
+          "Applications, client profiles, and schedule are currently under control.",
         href: "/admin/profiles",
         tone: "emerald",
       });
@@ -259,7 +272,8 @@ export default function AdminPage() {
                 Control Center
               </h1>
               <p className="mt-3 max-w-2xl text-sm text-slate-600 md:text-base">
-                Monitor applications, clients, schedule, templates, and uploads from one place.
+                Monitor applications, clients, schedule, templates, and uploads
+                from one place.
               </p>
             </div>
 
@@ -283,10 +297,26 @@ export default function AdminPage() {
       </section>
 
       <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        <MetricCard label="Pending Applications" value={String(pendingApplications)} tone="blue" />
-        <MetricCard label="Approved Applications" value={String(approvedApplications)} tone="success" />
-        <MetricCard label="Active Clients" value={String(activeClients)} tone="dark" />
-        <MetricCard label="Pending Payments" value={String(pendingPayments)} tone="light" />
+        <MetricCard
+          label="Pending Applications"
+          value={String(pendingApplications)}
+          tone="blue"
+        />
+        <MetricCard
+          label="Approved Applications"
+          value={String(approvedApplications)}
+          tone="success"
+        />
+        <MetricCard
+          label="Active Clients"
+          value={String(activeClients)}
+          tone="dark"
+        />
+        <MetricCard
+          label="Pending Payments"
+          value={String(pendingPayments)}
+          tone="light"
+        />
       </section>
 
       <section className="grid gap-4 xl:grid-cols-[1.2fr_0.8fr]">
@@ -324,10 +354,22 @@ export default function AdminPage() {
 
           <div className="mt-6 space-y-4">
             <MiniStat label="Profiles" value={String(profiles.length)} />
-            <MiniStat label="Inactive Clients" value={String(inactiveClients)} />
-            <MiniStat label="Rejected Applications" value={String(rejectedApplications)} />
-            <MiniStat label="Schedule Items" value={String(scheduleItems.length)} />
-            <MiniStat label="Photo Uploads" value={String(progressPhotos.length)} />
+            <MiniStat
+              label="Inactive Clients"
+              value={String(inactiveClients)}
+            />
+            <MiniStat
+              label="Rejected Applications"
+              value={String(rejectedApplications)}
+            />
+            <MiniStat
+              label="Schedule Items"
+              value={String(scheduleItems.length)}
+            />
+            <MiniStat
+              label="Photo Uploads"
+              value={String(progressPhotos.length)}
+            />
           </div>
         </div>
       </section>
@@ -434,15 +476,33 @@ export default function AdminPage() {
                   key={item.id}
                   className="rounded-[22px] border border-slate-100 bg-gradient-to-br from-slate-50 to-white p-4"
                 >
-                  <p className="text-sm font-semibold text-slate-900">
-                    {item.title || "Progress update"}
-                  </p>
-                  <p className="mt-1 text-sm text-slate-600">
-                    {profileNameMap[item.profileId] || "Unknown client"}
-                  </p>
-                  <p className="mt-2 text-xs text-slate-500">
-                    {formatTimestamp(item.createdAt)}
-                  </p>
+                  <div className="flex items-center gap-4">
+                    <div className="h-14 w-14 shrink-0 overflow-hidden rounded-2xl border border-slate-200 bg-white">
+                      {item.imageUrl ? (
+                        <img
+                          src={item.imageUrl}
+                          alt={item.title || "Progress update"}
+                          className="h-full w-full object-cover"
+                        />
+                      ) : (
+                        <div className="flex h-full w-full items-center justify-center text-[10px] text-slate-400">
+                          No image
+                        </div>
+                      )}
+                    </div>
+
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate text-sm font-semibold text-slate-900">
+                        {item.title || "Progress update"}
+                      </p>
+                      <p className="mt-1 truncate text-sm text-slate-600">
+                        {profileNameMap[item.profileId] || "Unknown client"}
+                      </p>
+                      <p className="mt-2 text-xs text-slate-500">
+                        {formatTimestamp(item.createdAt)}
+                      </p>
+                    </div>
+                  </div>
                 </div>
               ))}
             </div>
