@@ -18,7 +18,7 @@ export const metadata: Metadata = {
   description: "Premium fitness bootcamp platform",
 
   icons: {
-    apple: "/apple-touch-icon.png", // 👈 CLAVE para iPhone
+    apple: "/apple-touch-icon.png",
   },
 
   appleWebApp: {
