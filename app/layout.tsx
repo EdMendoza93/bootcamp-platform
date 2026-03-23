@@ -17,6 +17,7 @@ export const metadata: Metadata = {
   title: "Wild Atlantic Bootcamp",
   description: "Premium fitness bootcamp platform",
   icons: {
+    icon: "/icon.png",
     apple: "/apple-touch-icon.png",
   },
   appleWebApp: {
