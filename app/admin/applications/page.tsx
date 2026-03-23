@@ -189,7 +189,7 @@ export default function AdminApplicationsPage() {
         injuries: "",
         notes: "",
         internalNotes: "",
-        progressPhotosEnabled: false,
+        progressPhotosEnabled: true,
         createdAt: serverTimestamp(),
       });
 
