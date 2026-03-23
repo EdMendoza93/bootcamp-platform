@@ -16,6 +16,11 @@ const geistMono = Geist_Mono({
 export const metadata: Metadata = {
   title: "Wild Atlantic Bootcamp",
   description: "Premium fitness bootcamp platform",
+
+  icons: {
+    apple: "/apple-touch-icon.png", // 👈 CLAVE para iPhone
+  },
+
   appleWebApp: {
     capable: true,
     title: "Bootcamp",
