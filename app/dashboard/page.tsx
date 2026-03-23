@@ -676,14 +676,7 @@ export default function DashboardPage() {
                 </p>
               </div>
 
-              {canSeeProgress && (
-                <a
-                  href="/dashboard/progress"
-                  className="inline-flex rounded-2xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-medium text-slate-700 shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:border-slate-300 hover:shadow-md"
-                >
-                  View Progress Photos
-                </a>
-              )}
+             
             </div>
 
             <div className="space-y-6">

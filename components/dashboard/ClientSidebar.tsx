@@ -31,8 +31,11 @@ export default function ClientSidebar() {
 
         <nav className="space-y-2">
           {navItems.map((item) => {
-            const isActive =
-              pathname === item.href || pathname.startsWith(`${item.href}/`);
+            const isDashboard = item.href === "/dashboard";
+
+            const isActive = isDashboard
+              ? pathname === "/dashboard"
+              : pathname === item.href || pathname.startsWith(`${item.href}/`);
 
             return (
               <Link
