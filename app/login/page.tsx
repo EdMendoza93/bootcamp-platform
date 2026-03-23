@@ -1,17 +1,19 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { auth, db } from "@/lib/firebase";
 import {
   browserLocalPersistence,
   createUserWithEmailAndPassword,
   getRedirectResult,
   GoogleAuthProvider,
+  onAuthStateChanged,
   setPersistence,
   signInWithEmailAndPassword,
   signInWithPopup,
   signInWithRedirect,
   signOut,
+  User,
 } from "firebase/auth";
 import { doc, getDoc } from "firebase/firestore";
 import { useToast } from "@/components/ui/ToastProvider";
@@ -47,7 +49,6 @@ function isIosStandaloneApp() {
 
   const isStandalone =
     window.matchMedia?.("(display-mode: standalone)")?.matches ||
-    // Safari iOS standalone
     (window.navigator as Navigator & { standalone?: boolean }).standalone ===
       true;
 
@@ -59,37 +60,70 @@ export default function LoginPage() {
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const [checkingRedirect, setCheckingRedirect] = useState(true);
+  const routedRef = useRef(false);
   const { showToast } = useToast();
 
+  const finishLogin = async (user: User) => {
+    if (routedRef.current) return;
+    routedRef.current = true;
+    await routeAfterLogin(user.uid);
+  };
+
   useEffect(() => {
-    const handleRedirectLogin = async () => {
+    let mounted = true;
+
+    const initAuth = async () => {
       try {
         await setPersistence(auth, browserLocalPersistence);
-        const result = await getRedirectResult(auth);
 
-        if (result?.user?.uid) {
-          showToast({
-            title: "Google login successful",
-            description: "Redirecting to your account.",
-            type: "success",
-          });
+        try {
+          const redirectResult = await getRedirectResult(auth);
 
-          await routeAfterLogin(result.user.uid);
+          if (redirectResult?.user && mounted) {
+            showToast({
+              title: "Google login successful",
+              description: "Redirecting to your account.",
+              type: "success",
+            });
+
+            await finishLogin(redirectResult.user);
+            return;
+          }
+        } catch (err: any) {
+          console.error("Redirect login error:", err);
+          if (mounted) {
+            showToast({
+              title: "Google login failed",
+              description: err?.message || "Something went wrong.",
+              type: "error",
+            });
+          }
+        }
+
+        await auth.authStateReady();
+
+        if (auth.currentUser && mounted) {
+          await finishLogin(auth.currentUser);
           return;
         }
-      } catch (err: any) {
-        console.error("Redirect login error:", err);
-        showToast({
-          title: "Google login failed",
-          description: err?.message || "Something went wrong.",
-          type: "error",
-        });
       } finally {
-        setCheckingRedirect(false);
+        if (mounted) {
+          setCheckingRedirect(false);
+        }
       }
     };
 
-    handleRedirectLogin();
+    initAuth();
+
+    const unsubscribe = onAuthStateChanged(auth, async (user) => {
+      if (!mounted || !user || routedRef.current) return;
+      await finishLogin(user);
+    });
+
+    return () => {
+      mounted = false;
+      unsubscribe();
+    };
   }, [showToast]);
 
   const login = async () => {
@@ -105,7 +139,7 @@ export default function LoginPage() {
         type: "success",
       });
 
-      await routeAfterLogin(credential.user.uid);
+      await finishLogin(credential.user);
     } catch (err: any) {
       showToast({
         title: "Login failed",
@@ -134,7 +168,7 @@ export default function LoginPage() {
         type: "success",
       });
 
-      await routeAfterLogin(credential.user.uid);
+      await finishLogin(credential.user);
     } catch (err: any) {
       showToast({
         title: "Signup failed",
@@ -166,7 +200,7 @@ export default function LoginPage() {
         type: "success",
       });
 
-      await routeAfterLogin(credential.user.uid);
+      await finishLogin(credential.user);
     } catch (err: any) {
       showToast({
         title: "Google login failed",
@@ -180,6 +214,7 @@ export default function LoginPage() {
   const resetSession = async () => {
     try {
       await signOut(auth);
+      routedRef.current = false;
       showToast({
         title: "Session reset",
         description: "You have been signed out.",
@@ -286,11 +321,7 @@ export default function LoginPage() {
               disabled={loading}
               className="w-full rounded-xl border py-3 text-sm font-medium disabled:opacity-50"
             >
-              {loading
-                ? "Loading..."
-                : isIosStandaloneApp()
-                ? "Continue with Google"
-                : "Continue with Google"}
+              {loading ? "Loading..." : "Continue with Google"}
             </button>
 
             <button
