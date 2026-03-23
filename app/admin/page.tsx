@@ -31,6 +31,7 @@ type ScheduleItem = {
 type ProgressPhoto = {
   id: string;
   profileId: string;
+  imageUrl: string;
   title?: string;
   createdAt?: {
     seconds?: number;
