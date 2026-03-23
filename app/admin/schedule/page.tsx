@@ -394,7 +394,7 @@ export default function AdminSchedulePage() {
           </h1>
 
           <p className="mt-3 max-w-2xl text-sm text-slate-600 md:text-base">
-            Create, edit, and manage client itinerary items with template support.
+            Build structured itineraries for each client using templates or custom notes.
           </p>
         </div>
       </section>
@@ -409,7 +409,7 @@ export default function AdminSchedulePage() {
               {editingItemId ? "Edit Schedule Item" : "Create Schedule Item"}
             </h2>
             <p className="mt-2 text-sm text-slate-600">
-              Build the client itinerary using templates or custom notes.
+              Assign sessions clearly and keep each client plan organized.
             </p>
           </div>
 

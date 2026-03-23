@@ -505,7 +505,7 @@ export default function AdminProfileDetailPage() {
 
   return (
     <>
-      <div className="mx-auto max-w-6xl space-y-6">
+      <div className="mx-auto max-w-6xl space-y-6 pb-28">
         <a
           href="/admin/profiles"
           className="inline-flex rounded-2xl border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-700 shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:border-slate-300 hover:shadow-md"
@@ -513,70 +513,81 @@ export default function AdminProfileDetailPage() {
           Back to Profiles
         </a>
 
-        <section className="overflow-hidden rounded-[32px] border border-white/70 bg-white/90 shadow-[0_24px_80px_rgba(15,23,42,0.10)] backdrop-blur">
-          <div className="bg-gradient-to-r from-[#0f172a] via-[#123b76] to-[#2EA0FF] p-[1px]">
-            <div className="rounded-t-[31px] bg-transparent px-0 py-0" />
+        <section className="overflow-hidden rounded-[34px] border border-white/70 bg-white/90 shadow-[0_24px_80px_rgba(15,23,42,0.10)] backdrop-blur">
+          <div className="bg-gradient-to-r from-[#071120] via-[#123b76] to-[#2EA0FF] p-[1px]">
+            <div className="rounded-t-[33px] bg-transparent px-0 py-0" />
           </div>
 
-          <div className="p-6 md:p-8">
-            <div className="inline-flex items-center rounded-full border border-[#bfdbfe] bg-[#eff6ff] px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.2em] text-[#1d4ed8]">
-              Client Profile
+          <div className="relative overflow-hidden p-6 md:p-8">
+            <div className="absolute right-0 top-0 h-44 w-44 rounded-full bg-[#2EA0FF]/10 blur-3xl" />
+            <div className="absolute bottom-0 left-0 h-36 w-36 rounded-full bg-emerald-300/10 blur-3xl" />
+
+            <div className="relative flex flex-col gap-6 xl:flex-row xl:items-end xl:justify-between">
+              <div>
+                <div className="inline-flex items-center rounded-full border border-[#bfdbfe] bg-[#eff6ff] px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.2em] text-[#1d4ed8]">
+                  Client profile
+                </div>
+
+                <h1 className="mt-4 text-3xl font-semibold tracking-tight text-slate-950 md:text-5xl">
+                  {form.fullName || "Unnamed profile"}
+                </h1>
+
+                <p className="mt-3 max-w-2xl text-sm text-slate-600 md:text-base">
+                  Manage client details, status, program setup, schedule, and progress
+                  from one place.
+                </p>
+
+                <div className="mt-5 flex flex-wrap gap-2">
+                  <StatusChip
+                    tone={form.clientStatus === "inactive" ? "danger" : "success"}
+                    label={`Client: ${form.clientStatus}`}
+                  />
+                  <StatusChip
+                    tone={
+                      form.paymentStatus === "paid"
+                        ? "success"
+                        : form.paymentStatus === "cash"
+                        ? "violet"
+                        : "warning"
+                    }
+                    label={`Payment: ${form.paymentStatus}`}
+                  />
+                  <StatusChip
+                    tone={form.onboardingStatus === "active" ? "success" : "blue"}
+                    label={`Profile: ${
+                      form.onboardingStatus === "active"
+                        ? "completed"
+                        : "incomplete"
+                    }`}
+                  />
+                </div>
+              </div>
+
+              <div className="grid gap-3 sm:grid-cols-2 xl:min-w-[360px]">
+                <HeroStatCard label="Program" value={form.assignedProgram || "Not assigned"} />
+                <HeroStatCard label="Next action" value={nextAction} />
+              </div>
             </div>
-
-            <h1 className="mt-4 text-3xl font-semibold tracking-tight text-slate-950 md:text-4xl">
-              Edit Profile
-            </h1>
-
-            <p className="mt-3 max-w-2xl text-sm text-slate-600 md:text-base">
-              Update client details, payment, profile completion, schedule, and
-              progress.
-            </p>
           </div>
         </section>
 
-        <section className="rounded-[28px] border border-white/70 bg-white/90 p-5 shadow-[0_18px_50px_rgba(15,23,42,0.07)] backdrop-blur">
-          <h2 className="text-sm font-semibold uppercase tracking-[0.18em] text-[#1d4ed8]">
-            Summary
-          </h2>
-
-          <div className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-            <CompactSummaryPill label="Approval" value={form.approvalStatus} />
-            <CompactSummaryPill label="Payment" value={form.paymentStatus} />
-            <CompactSummaryPill
-              label="Profile"
-              value={
-                form.onboardingStatus === "active"
-                  ? "Completed"
-                  : "Not completed"
-              }
-            />
-            <CompactSummaryPill label="Client" value={form.clientStatus} />
-            <CompactSummaryPill
-              label="Program"
-              value={form.assignedProgram || "Not assigned"}
-            />
-            <CompactSummaryPill
-              label="Schedule"
-              value={String(scheduleItems.length)}
-            />
-            <CompactSummaryPill
-              label="Photos"
-              value={String(progressPhotos.length)}
-            />
-            <CompactSummaryPill label="Next" value={nextAction} />
-          </div>
+        <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+          <CompactSummaryPill label="Approval" value={form.approvalStatus} />
+          <CompactSummaryPill label="Schedule items" value={String(scheduleItems.length)} />
+          <CompactSummaryPill label="Progress photos" value={String(progressPhotos.length)} />
+          <CompactSummaryPill
+            label="Photo uploads"
+            value={form.progressPhotosEnabled ? "Enabled" : "Disabled"}
+          />
         </section>
 
         <div className="grid gap-6 xl:grid-cols-2">
-          <section className="rounded-[28px] border border-white/70 bg-white/90 p-5 shadow-[0_18px_50px_rgba(15,23,42,0.07)] backdrop-blur">
-            <div className="max-w-2xl">
-              <p className="text-sm font-semibold uppercase tracking-[0.18em] text-[#1d4ed8]">
-                Basic information
-              </p>
-              <h2 className="mt-2 text-2xl font-semibold tracking-tight text-slate-950">
-                Personal Details
-              </h2>
-            </div>
+          <section className="rounded-[28px] border border-white/70 bg-white/90 p-5 shadow-[0_18px_50px_rgba(15,23,42,0.07)] backdrop-blur md:p-6">
+            <SectionHeader
+              eyebrow="Basic information"
+              title="Personal Details"
+              description="Core information used by the team to personalize the client experience."
+            />
 
             <div className="mt-5 grid gap-4 sm:grid-cols-2">
               <FieldGroup label="Full name">
@@ -618,7 +629,7 @@ export default function AdminProfileDetailPage() {
 
             <FieldGroup label="Goal" className="mt-4">
               <textarea
-                className="min-h-[110px] w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 shadow-sm outline-none transition focus:border-[#93c5fd] focus:ring-4 focus:ring-[#dbeafe]"
+                className="min-h-[120px] w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 shadow-sm outline-none transition focus:border-[#93c5fd] focus:ring-4 focus:ring-[#dbeafe]"
                 placeholder="Goal"
                 value={form.goal}
                 onChange={(e) => setForm({ ...form, goal: e.target.value })}
@@ -626,18 +637,12 @@ export default function AdminProfileDetailPage() {
             </FieldGroup>
           </section>
 
-          <section className="rounded-[28px] border border-white/70 bg-white/90 p-5 shadow-[0_18px_50px_rgba(15,23,42,0.07)] backdrop-blur">
-            <div className="max-w-2xl">
-              <p className="text-sm font-semibold uppercase tracking-[0.18em] text-[#1d4ed8]">
-                Program & status
-              </p>
-              <h2 className="mt-2 text-2xl font-semibold tracking-tight text-slate-950">
-                Client Management
-              </h2>
-              <p className="mt-2 text-sm text-slate-600">
-                Manage assignment, payment, approval, and client state.
-              </p>
-            </div>
+          <section className="rounded-[28px] border border-white/70 bg-white/90 p-5 shadow-[0_18px_50px_rgba(15,23,42,0.07)] backdrop-blur md:p-6">
+            <SectionHeader
+              eyebrow="Program & status"
+              title="Client Management"
+              description="Control assignment, payment, approval, onboarding, and overall client status."
+            />
 
             <FieldGroup label="Assigned Program" className="mt-5">
               <input
@@ -707,18 +712,12 @@ export default function AdminProfileDetailPage() {
           </section>
         </div>
 
-        <section className="rounded-[28px] border border-white/70 bg-white/90 p-5 shadow-[0_18px_50px_rgba(15,23,42,0.07)] backdrop-blur">
-          <div className="max-w-2xl">
-            <p className="text-sm font-semibold uppercase tracking-[0.18em] text-[#1d4ed8]">
-              Schedule
-            </p>
-            <h2 className="mt-2 text-2xl font-semibold tracking-tight text-slate-950">
-              Client Schedule
-            </h2>
-            <p className="mt-2 text-sm text-slate-600">
-              Upcoming items shown in compact cards.
-            </p>
-          </div>
+        <section className="rounded-[28px] border border-white/70 bg-white/90 p-5 shadow-[0_18px_50px_rgba(15,23,42,0.07)] backdrop-blur md:p-6">
+          <SectionHeader
+            eyebrow="Schedule"
+            title="Client Schedule"
+            description="A structured view of all scheduled items currently assigned to this client."
+          />
 
           <div className="mt-5">
             {scheduleLoading ? (
@@ -773,87 +772,95 @@ export default function AdminProfileDetailPage() {
           </div>
         </section>
 
-        <section className="rounded-[28px] border border-white/70 bg-white/90 p-5 shadow-[0_18px_50px_rgba(15,23,42,0.07)] backdrop-blur">
-          <div className="max-w-2xl">
-            <p className="text-sm font-semibold uppercase tracking-[0.18em] text-[#1d4ed8]">
-              Health & notes
-            </p>
-            <h2 className="mt-2 text-2xl font-semibold tracking-tight text-slate-950">
-              Additional Information
-            </h2>
-          </div>
-
-          <div className="mt-5 grid gap-4 md:grid-cols-2">
-            <FieldGroup label="Allergies">
-              <textarea
-                className="min-h-[110px] w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 shadow-sm outline-none transition focus:border-[#93c5fd] focus:ring-4 focus:ring-[#dbeafe]"
-                placeholder="Allergies"
-                value={form.allergies}
-                onChange={(e) => setForm({ ...form, allergies: e.target.value })}
-              />
-            </FieldGroup>
-
-            <FieldGroup label="Injuries">
-              <textarea
-                className="min-h-[110px] w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 shadow-sm outline-none transition focus:border-[#93c5fd] focus:ring-4 focus:ring-[#dbeafe]"
-                placeholder="Injuries"
-                value={form.injuries}
-                onChange={(e) => setForm({ ...form, injuries: e.target.value })}
-              />
-            </FieldGroup>
-
-            <FieldGroup label="Client notes">
-              <textarea
-                className="min-h-[130px] w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 shadow-sm outline-none transition focus:border-[#93c5fd] focus:ring-4 focus:ring-[#dbeafe]"
-                placeholder="Client notes"
-                value={form.notes}
-                onChange={(e) => setForm({ ...form, notes: e.target.value })}
-              />
-            </FieldGroup>
-
-            <FieldGroup label="Internal admin notes">
-              <textarea
-                className="min-h-[130px] w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 shadow-sm outline-none transition focus:border-[#93c5fd] focus:ring-4 focus:ring-[#dbeafe]"
-                placeholder="Internal admin notes"
-                value={form.internalNotes}
-                onChange={(e) =>
-                  setForm({ ...form, internalNotes: e.target.value })
-                }
-              />
-            </FieldGroup>
-          </div>
-
-          <label className="mt-4 flex items-center gap-3 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
-            <input
-              type="checkbox"
-              checked={form.progressPhotosEnabled}
-              onChange={(e) =>
-                setForm({
-                  ...form,
-                  progressPhotosEnabled: e.target.checked,
-                })
-              }
+        <div className="grid gap-6 xl:grid-cols-2">
+          <section className="rounded-[28px] border border-white/70 bg-white/90 p-5 shadow-[0_18px_50px_rgba(15,23,42,0.07)] backdrop-blur md:p-6">
+            <SectionHeader
+              eyebrow="Health & notes"
+              title="Health Information"
+              description="Important physical and context details the team should keep in mind."
             />
-            <span className="text-sm font-semibold text-slate-700">
-              Progress photos enabled
-            </span>
-          </label>
-        </section>
 
-        <section className="rounded-[28px] border border-white/70 bg-white/90 p-5 shadow-[0_18px_50px_rgba(15,23,42,0.07)] backdrop-blur">
-          <div className="max-w-2xl">
-            <p className="text-sm font-semibold uppercase tracking-[0.18em] text-[#1d4ed8]">
-              Progress
-            </p>
-            <h2 className="mt-2 text-2xl font-semibold tracking-tight text-slate-950">
-              Progress Photos
-            </h2>
-            <p className="mt-2 text-sm text-slate-600">
-              Upload, edit, and manage this client's progress updates.
-            </p>
-          </div>
+            <div className="mt-5 grid gap-4">
+              <FieldGroup label="Allergies">
+                <textarea
+                  className="min-h-[110px] w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 shadow-sm outline-none transition focus:border-[#93c5fd] focus:ring-4 focus:ring-[#dbeafe]"
+                  placeholder="Allergies"
+                  value={form.allergies}
+                  onChange={(e) => setForm({ ...form, allergies: e.target.value })}
+                />
+              </FieldGroup>
 
-          <div className="mt-5 grid gap-8 xl:grid-cols-[320px_1fr]">
+              <FieldGroup label="Injuries">
+                <textarea
+                  className="min-h-[110px] w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 shadow-sm outline-none transition focus:border-[#93c5fd] focus:ring-4 focus:ring-[#dbeafe]"
+                  placeholder="Injuries"
+                  value={form.injuries}
+                  onChange={(e) => setForm({ ...form, injuries: e.target.value })}
+                />
+              </FieldGroup>
+
+              <FieldGroup label="Client notes">
+                <textarea
+                  className="min-h-[130px] w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 shadow-sm outline-none transition focus:border-[#93c5fd] focus:ring-4 focus:ring-[#dbeafe]"
+                  placeholder="Client notes"
+                  value={form.notes}
+                  onChange={(e) => setForm({ ...form, notes: e.target.value })}
+                />
+              </FieldGroup>
+            </div>
+          </section>
+
+          <section className="rounded-[28px] border border-white/70 bg-white/90 p-5 shadow-[0_18px_50px_rgba(15,23,42,0.07)] backdrop-blur md:p-6">
+            <SectionHeader
+              eyebrow="Internal"
+              title="Admin Notes & Controls"
+              description="Private admin context and platform permissions for this client."
+            />
+
+            <div className="mt-5 grid gap-4">
+              <FieldGroup label="Internal admin notes">
+                <textarea
+                  className="min-h-[180px] w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 shadow-sm outline-none transition focus:border-[#93c5fd] focus:ring-4 focus:ring-[#dbeafe]"
+                  placeholder="Internal admin notes"
+                  value={form.internalNotes}
+                  onChange={(e) =>
+                    setForm({ ...form, internalNotes: e.target.value })
+                  }
+                />
+              </FieldGroup>
+
+              <label className="flex items-center gap-3 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+                <input
+                  type="checkbox"
+                  checked={form.progressPhotosEnabled}
+                  onChange={(e) =>
+                    setForm({
+                      ...form,
+                      progressPhotosEnabled: e.target.checked,
+                    })
+                  }
+                />
+                <div>
+                  <p className="text-sm font-semibold text-slate-700">
+                    Progress photos enabled
+                  </p>
+                  <p className="mt-1 text-xs text-slate-500">
+                    Allow this client to upload progress images from their dashboard.
+                  </p>
+                </div>
+              </label>
+            </div>
+          </section>
+        </div>
+
+        <section className="rounded-[28px] border border-white/70 bg-white/90 p-5 shadow-[0_18px_50px_rgba(15,23,42,0.07)] backdrop-blur md:p-6">
+          <SectionHeader
+            eyebrow="Progress"
+            title="Progress Photos"
+            description="Track transformation visually, upload coach-side updates, and keep the client timeline organized."
+          />
+
+          <div className="mt-5 grid gap-8 xl:grid-cols-[340px_1fr]">
             <div className="space-y-4">
               {!editingPhotoId && (
                 <FieldGroup label="Choose image">
@@ -939,17 +946,23 @@ export default function AdminProfileDetailPage() {
                       </button>
 
                       <div className="mt-3">
-                        <span
-                          className={`rounded-full border px-3 py-1 text-[11px] font-semibold ${
-                            photo.uploadedByRole === "admin"
-                              ? "border-[#bfdbfe] bg-[#eff6ff] text-[#1d4ed8]"
-                              : "border-slate-200 bg-slate-50 text-slate-700"
-                          }`}
-                        >
-                          {photo.uploadedByRole === "admin"
-                            ? "Coach upload"
-                            : "User upload"}
-                        </span>
+                        <div className="flex flex-wrap items-center gap-2">
+                          <span
+                            className={`rounded-full border px-3 py-1 text-[11px] font-semibold ${
+                              photo.uploadedByRole === "admin"
+                                ? "border-[#bfdbfe] bg-[#eff6ff] text-[#1d4ed8]"
+                                : "border-slate-200 bg-slate-50 text-slate-700"
+                            }`}
+                          >
+                            {photo.uploadedByRole === "admin"
+                              ? "Coach upload"
+                              : "User upload"}
+                          </span>
+
+                          <span className="text-xs text-slate-500">
+                            {formatTimestamp(photo.createdAt)}
+                          </span>
+                        </div>
 
                         <p className="mt-3 line-clamp-1 font-semibold text-slate-900">
                           {photo.title || "Progress update"}
@@ -984,8 +997,19 @@ export default function AdminProfileDetailPage() {
             </div>
           </div>
         </section>
+      </div>
 
-        <div className="pt-1">
+      <div className="fixed bottom-0 left-0 right-0 z-40 border-t border-white/70 bg-white/85 backdrop-blur">
+        <div className="mx-auto flex max-w-7xl items-center justify-between gap-4 px-4 py-4 md:px-8">
+          <div>
+            <p className="text-sm font-semibold text-slate-900">
+              Save profile changes
+            </p>
+            <p className="text-xs text-slate-500">
+              Update client information, status, notes, and permissions.
+            </p>
+          </div>
+
           <button
             onClick={saveProfile}
             disabled={saving}
@@ -1046,6 +1070,47 @@ export default function AdminProfileDetailPage() {
   );
 }
 
+function SectionHeader({
+  eyebrow,
+  title,
+  description,
+}: {
+  eyebrow: string;
+  title: string;
+  description?: string;
+}) {
+  return (
+    <div className="max-w-2xl">
+      <p className="text-sm font-semibold uppercase tracking-[0.18em] text-[#1d4ed8]">
+        {eyebrow}
+      </p>
+      <h2 className="mt-2 text-2xl font-semibold tracking-tight text-slate-950">
+        {title}
+      </h2>
+      {description && (
+        <p className="mt-2 text-sm text-slate-600">{description}</p>
+      )}
+    </div>
+  );
+}
+
+function HeroStatCard({
+  label,
+  value,
+}: {
+  label: string;
+  value: string;
+}) {
+  return (
+    <div className="rounded-[22px] border border-white/80 bg-white/85 p-4 shadow-sm backdrop-blur">
+      <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">
+        {label}
+      </p>
+      <p className="mt-2 text-sm font-semibold text-slate-900">{value}</p>
+    </div>
+  );
+}
+
 function CompactSummaryPill({
   label,
   value,
@@ -1060,6 +1125,30 @@ function CompactSummaryPill({
       </p>
       <p className="mt-1 text-sm font-medium text-slate-700">{value}</p>
     </div>
+  );
+}
+
+function StatusChip({
+  label,
+  tone,
+}: {
+  label: string;
+  tone: "success" | "danger" | "warning" | "blue" | "violet";
+}) {
+  const styles = {
+    success: "border-emerald-200 bg-emerald-50 text-emerald-700",
+    danger: "border-rose-200 bg-rose-50 text-rose-700",
+    warning: "border-amber-200 bg-amber-50 text-amber-700",
+    blue: "border-[#bfdbfe] bg-[#eff6ff] text-[#1d4ed8]",
+    violet: "border-violet-200 bg-violet-50 text-violet-700",
+  };
+
+  return (
+    <span
+      className={`rounded-full border px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.14em] ${styles[tone]}`}
+    >
+      {label}
+    </span>
   );
 }
 
@@ -1104,5 +1193,19 @@ function formatDateLabel(date: string) {
     weekday: "long",
     month: "long",
     day: "numeric",
+  });
+}
+
+function formatTimestamp(
+  createdAt?: { seconds?: number; nanoseconds?: number }
+) {
+  if (!createdAt?.seconds) return "No date";
+
+  const date = new Date(createdAt.seconds * 1000);
+
+  return date.toLocaleDateString("en-US", {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
   });
 }
