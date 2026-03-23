@@ -34,7 +34,6 @@ export default function ProgressPage() {
   const [approvalStatus, setApprovalStatus] = useState<
     "pending" | "approved" | "rejected" | "none"
   >("none");
-
   const [progressPhotosEnabled, setProgressPhotosEnabled] = useState(false);
 
   useEffect(() => {
@@ -45,7 +44,6 @@ export default function ProgressPage() {
       }
 
       try {
-        // 🔹 GET PROFILE
         const profileSnap = await getDocs(
           query(collection(db, "profiles"), where("userId", "==", user.uid))
         );
@@ -63,7 +61,6 @@ export default function ProgressPage() {
           setApprovalStatus(data.approvalStatus || "none");
           setProgressPhotosEnabled(data.progressPhotosEnabled === true);
 
-          // 🔹 GET PHOTOS
           const photosSnap = await getDocs(
             query(collection(db, "progressPhotos"), where("profileId", "==", pid))
           );
@@ -85,7 +82,6 @@ export default function ProgressPage() {
     return () => unsubscribe();
   }, []);
 
-  // 🔒 CONDITIONS
   const notApproved = approvalStatus !== "approved";
   const notEnabled = !progressPhotosEnabled;
 
@@ -106,8 +102,8 @@ export default function ProgressPage() {
       await addDoc(collection(db, "progressPhotos"), {
         profileId,
         imageUrl,
-        title,
-        note,
+        title: title.trim(),
+        note: note.trim(),
         uploadedByRole: "user",
         createdAt: serverTimestamp(),
       });
@@ -130,7 +126,6 @@ export default function ProgressPage() {
 
   return (
     <div className="space-y-8">
-      {/* HEADER */}
       <section className="rounded-[32px] border bg-white p-8 shadow-sm">
         <h1 className="text-3xl font-bold">Your Progress</h1>
         <p className="mt-2 text-gray-600">
@@ -138,8 +133,7 @@ export default function ProgressPage() {
         </p>
       </section>
 
-      {/* 🚫 NOT APPROVED */}
-      {notApproved && (
+      {notApproved ? (
         <section className="rounded-[32px] border bg-white p-6 shadow-sm">
           <h2 className="text-xl font-semibold">
             Progress photos will unlock soon
@@ -148,20 +142,14 @@ export default function ProgressPage() {
             You’ll be able to upload progress photos once your profile has been approved.
           </p>
         </section>
-      )}
-
-      {/* ⚠️ NOT ENABLED */}
-      {!notApproved && notEnabled && (
+      ) : notEnabled ? (
         <section className="rounded-[32px] border bg-white p-6 shadow-sm">
           <h2 className="text-xl font-semibold">Uploads not enabled yet</h2>
           <p className="mt-2 text-gray-600">
             Your coach has not enabled progress photos for your profile yet.
           </p>
         </section>
-      )}
-
-      {/* ✅ UPLOAD */}
-      {!notApproved && !notEnabled && (
+      ) : (
         <section className="rounded-[32px] border bg-white p-6 shadow-sm">
           <h2 className="text-xl font-semibold">Upload new photo</h2>
 
@@ -189,7 +177,7 @@ export default function ProgressPage() {
             <button
               onClick={uploadPhoto}
               disabled={uploading}
-              className="rounded-xl bg-black px-6 py-3 text-white"
+              className="rounded-xl bg-black px-6 py-3 text-white disabled:opacity-50"
             >
               {uploading ? "Uploading..." : "Upload"}
             </button>
@@ -197,7 +185,6 @@ export default function ProgressPage() {
         </section>
       )}
 
-      {/* 📸 GALLERY */}
       <section className="rounded-[32px] border bg-white p-6 shadow-sm">
         <h2 className="text-xl font-semibold">Your Photo Timeline</h2>
         <p className="mt-2 text-gray-600">
