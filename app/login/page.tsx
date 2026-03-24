@@ -68,14 +68,17 @@ export default function LoginPage() {
       try {
         await setPersistence(auth, browserLocalPersistence);
 
+        // Important: let Firebase finish restoring session first
         await auth.authStateReady();
 
+        // Important for iPhone homescreen redirect flow
         try {
           await getRedirectResult(auth);
         } catch (redirectError) {
           console.error("Redirect result error:", redirectError);
         }
 
+        // Check again after redirect result settles
         const currentUser = auth.currentUser;
 
         if (currentUser && !cancelled) {
