@@ -73,7 +73,6 @@ export default function LoginPage() {
   const [emailLoading, setEmailLoading] = useState(false);
   const [googleLoading, setGoogleLoading] = useState(false);
   const [signupLoading, setSignupLoading] = useState(false);
-  const [resettingSession, setResettingSession] = useState(false);
   const [error, setError] = useState("");
 
   const isRedirectMode = useMemo(() => isStandaloneIOS(), []);
@@ -212,19 +211,6 @@ export default function LoginPage() {
     }
   };
 
-  const handleResetSession = async () => {
-    setError("");
-    setResettingSession(true);
-
-    try {
-      await auth.signOut();
-      window.location.replace("/login");
-    } catch (err) {
-      console.error("Reset session error:", err);
-      setError("Could not reset session.");
-      setResettingSession(false);
-    }
-  };
 
   if (loading) {
     return (
@@ -335,7 +321,7 @@ export default function LoginPage() {
                   type="button"
                   onClick={handleEmailLogin}
                   disabled={
-                    emailLoading || googleLoading || signupLoading || resettingSession
+                    emailLoading || googleLoading || signupLoading 
                   }
                   className="w-full rounded-2xl bg-slate-950 px-4 py-3 text-sm font-medium text-white transition hover:bg-slate-800 disabled:opacity-50"
                 >
@@ -346,7 +332,7 @@ export default function LoginPage() {
                   type="button"
                   onClick={handleCreateAccount}
                   disabled={
-                    emailLoading || googleLoading || signupLoading || resettingSession
+                    emailLoading || googleLoading || signupLoading 
                   }
                   className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-medium text-slate-700 transition hover:bg-slate-50 disabled:opacity-50"
                 >
@@ -368,7 +354,7 @@ export default function LoginPage() {
                   type="button"
                   onClick={handleGoogleLogin}
                   disabled={
-                    emailLoading || googleLoading || signupLoading || resettingSession
+                    emailLoading || googleLoading || signupLoading 
                   }
                   className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-medium text-slate-700 transition hover:bg-slate-50 disabled:opacity-50"
                 >
@@ -379,16 +365,7 @@ export default function LoginPage() {
                     : "Continue with Google"}
                 </button>
 
-                <button
-                  type="button"
-                  onClick={handleResetSession}
-                  disabled={
-                    emailLoading || googleLoading || signupLoading || resettingSession
-                  }
-                  className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-medium text-slate-500 transition hover:bg-slate-100 disabled:opacity-50"
-                >
-                  {resettingSession ? "Resetting..." : "Reset session"}
-                </button>
+            
               </div>
             </div>
           </div>
