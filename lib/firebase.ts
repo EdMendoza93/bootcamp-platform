@@ -5,7 +5,7 @@ import { getStorage } from "firebase/storage";
 
 const firebaseConfig = {
   apiKey: "AIzaSyAc9WUQzLLGXdjCXXpvi7paqTFRHwc0E5M",
-  authDomain: "app.bootcamp.rivcor.com",
+  authDomain: "bootcamp-platform-27d16.firebaseapp.com",
   projectId: "bootcamp-platform-27d16",
   storageBucket: "bootcamp-platform-27d16.firebasestorage.app",
   messagingSenderId: "780790284759",
