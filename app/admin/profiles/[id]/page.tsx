@@ -81,6 +81,22 @@ function getPhotoSortValue(photo: ProgressPhoto) {
   return (photo.createdAt?.seconds || 0) * 1000;
 }
 
+function getFallbackDateInputValue(photo?: ProgressPhoto) {
+  if (!photo) return getTodayDateInputValue();
+
+  if (photo.photoDate) return photo.photoDate;
+
+  if (photo.createdAt?.seconds) {
+    const date = new Date(photo.createdAt.seconds * 1000);
+    const yyyy = date.getFullYear();
+    const mm = String(date.getMonth() + 1).padStart(2, "0");
+    const dd = String(date.getDate()).padStart(2, "0");
+    return `${yyyy}-${mm}-${dd}`;
+  }
+
+  return getTodayDateInputValue();
+}
+
 function formatPhotoDate(
   photoDate?: string,
   createdAt?: { seconds?: number; nanoseconds?: number }
@@ -527,6 +543,11 @@ export default function AdminProfileDetailPage() {
     }, {} as Record<string, ScheduleItem[]>);
   }, [scheduleItems]);
 
+  const editingPhoto = useMemo(
+    () => progressPhotos.find((photo) => photo.id === editingPhotoId) || null,
+    [progressPhotos, editingPhotoId]
+  );
+
   const resetProgressForm = () => {
     setProgressImageFile(null);
     setProgressTitle("");
@@ -540,7 +561,7 @@ export default function AdminProfileDetailPage() {
     setEditingPhotoId(photo.id);
     setProgressTitle(photo.title || "");
     setProgressNote(photo.note || "");
-    setProgressPhotoDate(photo.photoDate || "");
+    setProgressPhotoDate(getFallbackDateInputValue(photo));
     setProgressMilestone(photo.milestone || "progress");
     setProgressImageFile(null);
     window.scrollTo({ top: document.body.scrollHeight, behavior: "smooth" });
@@ -578,7 +599,7 @@ export default function AdminProfileDetailPage() {
         await updateDoc(doc(db, "progressPhotos", editingPhotoId), {
           title: progressTitle.trim(),
           note: progressNote.trim(),
-          photoDate: progressPhotoDate || "",
+          photoDate: progressPhotoDate || getTodayDateInputValue(),
           milestone: progressMilestone,
         });
 
@@ -1096,12 +1117,30 @@ export default function AdminProfileDetailPage() {
         </section>
 
         <section className="rounded-[28px] border border-white/70 bg-white/90 p-5 shadow-[0_18px_50px_rgba(15,23,42,0.07)] backdrop-blur">
-          <h2 className="text-base font-semibold text-slate-950">
-            Progress Photos
-          </h2>
+          <div className="flex flex-wrap items-center gap-3">
+            <h2 className="text-base font-semibold text-slate-950">
+              Progress Photos
+            </h2>
+            {editingPhotoId && (
+              <span className="rounded-full border border-amber-200 bg-amber-50 px-3 py-1 text-xs font-medium text-amber-700">
+                Editing photo
+              </span>
+            )}
+          </div>
+
           <p className="mt-1 text-sm text-slate-500">
             Upload, edit, and manage this client's progress updates.
           </p>
+
+          {editingPhoto && (
+            <div className="mt-4 overflow-hidden rounded-2xl border bg-slate-50 p-3">
+              <img
+                src={editingPhoto.imageUrl}
+                alt={editingPhoto.title || "Editing photo"}
+                className="h-48 w-full rounded-xl object-cover"
+              />
+            </div>
+          )}
 
           <div className="mt-5 grid gap-8 xl:grid-cols-[320px_1fr]">
             <div className="space-y-4">
@@ -1123,17 +1162,30 @@ export default function AdminProfileDetailPage() {
                 className="w-full rounded-2xl border border-slate-200 p-3"
               />
 
-              <select
-                value={progressMilestone}
-                onChange={(e) =>
-                  setProgressMilestone(e.target.value as Milestone)
-                }
-                className="w-full rounded-2xl border border-slate-200 p-3"
-              >
-                <option value="progress">Progress</option>
-                <option value="start">Start</option>
-                <option value="final">Final</option>
-              </select>
+              <div className="flex flex-wrap gap-2">
+                {(["start", "progress", "final"] as const).map((value) => (
+                  <button
+                    key={value}
+                    type="button"
+                    onClick={() => setProgressMilestone(value)}
+                    className={`rounded-full border px-4 py-2 text-sm font-medium transition ${
+                      progressMilestone === value
+                        ? value === "start"
+                          ? "border-sky-200 bg-sky-50 text-sky-700"
+                          : value === "final"
+                          ? "border-emerald-200 bg-emerald-50 text-emerald-700"
+                          : "border-slate-300 bg-slate-100 text-slate-800"
+                        : "border-slate-200 bg-white text-slate-600 hover:bg-slate-50"
+                    }`}
+                  >
+                    {value === "start"
+                      ? "Start"
+                      : value === "final"
+                      ? "Final"
+                      : "Progress"}
+                  </button>
+                ))}
+              </div>
 
               <input
                 type="text"
@@ -1168,7 +1220,7 @@ export default function AdminProfileDetailPage() {
                     onClick={resetProgressForm}
                     className="rounded-2xl border border-slate-200 px-5 py-3 text-sm font-medium"
                   >
-                    Cancel
+                    Cancel edit
                   </button>
                 )}
               </div>
@@ -1189,6 +1241,7 @@ export default function AdminProfileDetailPage() {
                       className="rounded-2xl border bg-white p-3 shadow-sm"
                     >
                       <button
+                        type="button"
                         onClick={() => openPhotoModal(photo)}
                         className="w-full text-left"
                       >
@@ -1228,6 +1281,7 @@ export default function AdminProfileDetailPage() {
 
                         <div className="mt-4 flex gap-2">
                           <button
+                            type="button"
                             onClick={() => startEditPhoto(photo)}
                             className="rounded-xl border border-slate-200 px-3 py-2 text-sm font-medium"
                           >
@@ -1235,6 +1289,7 @@ export default function AdminProfileDetailPage() {
                           </button>
 
                           <button
+                            type="button"
                             onClick={() => deleteProgressPhoto(photo.id)}
                             className="rounded-xl border border-slate-200 px-3 py-2 text-sm font-medium"
                           >
@@ -1288,6 +1343,7 @@ export default function AdminProfileDetailPage() {
               </div>
 
               <button
+                type="button"
                 onClick={closePhotoModal}
                 className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-medium"
               >

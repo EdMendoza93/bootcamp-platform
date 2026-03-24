@@ -56,6 +56,22 @@ function getPhotoSortValue(photo: Photo) {
   return (photo.createdAt?.seconds || 0) * 1000;
 }
 
+function getFallbackDateInputValue(photo?: Photo) {
+  if (!photo) return getTodayDateInputValue();
+
+  if (photo.photoDate) return photo.photoDate;
+
+  if (photo.createdAt?.seconds) {
+    const date = new Date(photo.createdAt.seconds * 1000);
+    const yyyy = date.getFullYear();
+    const mm = String(date.getMonth() + 1).padStart(2, "0");
+    const dd = String(date.getDate()).padStart(2, "0");
+    return `${yyyy}-${mm}-${dd}`;
+  }
+
+  return getTodayDateInputValue();
+}
+
 function formatPhotoDate(photoDate?: string, createdAt?: { seconds?: number }) {
   if (photoDate) {
     const parsed = new Date(`${photoDate}T12:00:00`);
@@ -167,6 +183,11 @@ export default function ProgressPage() {
     return URL.createObjectURL(file);
   }, [file]);
 
+  const editingPhoto = useMemo(
+    () => photos.find((photo) => photo.id === editingPhotoId) || null,
+    [photos, editingPhotoId]
+  );
+
   useEffect(() => {
     return () => {
       if (previewUrl) {
@@ -229,7 +250,7 @@ export default function ProgressPage() {
     setFile(null);
     setTitle(photo.title || "");
     setNote(photo.note || "");
-    setPhotoDate(photo.photoDate || "");
+    setPhotoDate(getFallbackDateInputValue(photo));
     setMilestone(photo.milestone || "progress");
     setFileError("");
     window.scrollTo({ top: 0, behavior: "smooth" });
@@ -245,7 +266,7 @@ export default function ProgressPage() {
         await updateDoc(doc(db, "progressPhotos", editingPhotoId), {
           title: title.trim(),
           note: note.trim(),
-          photoDate: photoDate || "",
+          photoDate: photoDate || getTodayDateInputValue(),
           milestone,
         });
 
@@ -366,14 +387,10 @@ export default function ProgressPage() {
 
         {beforePhoto && afterPhoto && beforePhoto.id !== afterPhoto.id && (
           <section className="rounded-[32px] border bg-white p-6 shadow-sm">
-            <div className="flex items-end justify-between gap-4">
-              <div>
-                <h2 className="text-xl font-semibold">Before / After</h2>
-                <p className="mt-2 text-gray-600">
-                  Quick visual comparison using your marked photos.
-                </p>
-              </div>
-            </div>
+            <h2 className="text-xl font-semibold">Before / After</h2>
+            <p className="mt-2 text-gray-600">
+              Quick visual comparison using your marked photos.
+            </p>
 
             <div className="mt-6 grid gap-4 md:grid-cols-2">
               <div className="rounded-2xl border p-3">
@@ -432,14 +449,32 @@ export default function ProgressPage() {
           </section>
         ) : (
           <section className="rounded-[32px] border bg-white p-6 shadow-sm">
-            <h2 className="text-xl font-semibold">
-              {editingPhotoId ? "Edit photo details" : "Upload new photo"}
-            </h2>
+            <div className="flex flex-wrap items-center gap-3">
+              <h2 className="text-xl font-semibold">
+                {editingPhotoId ? "Edit photo details" : "Upload new photo"}
+              </h2>
+              {editingPhotoId && (
+                <span className="rounded-full border border-amber-200 bg-amber-50 px-3 py-1 text-xs font-medium text-amber-700">
+                  Editing photo
+                </span>
+              )}
+            </div>
+
             <p className="mt-2 text-gray-600">
               {editingPhotoId
                 ? "Update the details of your progress photo."
                 : "Add a new visual update to your progress timeline."}
             </p>
+
+            {editingPhoto && (
+              <div className="mt-4 overflow-hidden rounded-2xl border bg-slate-50 p-3">
+                <img
+                  src={editingPhoto.imageUrl}
+                  alt={editingPhoto.title || "Editing photo"}
+                  className="h-48 w-full rounded-xl object-cover"
+                />
+              </div>
+            )}
 
             <div className="mt-6 space-y-4">
               {!editingPhotoId && (
@@ -498,15 +533,30 @@ export default function ProgressPage() {
                 <label className="mb-2 block text-sm font-medium text-gray-700">
                   Milestone
                 </label>
-                <select
-                  value={milestone}
-                  onChange={(e) => setMilestone(e.target.value as Milestone)}
-                  className="w-full rounded-xl border p-3"
-                >
-                  <option value="progress">Progress</option>
-                  <option value="start">Start</option>
-                  <option value="final">Final</option>
-                </select>
+                <div className="flex flex-wrap gap-2">
+                  {(["start", "progress", "final"] as const).map((value) => (
+                    <button
+                      key={value}
+                      type="button"
+                      onClick={() => setMilestone(value)}
+                      className={`rounded-full border px-4 py-2 text-sm font-medium transition ${
+                        milestone === value
+                          ? value === "start"
+                            ? "border-sky-200 bg-sky-50 text-sky-700"
+                            : value === "final"
+                            ? "border-emerald-200 bg-emerald-50 text-emerald-700"
+                            : "border-slate-300 bg-slate-100 text-slate-800"
+                          : "border-slate-200 bg-white text-slate-600 hover:bg-slate-50"
+                      }`}
+                    >
+                      {value === "start"
+                        ? "Start"
+                        : value === "final"
+                        ? "Final"
+                        : "Progress"}
+                    </button>
+                  ))}
+                </div>
               </div>
 
               <div>
@@ -553,7 +603,7 @@ export default function ProgressPage() {
                     disabled={uploading}
                     className="rounded-xl border bg-white px-6 py-3 text-sm font-medium disabled:opacity-50"
                   >
-                    Cancel
+                    Cancel edit
                   </button>
                 )}
               </div>
@@ -576,6 +626,7 @@ export default function ProgressPage() {
               {photos.map((photo) => (
                 <div key={photo.id} className="rounded-2xl border p-3">
                   <button
+                    type="button"
                     onClick={() => openPhotoModal(photo)}
                     className="w-full text-left"
                   >
@@ -604,6 +655,7 @@ export default function ProgressPage() {
 
                   <div className="mt-4 flex gap-2">
                     <button
+                      type="button"
                       onClick={() => startEdit(photo)}
                       className="rounded-xl border px-3 py-2 text-sm font-medium"
                     >
@@ -611,6 +663,7 @@ export default function ProgressPage() {
                     </button>
 
                     <button
+                      type="button"
                       onClick={() => deletePhoto(photo.id)}
                       disabled={workingPhotoId === photo.id}
                       className="rounded-xl border px-3 py-2 text-sm font-medium disabled:opacity-50"
@@ -646,6 +699,7 @@ export default function ProgressPage() {
               </div>
 
               <button
+                type="button"
                 onClick={closePhotoModal}
                 className="rounded-xl border bg-white px-3 py-2 text-sm font-medium"
               >
@@ -682,7 +736,9 @@ function MilestoneBadge({ milestone }: { milestone: Milestone }) {
       : "Progress";
 
   return (
-    <span className={`rounded-full border px-3 py-1 text-xs font-medium ${styles[milestone]}`}>
+    <span
+      className={`rounded-full border px-3 py-1 text-xs font-medium ${styles[milestone]}`}
+    >
       {label}
     </span>
   );
