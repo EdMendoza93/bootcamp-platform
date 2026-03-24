@@ -2,8 +2,44 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { auth, db } from "@/lib/firebase";
-import { onAuthStateChanged, signOut } from "firebase/auth";
-import { collection, doc, getDoc, getDocs } from "firebase/firestore";
+import {
+  onAuthStateChanged,
+  signOut,
+  User,
+} from "firebase/auth";
+import {
+  collection,
+  doc,
+  getDoc,
+  getDocs,
+} from "firebase/firestore";
+import { useToast } from "@/components/ui/ToastProvider";
+
+/* ===================== FIX PWA LOGIN ===================== */
+
+function waitForAuthenticatedUser(timeoutMs = 5000): Promise<User | null> {
+  return new Promise((resolve) => {
+    if (auth.currentUser) {
+      resolve(auth.currentUser);
+      return;
+    }
+
+    const timeout = window.setTimeout(() => {
+      unsubscribe();
+      resolve(auth.currentUser);
+    }, timeoutMs);
+
+    const unsubscribe = onAuthStateChanged(auth, (user) => {
+      if (user) {
+        window.clearTimeout(timeout);
+        unsubscribe();
+        resolve(user);
+      }
+    });
+  });
+}
+
+/* ===================== TYPES ===================== */
 
 type Application = {
   id: string;
@@ -21,6 +57,9 @@ type ScheduleItem = {
   id: string;
   date: string;
   startTime: string;
+  profileId: string;
+  title?: string;
+  type?: "training" | "nutrition" | "activity";
 };
 
 type ProgressPhoto = {
@@ -34,6 +73,8 @@ type ProgressPhoto = {
   };
 };
 
+/* ===================== HELPERS ===================== */
+
 function getPhotoSortValue(photo: ProgressPhoto) {
   if (photo.photoDate) {
     return new Date(`${photo.photoDate}T12:00:00`).getTime();
@@ -41,15 +82,30 @@ function getPhotoSortValue(photo: ProgressPhoto) {
   return (photo.createdAt?.seconds || 0) * 1000;
 }
 
-function formatPhotoDate(photo: ProgressPhoto) {
-  if (photo.photoDate) {
-    return new Date(`${photo.photoDate}T12:00:00`).toLocaleDateString();
+function formatPhotoDate(
+  photoDate?: string,
+  createdAt?: { seconds?: number }
+) {
+  if (photoDate) {
+    return new Date(`${photoDate}T12:00:00`).toLocaleDateString("en-US", {
+      month: "short",
+      day: "numeric",
+      year: "numeric",
+    });
   }
-  if (photo.createdAt?.seconds) {
-    return new Date(photo.createdAt.seconds * 1000).toLocaleDateString();
+
+  if (createdAt?.seconds) {
+    return new Date(createdAt.seconds * 1000).toLocaleDateString("en-US", {
+      month: "short",
+      day: "numeric",
+      year: "numeric",
+    });
   }
+
   return "No date";
 }
+
+/* ===================== PAGE ===================== */
 
 export default function AdminPage() {
   const [loading, setLoading] = useState(true);
@@ -60,15 +116,25 @@ export default function AdminPage() {
   const [scheduleItems, setScheduleItems] = useState<ScheduleItem[]>([]);
   const [progressPhotos, setProgressPhotos] = useState<ProgressPhoto[]>([]);
 
+  const { showToast } = useToast();
+
   useEffect(() => {
-    const unsub = onAuthStateChanged(auth, async (user) => {
+    let cancelled = false;
+
+    const init = async () => {
       try {
-        if (!user) {
+        await auth.authStateReady();
+
+        const currentUser =
+          auth.currentUser || (await waitForAuthenticatedUser(5000));
+
+        if (!currentUser) {
           window.location.replace("/login");
           return;
         }
 
-        const userSnap = await getDoc(doc(db, "users", user.uid));
+        const userRef = doc(db, "users", currentUser.uid);
+        const userSnap = await getDoc(userRef);
 
         if (!userSnap.exists()) {
           window.location.replace("/dashboard");
@@ -82,6 +148,7 @@ export default function AdminPage() {
           return;
         }
 
+        if (cancelled) return;
         setAllowed(true);
 
         const [appsSnap, profilesSnap, scheduleSnap, progressSnap] =
@@ -92,138 +159,146 @@ export default function AdminPage() {
             getDocs(collection(db, "progressPhotos")),
           ]);
 
-        const apps = appsSnap.docs.map((d) => ({
+        const appData = appsSnap.docs.map((d) => ({
           id: d.id,
-          ...(d.data() as any),
+          ...(d.data() as Omit<Application, "id">),
         }));
 
-        const profs = profilesSnap.docs.map((d) => ({
+        const profileData = profilesSnap.docs.map((d) => ({
           id: d.id,
-          ...(d.data() as any),
+          ...(d.data() as Omit<Profile, "id">),
         }));
 
-        const schedule = scheduleSnap.docs.map((d) => ({
+        const scheduleData = scheduleSnap.docs.map((d) => ({
           id: d.id,
-          ...(d.data() as any),
+          ...(d.data() as Omit<ScheduleItem, "id">),
         }));
 
-        schedule.sort((a, b) => {
-          if (a.date !== b.date) return a.date.localeCompare(b.date);
-          return (a.startTime || "").localeCompare(b.startTime || "");
-        });
-
-        const photos = progressSnap.docs
+        const progressData = progressSnap.docs
           .map((d) => ({
             id: d.id,
-            ...(d.data() as any),
+            ...(d.data() as Omit<ProgressPhoto, "id">),
           }))
           .sort((a, b) => getPhotoSortValue(b) - getPhotoSortValue(a));
 
-        setApplications(apps);
-        setProfiles(profs);
-        setScheduleItems(schedule);
-        setProgressPhotos(photos);
-      } catch (err) {
-        console.error(err);
-        window.location.replace("/dashboard");
+        setApplications(appData);
+        setProfiles(profileData);
+        setScheduleItems(scheduleData);
+        setProgressPhotos(progressData);
+      } catch (error) {
+        console.error(error);
+        showToast({
+          title: "Error loading admin",
+          description: "Please refresh",
+          type: "error",
+        });
       } finally {
-        setLoading(false);
+        if (!cancelled) setLoading(false);
       }
+    };
+
+    init();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [showToast]);
+
+  const pendingApplications = useMemo(
+    () => applications.filter((a) => a.status === "pending").length,
+    [applications]
+  );
+
+  const activeClients = useMemo(
+    () =>
+      profiles.filter((p) => (p.clientStatus || "active") === "active").length,
+    [profiles]
+  );
+
+  const recentUploads = useMemo(
+    () => progressPhotos.slice(0, 6),
+    [progressPhotos]
+  );
+
+  const profileNameMap = useMemo(() => {
+    const map: Record<string, string> = {};
+    profiles.forEach((p) => {
+      map[p.id] = p.fullName || "Unnamed";
     });
-
-    return () => unsub();
-  }, []);
-
-  const pendingApps = applications.filter(
-    (a) => a.status === "pending"
-  ).length;
-
-  const activeClients = profiles.filter(
-    (p) => (p.clientStatus || "active") === "active"
-  ).length;
-
-  const recentUploads = progressPhotos.slice(0, 6);
+    return map;
+  }, [profiles]);
 
   const logout = async () => {
     await signOut(auth);
     window.location.replace("/login");
   };
 
-  if (loading) {
-    return <p className="p-6">Loading...</p>;
-  }
-
+  if (loading) return <p className="p-6">Loading...</p>;
   if (!allowed) return null;
 
   return (
     <div className="space-y-8 p-6">
-      {/* HEADER */}
-      <div className="flex justify-between items-center">
-        <h1 className="text-3xl font-semibold">Admin</h1>
-        <button
-          onClick={logout}
-          className="bg-black text-white px-4 py-2 rounded-xl"
-        >
-          Logout
-        </button>
-      </div>
+      <h1 className="text-3xl font-bold">Admin</h1>
 
-      {/* METRICS */}
       <div className="grid grid-cols-2 gap-4">
-        <Card label="Pending Apps" value={pendingApps} />
-        <Card label="Active Clients" value={activeClients} />
+        <Stat label="Pending Apps" value={pendingApplications} />
+        <Stat label="Active Clients" value={activeClients} />
       </div>
 
-      {/* RECENT UPLOADS */}
-      <div>
-        <h2 className="text-xl font-semibold mb-3">Recent Uploads</h2>
+      <section>
+        <h2 className="text-xl font-semibold mb-4">Recent Uploads</h2>
 
         {recentUploads.length === 0 ? (
-          <p className="text-slate-500">No uploads</p>
+          <p>No uploads</p>
         ) : (
           <div className="space-y-3">
-            {recentUploads.map((photo) => (
-              <div
-                key={photo.id}
-                className="flex gap-4 items-center border p-3 rounded-xl"
-              >
-                <div className="w-14 h-14 rounded-lg overflow-hidden bg-gray-100">
-                  {photo.imageUrl && (
+            {recentUploads.map((item) => (
+              <div key={item.id} className="flex gap-4 items-center">
+                <div className="w-14 h-14 overflow-hidden rounded-xl border">
+                  {item.imageUrl ? (
                     <img
-                      src={photo.imageUrl}
+                      src={item.imageUrl}
                       className="w-full h-full object-cover"
                     />
+                  ) : (
+                    <div className="text-xs text-gray-400">No image</div>
                   )}
                 </div>
 
                 <div>
-                  <p className="font-medium">
-                    {photo.title || "Progress update"}
+                  <p className="font-semibold">
+                    {item.title || "Progress"}
                   </p>
                   <p className="text-sm text-gray-500">
-                    {formatPhotoDate(photo)}
+                    {profileNameMap[item.profileId]}
+                  </p>
+                  <p className="text-xs text-gray-400">
+                    {formatPhotoDate(item.photoDate, item.createdAt)}
                   </p>
                 </div>
               </div>
             ))}
           </div>
         )}
-      </div>
+      </section>
+
+      <button
+        onClick={logout}
+        className="bg-black text-white px-4 py-2 rounded-xl"
+      >
+        Logout
+      </button>
     </div>
   );
 }
 
-function Card({
-  label,
-  value,
-}: {
-  label: string;
-  value: number;
-}) {
+/* ===================== UI ===================== */
+
+function Stat({ label, value }: { label: string; value: number }) {
   return (
-    <div className="border rounded-xl p-4">
+    <div className="border p-4 rounded-xl">
       <p className="text-sm text-gray-500">{label}</p>
-      <p className="text-2xl font-semibold">{value}</p>
+      <p className="text-2xl font-bold">{value}</p>
     </div>
   );
 }

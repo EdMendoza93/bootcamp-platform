@@ -1,22 +1,15 @@
-import type { Metadata } from "next";
-import "./globals.css";
-import { ToastProvider } from "@/components/ui/ToastProvider";
+import AdminShell from "@/components/admin/AdminShell";
 
-export const metadata: Metadata = {
-  title: "Wild Atlantic Bootcamp",
-  description: "Premium fitness bootcamp platform",
-};
-
-export default function RootLayout({
+export default function AdminLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
   return (
-    <html lang="en">
-      <body>
-        <ToastProvider>{children}</ToastProvider>
-      </body>
-    </html>
+    <div className="min-h-screen">
+      <AdminShell>
+        <div className="p-6 md:p-8">{children}</div>
+      </AdminShell>
+    </div>
   );
 }
