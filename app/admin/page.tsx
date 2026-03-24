@@ -31,13 +31,47 @@ type ScheduleItem = {
 type ProgressPhoto = {
   id: string;
   profileId: string;
-  imageUrl: string;
+  imageUrl?: string;
   title?: string;
+  photoDate?: string;
   createdAt?: {
     seconds?: number;
     nanoseconds?: number;
   };
 };
+
+function getPhotoSortValue(photo: ProgressPhoto) {
+  if (photo.photoDate) {
+    return new Date(`${photo.photoDate}T12:00:00`).getTime();
+  }
+
+  return (photo.createdAt?.seconds || 0) * 1000;
+}
+
+function formatPhotoDate(
+  photoDate?: string,
+  createdAt?: { seconds?: number; nanoseconds?: number }
+) {
+  if (photoDate) {
+    const parsed = new Date(`${photoDate}T12:00:00`);
+    return parsed.toLocaleDateString("en-US", {
+      month: "short",
+      day: "numeric",
+      year: "numeric",
+    });
+  }
+
+  if (createdAt?.seconds) {
+    const parsed = new Date(createdAt.seconds * 1000);
+    return parsed.toLocaleDateString("en-US", {
+      month: "short",
+      day: "numeric",
+      year: "numeric",
+    });
+  }
+
+  return "No date";
+}
 
 export default function AdminPage() {
   const [loading, setLoading] = useState(true);
@@ -98,20 +132,16 @@ export default function AdminPage() {
           ...(docItem.data() as Omit<ScheduleItem, "id">),
         })) as ScheduleItem[];
 
-        const progressData = progressSnap.docs.map((docItem) => ({
-          id: docItem.id,
-          ...(docItem.data() as Omit<ProgressPhoto, "id">),
-        })) as ProgressPhoto[];
+        const progressData = progressSnap.docs
+          .map((docItem) => ({
+            id: docItem.id,
+            ...(docItem.data() as Omit<ProgressPhoto, "id">),
+          }))
+          .sort((a, b) => getPhotoSortValue(b) - getPhotoSortValue(a)) as ProgressPhoto[];
 
         scheduleData.sort((a, b) => {
           if (a.date !== b.date) return a.date.localeCompare(b.date);
           return (a.startTime || "").localeCompare(b.startTime || "");
-        });
-
-        progressData.sort((a, b) => {
-          const aSeconds = a.createdAt?.seconds || 0;
-          const bSeconds = b.createdAt?.seconds || 0;
-          return bSeconds - aSeconds;
         });
 
         setApplications(appData);
@@ -499,7 +529,7 @@ export default function AdminPage() {
                         {profileNameMap[item.profileId] || "Unknown client"}
                       </p>
                       <p className="mt-2 text-xs text-slate-500">
-                        {formatTimestamp(item.createdAt)}
+                        {formatPhotoDate(item.photoDate, item.createdAt)}
                       </p>
                     </div>
                   </div>
@@ -623,18 +653,4 @@ function MiniStat({
       <span className="text-sm font-semibold text-slate-950">{value}</span>
     </div>
   );
-}
-
-function formatTimestamp(
-  createdAt?: { seconds?: number; nanoseconds?: number }
-) {
-  if (!createdAt?.seconds) return "No date";
-
-  const date = new Date(createdAt.seconds * 1000);
-
-  return date.toLocaleDateString("en-US", {
-    month: "short",
-    day: "numeric",
-    year: "numeric",
-  });
 }

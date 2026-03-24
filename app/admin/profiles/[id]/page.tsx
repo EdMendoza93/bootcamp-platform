@@ -24,6 +24,7 @@ import {
 import { useToast } from "@/components/ui/ToastProvider";
 
 type ScheduleType = "training" | "nutrition" | "activity";
+type Milestone = "progress" | "start" | "final";
 
 type ProgressPhoto = {
   id: string;
@@ -34,6 +35,7 @@ type ProgressPhoto = {
   title?: string;
   note?: string;
   photoDate?: string;
+  milestone?: Milestone;
   uploadedByRole: "admin" | "user";
   createdAt?: {
     seconds?: number;
@@ -159,6 +161,8 @@ export default function AdminProfileDetailPage() {
   const [progressPhotoDate, setProgressPhotoDate] = useState(
     getTodayDateInputValue()
   );
+  const [progressMilestone, setProgressMilestone] =
+    useState<Milestone>("progress");
   const [editingPhotoId, setEditingPhotoId] = useState<string | null>(null);
 
   const [photoModalData, setPhotoModalData] = useState<PhotoModalData>({
@@ -528,6 +532,7 @@ export default function AdminProfileDetailPage() {
     setProgressTitle("");
     setProgressNote("");
     setProgressPhotoDate(getTodayDateInputValue());
+    setProgressMilestone("progress");
     setEditingPhotoId(null);
   };
 
@@ -536,6 +541,7 @@ export default function AdminProfileDetailPage() {
     setProgressTitle(photo.title || "");
     setProgressNote(photo.note || "");
     setProgressPhotoDate(photo.photoDate || "");
+    setProgressMilestone(photo.milestone || "progress");
     setProgressImageFile(null);
     window.scrollTo({ top: document.body.scrollHeight, behavior: "smooth" });
   };
@@ -573,6 +579,7 @@ export default function AdminProfileDetailPage() {
           title: progressTitle.trim(),
           note: progressNote.trim(),
           photoDate: progressPhotoDate || "",
+          milestone: progressMilestone,
         });
 
         resetProgressForm();
@@ -636,6 +643,7 @@ export default function AdminProfileDetailPage() {
         title: progressTitle.trim(),
         note: progressNote.trim(),
         photoDate: progressPhotoDate,
+        milestone: progressMilestone,
         uploadedByRole: "admin",
         createdAt: serverTimestamp(),
       });
@@ -1115,6 +1123,18 @@ export default function AdminProfileDetailPage() {
                 className="w-full rounded-2xl border border-slate-200 p-3"
               />
 
+              <select
+                value={progressMilestone}
+                onChange={(e) =>
+                  setProgressMilestone(e.target.value as Milestone)
+                }
+                className="w-full rounded-2xl border border-slate-200 p-3"
+              >
+                <option value="progress">Progress</option>
+                <option value="start">Start</option>
+                <option value="final">Final</option>
+              </select>
+
               <input
                 type="text"
                 placeholder="Title (optional)"
@@ -1188,6 +1208,8 @@ export default function AdminProfileDetailPage() {
                               ? "Coach upload"
                               : "User upload"}
                           </span>
+
+                          <MilestoneBadge milestone={photo.milestone || "progress"} />
 
                           <span className="text-xs text-slate-500">
                             {formatPhotoDate(photo.photoDate, photo.createdAt)}
@@ -1308,6 +1330,27 @@ function TypeBadge({ type }: { type: ScheduleType }) {
   return (
     <span className="inline-flex rounded-full border px-3 py-1 text-xs font-medium uppercase tracking-wide text-slate-800">
       {type}
+    </span>
+  );
+}
+
+function MilestoneBadge({ milestone }: { milestone: Milestone }) {
+  const styles: Record<Milestone, string> = {
+    start: "border-sky-200 bg-sky-50 text-sky-700",
+    progress: "border-slate-200 bg-slate-50 text-slate-700",
+    final: "border-emerald-200 bg-emerald-50 text-emerald-700",
+  };
+
+  const label =
+    milestone === "start"
+      ? "Start"
+      : milestone === "final"
+      ? "Final"
+      : "Progress";
+
+  return (
+    <span className={`rounded-full border px-3 py-1 text-xs font-medium ${styles[milestone]}`}>
+      {label}
     </span>
   );
 }
