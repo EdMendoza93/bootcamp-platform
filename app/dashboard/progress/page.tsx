@@ -154,10 +154,20 @@ export default function ProgressPage() {
           <h2 className="text-xl font-semibold">Upload new photo</h2>
 
           <div className="mt-4 space-y-3">
-            <input
-              type="file"
-              onChange={(e) => setFile(e.target.files?.[0] || null)}
-            />
+           <div className="flex items-center gap-3">
+  <label className="cursor-pointer rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-medium text-slate-700 shadow-sm transition hover:-translate-y-0.5 hover:border-slate-300 hover:shadow-md">
+    Choose file
+    <input
+      type="file"
+      className="hidden"
+      onChange={(e) => setFile(e.target.files?.[0] || null)}
+    />
+  </label>
+
+  <span className="text-sm text-slate-500">
+    {file ? file.name : "No file selected"}
+  </span>
+</div>
 
             <input
               type="text"
