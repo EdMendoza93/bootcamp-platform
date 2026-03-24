@@ -1,15 +1,19 @@
-import AdminShell from "@/components/admin/AdminShell";
+import type { Metadata } from "next";
+import "./globals.css";
 
-export default function AdminLayout({
+export const metadata: Metadata = {
+  title: "Bootcamp",
+  description: "Bootcamp Platform",
+};
+
+export default function RootLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
   return (
-    <div className="min-h-screen">
-      <AdminShell>
-        <div className="p-6 md:p-8">{children}</div>
-      </AdminShell>
-    </div>
+    <html lang="en">
+      <body>{children}</body>
+    </html>
   );
 }
