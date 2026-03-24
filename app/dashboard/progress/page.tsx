@@ -18,7 +18,50 @@ type Photo = {
   imageUrl: string;
   title?: string;
   note?: string;
+  photoDate?: string;
+  createdAt?: {
+    seconds?: number;
+    nanoseconds?: number;
+  };
 };
+
+function getTodayDateInputValue() {
+  const now = new Date();
+  const yyyy = now.getFullYear();
+  const mm = String(now.getMonth() + 1).padStart(2, "0");
+  const dd = String(now.getDate()).padStart(2, "0");
+  return `${yyyy}-${mm}-${dd}`;
+}
+
+function getPhotoSortValue(photo: Photo) {
+  if (photo.photoDate) {
+    return new Date(`${photo.photoDate}T12:00:00`).getTime();
+  }
+
+  return (photo.createdAt?.seconds || 0) * 1000;
+}
+
+function formatPhotoDate(photo: Photo) {
+  if (photo.photoDate) {
+    const parsed = new Date(`${photo.photoDate}T12:00:00`);
+    return parsed.toLocaleDateString("en-US", {
+      month: "short",
+      day: "numeric",
+      year: "numeric",
+    });
+  }
+
+  if (photo.createdAt?.seconds) {
+    const parsed = new Date(photo.createdAt.seconds * 1000);
+    return parsed.toLocaleDateString("en-US", {
+      month: "short",
+      day: "numeric",
+      year: "numeric",
+    });
+  }
+
+  return "No date";
+}
 
 export default function ProgressPage() {
   const [loading, setLoading] = useState(true);
@@ -29,6 +72,7 @@ export default function ProgressPage() {
   const [file, setFile] = useState<File | null>(null);
   const [title, setTitle] = useState("");
   const [note, setNote] = useState("");
+  const [photoDate, setPhotoDate] = useState(getTodayDateInputValue());
   const [uploading, setUploading] = useState(false);
   const [fileError, setFileError] = useState("");
 
@@ -66,12 +110,14 @@ export default function ProgressPage() {
             query(collection(db, "progressPhotos"), where("profileId", "==", pid))
           );
 
-          const photoData = photosSnap.docs.map((docItem) => ({
-            id: docItem.id,
-            ...(docItem.data() as Omit<Photo, "id">),
-          }));
+          const photoData = photosSnap.docs
+            .map((docItem) => ({
+              id: docItem.id,
+              ...(docItem.data() as Omit<Photo, "id">),
+            }))
+            .sort((a, b) => getPhotoSortValue(b) - getPhotoSortValue(a));
 
-          setPhotos(photoData.reverse());
+          setPhotos(photoData);
         }
       } catch (error) {
         console.error("Load progress error:", error);
@@ -117,7 +163,7 @@ export default function ProgressPage() {
   };
 
   const uploadPhoto = async () => {
-    if (!file || !profileId) return;
+    if (!file || !profileId || !photoDate) return;
 
     setUploading(true);
     setFileError("");
@@ -136,6 +182,7 @@ export default function ProgressPage() {
         imageUrl,
         title: title.trim(),
         note: note.trim(),
+        photoDate,
         uploadedByRole: "user",
         createdAt: serverTimestamp(),
       });
@@ -143,6 +190,7 @@ export default function ProgressPage() {
       setFile(null);
       setTitle("");
       setNote("");
+      setPhotoDate(getTodayDateInputValue());
 
       window.location.reload();
     } catch (error) {
@@ -230,6 +278,18 @@ export default function ProgressPage() {
 
             <div>
               <label className="mb-2 block text-sm font-medium text-gray-700">
+                Date
+              </label>
+              <input
+                type="date"
+                value={photoDate}
+                onChange={(e) => setPhotoDate(e.target.value)}
+                className="w-full rounded-xl border p-3"
+              />
+            </div>
+
+            <div>
+              <label className="mb-2 block text-sm font-medium text-gray-700">
                 Title
               </label>
               <input
@@ -255,7 +315,7 @@ export default function ProgressPage() {
 
             <button
               onClick={uploadPhoto}
-              disabled={uploading || !file}
+              disabled={uploading || !file || !photoDate}
               className="rounded-xl bg-black px-6 py-3 text-white disabled:cursor-not-allowed disabled:opacity-50"
             >
               {uploading ? "Uploading..." : "Upload Photo"}
@@ -286,6 +346,10 @@ export default function ProgressPage() {
 
                 <p className="mt-3 font-medium">
                   {photo.title || "Progress"}
+                </p>
+
+                <p className="mt-1 text-xs text-gray-500">
+                  {formatPhotoDate(photo)}
                 </p>
 
                 {photo.note && (

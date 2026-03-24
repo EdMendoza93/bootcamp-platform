@@ -33,6 +33,7 @@ type ProgressPhoto = {
   storagePath?: string;
   title?: string;
   note?: string;
+  photoDate?: string;
   uploadedByRole: "admin" | "user";
   createdAt?: {
     seconds?: number;
@@ -58,8 +59,50 @@ type PhotoModalData = {
   imageUrl: string;
   title: string;
   note: string;
+  photoDate: string;
   uploadedByRole: "admin" | "user" | "";
 };
+
+function getTodayDateInputValue() {
+  const now = new Date();
+  const yyyy = now.getFullYear();
+  const mm = String(now.getMonth() + 1).padStart(2, "0");
+  const dd = String(now.getDate()).padStart(2, "0");
+  return `${yyyy}-${mm}-${dd}`;
+}
+
+function getPhotoSortValue(photo: ProgressPhoto) {
+  if (photo.photoDate) {
+    return new Date(`${photo.photoDate}T12:00:00`).getTime();
+  }
+
+  return (photo.createdAt?.seconds || 0) * 1000;
+}
+
+function formatPhotoDate(
+  photoDate?: string,
+  createdAt?: { seconds?: number; nanoseconds?: number }
+) {
+  if (photoDate) {
+    const parsed = new Date(`${photoDate}T12:00:00`);
+    return parsed.toLocaleDateString("en-US", {
+      month: "short",
+      day: "numeric",
+      year: "numeric",
+    });
+  }
+
+  if (createdAt?.seconds) {
+    const parsed = new Date(createdAt.seconds * 1000);
+    return parsed.toLocaleDateString("en-US", {
+      month: "short",
+      day: "numeric",
+      year: "numeric",
+    });
+  }
+
+  return "No date";
+}
 
 async function compressImage(file: File): Promise<File> {
   const imageBitmap = await createImageBitmap(file);
@@ -113,6 +156,9 @@ export default function AdminProfileDetailPage() {
   const [progressImageFile, setProgressImageFile] = useState<File | null>(null);
   const [progressTitle, setProgressTitle] = useState("");
   const [progressNote, setProgressNote] = useState("");
+  const [progressPhotoDate, setProgressPhotoDate] = useState(
+    getTodayDateInputValue()
+  );
   const [editingPhotoId, setEditingPhotoId] = useState<string | null>(null);
 
   const [photoModalData, setPhotoModalData] = useState<PhotoModalData>({
@@ -120,6 +166,7 @@ export default function AdminProfileDetailPage() {
     imageUrl: "",
     title: "",
     note: "",
+    photoDate: "",
     uploadedByRole: "",
   });
 
@@ -216,16 +263,12 @@ export default function AdminProfileDetailPage() {
 
     const snapshot = await getDocs(q);
 
-    const data = snapshot.docs.map((docItem) => ({
-      id: docItem.id,
-      ...(docItem.data() as Omit<ProgressPhoto, "id">),
-    })) as ProgressPhoto[];
-
-    data.sort((a, b) => {
-      const aSeconds = a.createdAt?.seconds || 0;
-      const bSeconds = b.createdAt?.seconds || 0;
-      return bSeconds - aSeconds;
-    });
+    const data = snapshot.docs
+      .map((docItem) => ({
+        id: docItem.id,
+        ...(docItem.data() as Omit<ProgressPhoto, "id">),
+      }))
+      .sort((a, b) => getPhotoSortValue(b) - getPhotoSortValue(a)) as ProgressPhoto[];
 
     setProgressPhotos(data);
   };
@@ -484,6 +527,7 @@ export default function AdminProfileDetailPage() {
     setProgressImageFile(null);
     setProgressTitle("");
     setProgressNote("");
+    setProgressPhotoDate(getTodayDateInputValue());
     setEditingPhotoId(null);
   };
 
@@ -491,6 +535,7 @@ export default function AdminProfileDetailPage() {
     setEditingPhotoId(photo.id);
     setProgressTitle(photo.title || "");
     setProgressNote(photo.note || "");
+    setProgressPhotoDate(photo.photoDate || "");
     setProgressImageFile(null);
     window.scrollTo({ top: document.body.scrollHeight, behavior: "smooth" });
   };
@@ -501,6 +546,7 @@ export default function AdminProfileDetailPage() {
       imageUrl: photo.imageUrl,
       title: photo.title || "Progress update",
       note: photo.note || "",
+      photoDate: formatPhotoDate(photo.photoDate, photo.createdAt),
       uploadedByRole: photo.uploadedByRole,
     });
   };
@@ -511,6 +557,7 @@ export default function AdminProfileDetailPage() {
       imageUrl: "",
       title: "",
       note: "",
+      photoDate: "",
       uploadedByRole: "",
     });
   };
@@ -525,6 +572,7 @@ export default function AdminProfileDetailPage() {
         await updateDoc(doc(db, "progressPhotos", editingPhotoId), {
           title: progressTitle.trim(),
           note: progressNote.trim(),
+          photoDate: progressPhotoDate || "",
         });
 
         resetProgressForm();
@@ -558,6 +606,15 @@ export default function AdminProfileDetailPage() {
       return;
     }
 
+    if (!progressPhotoDate) {
+      showToast({
+        title: "Select a date",
+        description: "Please choose the photo date before uploading.",
+        type: "error",
+      });
+      return;
+    }
+
     setProgressSaving(true);
 
     try {
@@ -578,6 +635,7 @@ export default function AdminProfileDetailPage() {
         storagePath: fileRef.fullPath,
         title: progressTitle.trim(),
         note: progressNote.trim(),
+        photoDate: progressPhotoDate,
         uploadedByRole: "admin",
         createdAt: serverTimestamp(),
       });
@@ -1051,6 +1109,13 @@ export default function AdminProfileDetailPage() {
               )}
 
               <input
+                type="date"
+                value={progressPhotoDate}
+                onChange={(e) => setProgressPhotoDate(e.target.value)}
+                className="w-full rounded-2xl border border-slate-200 p-3"
+              />
+
+              <input
                 type="text"
                 placeholder="Title (optional)"
                 value={progressTitle}
@@ -1117,11 +1182,17 @@ export default function AdminProfileDetailPage() {
                       </button>
 
                       <div className="mt-3">
-                        <span className="rounded-full border bg-slate-50 px-3 py-1 text-xs font-medium text-slate-700">
-                          {photo.uploadedByRole === "admin"
-                            ? "Coach upload"
-                            : "User upload"}
-                        </span>
+                        <div className="flex flex-wrap items-center gap-2">
+                          <span className="rounded-full border bg-slate-50 px-3 py-1 text-xs font-medium text-slate-700">
+                            {photo.uploadedByRole === "admin"
+                              ? "Coach upload"
+                              : "User upload"}
+                          </span>
+
+                          <span className="text-xs text-slate-500">
+                            {formatPhotoDate(photo.photoDate, photo.createdAt)}
+                          </span>
+                        </div>
 
                         <p className="mt-3 line-clamp-1 font-medium text-slate-950">
                           {photo.title || "Progress update"}
@@ -1182,6 +1253,10 @@ export default function AdminProfileDetailPage() {
                 <h2 className="mt-3 text-2xl font-bold tracking-tight text-slate-950">
                   {photoModalData.title}
                 </h2>
+
+                <p className="mt-2 text-sm text-slate-500">
+                  {photoModalData.photoDate}
+                </p>
 
                 {photoModalData.note && (
                   <p className="mt-2 text-sm text-slate-600">

@@ -21,6 +21,7 @@ type ProgressPhoto = {
   storagePath?: string;
   title?: string;
   note?: string;
+  photoDate?: string;
   uploadedByRole: "admin" | "user";
   createdAt?: {
     seconds?: number;
@@ -40,7 +41,41 @@ type PhotoModalData = {
   note: string;
   uploadedByRole: "admin" | "user" | "";
   profileName: string;
+  photoDate: string;
 };
+
+function getPhotoSortValue(photo: ProgressPhoto) {
+  if (photo.photoDate) {
+    return new Date(`${photo.photoDate}T12:00:00`).getTime();
+  }
+
+  return (photo.createdAt?.seconds || 0) * 1000;
+}
+
+function formatTimestamp(
+  photoDate?: string,
+  createdAt?: { seconds?: number; nanoseconds?: number }
+) {
+  if (photoDate) {
+    const date = new Date(`${photoDate}T12:00:00`);
+    return date.toLocaleDateString("en-US", {
+      month: "short",
+      day: "numeric",
+      year: "numeric",
+    });
+  }
+
+  if (createdAt?.seconds) {
+    const date = new Date(createdAt.seconds * 1000);
+    return date.toLocaleDateString("en-US", {
+      month: "short",
+      day: "numeric",
+      year: "numeric",
+    });
+  }
+
+  return "No date";
+}
 
 export default function AdminProgressPage() {
   const [loading, setLoading] = useState(true);
@@ -52,6 +87,7 @@ export default function AdminProgressPage() {
   const [editingPhotoId, setEditingPhotoId] = useState<string | null>(null);
   const [editTitle, setEditTitle] = useState("");
   const [editNote, setEditNote] = useState("");
+  const [editPhotoDate, setEditPhotoDate] = useState("");
 
   const [photoModalData, setPhotoModalData] = useState<PhotoModalData>({
     open: false,
@@ -60,6 +96,7 @@ export default function AdminProgressPage() {
     note: "",
     uploadedByRole: "",
     profileName: "",
+    photoDate: "",
   });
 
   const { showToast } = useToast();
@@ -70,16 +107,12 @@ export default function AdminProgressPage() {
       getDocs(query(collection(db, "profiles"))),
     ]);
 
-    const photoData = photosSnapshot.docs.map((docItem) => ({
-      id: docItem.id,
-      ...(docItem.data() as Omit<ProgressPhoto, "id">),
-    })) as ProgressPhoto[];
-
-    photoData.sort((a, b) => {
-      const aSeconds = a.createdAt?.seconds || 0;
-      const bSeconds = b.createdAt?.seconds || 0;
-      return bSeconds - aSeconds;
-    });
+    const photoData = photosSnapshot.docs
+      .map((docItem) => ({
+        id: docItem.id,
+        ...(docItem.data() as Omit<ProgressPhoto, "id">),
+      }))
+      .sort((a, b) => getPhotoSortValue(b) - getPhotoSortValue(a)) as ProgressPhoto[];
 
     const profileData = profilesSnapshot.docs.map((docItem) => ({
       id: docItem.id,
@@ -142,6 +175,7 @@ export default function AdminProgressPage() {
     setEditingPhotoId(photo.id);
     setEditTitle(photo.title || "");
     setEditNote(photo.note || "");
+    setEditPhotoDate(photo.photoDate || "");
     window.scrollTo({ top: 0, behavior: "smooth" });
   };
 
@@ -149,6 +183,7 @@ export default function AdminProgressPage() {
     setEditingPhotoId(null);
     setEditTitle("");
     setEditNote("");
+    setEditPhotoDate("");
   };
 
   const saveEdit = async () => {
@@ -160,6 +195,7 @@ export default function AdminProgressPage() {
       await updateDoc(doc(db, "progressPhotos", editingPhotoId), {
         title: editTitle.trim(),
         note: editNote.trim(),
+        photoDate: editPhotoDate || "",
       });
 
       await loadPage();
@@ -236,6 +272,7 @@ export default function AdminProgressPage() {
       note: photo.note || "",
       uploadedByRole: photo.uploadedByRole,
       profileName: profileNameMap[photo.profileId] || "Unnamed profile",
+      photoDate: formatTimestamp(photo.photoDate, photo.createdAt),
     });
   };
 
@@ -247,6 +284,7 @@ export default function AdminProgressPage() {
       note: "",
       uploadedByRole: "",
       profileName: "",
+      photoDate: "",
     });
   };
 
@@ -274,6 +312,13 @@ export default function AdminProgressPage() {
                 value={editTitle}
                 onChange={(e) => setEditTitle(e.target.value)}
                 placeholder="Title"
+                className="w-full rounded-xl border p-3"
+              />
+
+              <input
+                type="date"
+                value={editPhotoDate}
+                onChange={(e) => setEditPhotoDate(e.target.value)}
                 className="w-full rounded-xl border p-3"
               />
 
@@ -370,7 +415,7 @@ export default function AdminProgressPage() {
                     </span>
 
                     <span className="text-xs text-gray-500">
-                      {formatTimestamp(photo.createdAt)}
+                      {formatTimestamp(photo.photoDate, photo.createdAt)}
                     </span>
                   </div>
 
@@ -432,6 +477,10 @@ export default function AdminProgressPage() {
                   {photoModalData.title}
                 </h2>
 
+                <p className="mt-2 text-sm text-gray-500">
+                  {photoModalData.photoDate}
+                </p>
+
                 {photoModalData.note && (
                   <p className="mt-2 text-sm text-gray-600">
                     {photoModalData.note}
@@ -459,18 +508,4 @@ export default function AdminProgressPage() {
       )}
     </>
   );
-}
-
-function formatTimestamp(
-  createdAt?: { seconds?: number; nanoseconds?: number }
-) {
-  if (!createdAt?.seconds) return "No date";
-
-  const date = new Date(createdAt.seconds * 1000);
-
-  return date.toLocaleDateString("en-US", {
-    month: "short",
-    day: "numeric",
-    year: "numeric",
-  });
 }
