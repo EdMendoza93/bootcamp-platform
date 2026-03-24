@@ -1,44 +1,20 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
-import { auth, db } from "@/lib/firebase";
+import { useEffect, useMemo, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import {
-  browserLocalPersistence,
-  createUserWithEmailAndPassword,
-  getRedirectResult,
   GoogleAuthProvider,
-  onAuthStateChanged,
+  getRedirectResult,
   setPersistence,
   signInWithEmailAndPassword,
   signInWithPopup,
   signInWithRedirect,
-  User,
+  browserLocalPersistence,
 } from "firebase/auth";
+import { auth, db } from "@/lib/firebase";
 import { doc, getDoc } from "firebase/firestore";
-import { useToast } from "@/components/ui/ToastProvider";
 
-async function routeAfterLogin(uid: string) {
-  try {
-    const userRef = doc(db, "users", uid);
-    const userSnap = await getDoc(userRef);
-
-    if (userSnap.exists()) {
-      const data = userSnap.data() as { role?: string };
-
-      if (data.role === "admin") {
-        window.location.assign("/admin");
-        return;
-      }
-    }
-
-    window.location.assign("/dashboard");
-  } catch (error) {
-    console.error("Route after login error:", error);
-    window.location.assign("/dashboard");
-  }
-}
-
-function isIosStandaloneApp() {
+function isStandaloneIOS() {
   if (typeof window === "undefined") return false;
 
   const isIos =
@@ -46,304 +22,222 @@ function isIosStandaloneApp() {
     (window.navigator.platform === "MacIntel" &&
       window.navigator.maxTouchPoints > 1);
 
-  const isStandalone =
+  const standalone =
     window.matchMedia?.("(display-mode: standalone)")?.matches ||
-    (window.navigator as Navigator & { standalone?: boolean }).standalone ===
-      true;
+    (window.navigator as Navigator & { standalone?: boolean }).standalone === true;
 
-  return isIos && isStandalone;
+  return isIos && standalone;
+}
+
+async function routeUserByRole(uid: string) {
+  const userRef = doc(db, "users", uid);
+  const userSnap = await getDoc(userRef);
+
+  if (!userSnap.exists()) {
+    window.location.replace("/dashboard");
+    return;
+  }
+
+  const userData = userSnap.data() as { role?: string };
+
+  if (userData.role === "admin") {
+    window.location.replace("/admin");
+    return;
+  }
+
+  window.location.replace("/dashboard");
 }
 
 export default function LoginPage() {
+  const searchParams = useSearchParams();
+
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [loading, setLoading] = useState(false);
-  const [checkingRedirect, setCheckingRedirect] = useState(true);
-  const routedRef = useRef(false);
-  const { showToast } = useToast();
 
-  const finishLogin = async (user: User) => {
-    if (routedRef.current) return;
-    routedRef.current = true;
-    await routeAfterLogin(user.uid);
-  };
+  const [loading, setLoading] = useState(true);
+  const [emailLoading, setEmailLoading] = useState(false);
+  const [googleLoading, setGoogleLoading] = useState(false);
+  const [error, setError] = useState("");
+
+  const isRedirectMode = useMemo(() => isStandaloneIOS(), []);
 
   useEffect(() => {
-    let mounted = true;
+    let cancelled = false;
 
-    const initAuth = async () => {
+    const init = async () => {
       try {
         await setPersistence(auth, browserLocalPersistence);
 
-        try {
-          const redirectResult = await getRedirectResult(auth);
-
-          if (redirectResult?.user && mounted) {
-            showToast({
-              title: "Google login successful",
-              description: "Redirecting to your account.",
-              type: "success",
-            });
-
-            await finishLogin(redirectResult.user);
-            return;
-          }
-        } catch (err: any) {
-          console.error("Redirect login error:", err);
-          if (mounted) {
-            showToast({
-              title: "Google login failed",
-              description: err?.message || "Something went wrong.",
-              type: "error",
-            });
-          }
-        }
-
+        // Important: let Firebase finish restoring session first
         await auth.authStateReady();
 
-        if (auth.currentUser && mounted) {
-          await finishLogin(auth.currentUser);
+        // Important for iPhone homescreen redirect flow
+        try {
+          await getRedirectResult(auth);
+        } catch (redirectError) {
+          console.error("Redirect result error:", redirectError);
+        }
+
+        // Check again after redirect result settles
+        const currentUser = auth.currentUser;
+
+        if (currentUser && !cancelled) {
+          await routeUserByRole(currentUser.uid);
           return;
         }
+
+        const loginError = searchParams.get("error");
+        if (loginError && !cancelled) {
+          setError("Could not complete sign in. Please try again.");
+        }
+      } catch (err) {
+        console.error("Login init error:", err);
+        if (!cancelled) {
+          setError("Could not load login. Please refresh the page.");
+        }
       } finally {
-        if (mounted) {
-          setCheckingRedirect(false);
+        if (!cancelled) {
+          setLoading(false);
         }
       }
     };
 
-    initAuth();
-
-    const unsubscribe = onAuthStateChanged(auth, async (user) => {
-      if (!mounted || !user || routedRef.current) return;
-      await finishLogin(user);
-    });
+    init();
 
     return () => {
-      mounted = false;
-      unsubscribe();
+      cancelled = true;
     };
-  }, [showToast]);
+  }, [searchParams]);
 
-  const login = async () => {
-    setLoading(true);
-
-    try {
-      await setPersistence(auth, browserLocalPersistence);
-      const credential = await signInWithEmailAndPassword(auth, email, password);
-
-      showToast({
-        title: "Login successful",
-        description: "Redirecting to your account.",
-        type: "success",
-      });
-
-      await finishLogin(credential.user);
-    } catch (err: any) {
-      showToast({
-        title: "Login failed",
-        description: err.message || "Something went wrong.",
-        type: "error",
-      });
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const signup = async () => {
-    setLoading(true);
+  const handleEmailLogin = async () => {
+    setError("");
+    setEmailLoading(true);
 
     try {
       await setPersistence(auth, browserLocalPersistence);
-      const credential = await createUserWithEmailAndPassword(
+
+      const credential = await signInWithEmailAndPassword(
         auth,
-        email,
+        email.trim(),
         password
       );
 
-      showToast({
-        title: "Account created",
-        description: "Redirecting to your account.",
-        type: "success",
-      });
-
-      await finishLogin(credential.user);
-    } catch (err: any) {
-      showToast({
-        title: "Signup failed",
-        description: err.message || "Something went wrong.",
-        type: "error",
-      });
+      await routeUserByRole(credential.user.uid);
+    } catch (err) {
+      console.error("Email login error:", err);
+      setError("Incorrect email or password.");
     } finally {
-      setLoading(false);
+      setEmailLoading(false);
     }
   };
 
-  const googleLogin = async () => {
-    setLoading(true);
+  const handleGoogleLogin = async () => {
+    setError("");
+    setGoogleLoading(true);
 
     try {
       await setPersistence(auth, browserLocalPersistence);
-      const provider = new GoogleAuthProvider();
 
-      if (isIosStandaloneApp()) {
+      const provider = new GoogleAuthProvider();
+      provider.setCustomParameters({
+        prompt: "select_account",
+      });
+
+      if (isRedirectMode) {
         await signInWithRedirect(auth, provider);
         return;
       }
 
       const credential = await signInWithPopup(auth, provider);
-
-      showToast({
-        title: "Google login successful",
-        description: "Redirecting to your account.",
-        type: "success",
-      });
-
-      await finishLogin(credential.user);
-    } catch (err: any) {
-      showToast({
-        title: "Google login failed",
-        description: err.message || "Something went wrong.",
-        type: "error",
-      });
-      setLoading(false);
+      await routeUserByRole(credential.user.uid);
+    } catch (err) {
+      console.error("Google login error:", err);
+      setError("Google sign-in failed. Please try again.");
+      setGoogleLoading(false);
     }
   };
 
-
-  if (checkingRedirect) {
+  if (loading) {
     return (
-      <main className="min-h-screen bg-[radial-gradient(circle_at_top_left,_rgba(46,160,255,0.18),_transparent_28%),radial-gradient(circle_at_bottom_right,_rgba(15,23,42,0.10),_transparent_28%),linear-gradient(to_bottom_right,_#f8fbff,_#eef5ff)] px-6 py-10">
-        <div className="mx-auto grid min-h-[80vh] max-w-6xl items-center gap-10 lg:grid-cols-[1.05fr_520px]">
-          <section>
-            <div className="inline-flex items-center rounded-full border border-[#bfdbfe] bg-[#eff6ff] px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.22em] text-[#1d4ed8]">
-              Wild Atlantic Bootcamp
-            </div>
-
-            <h1 className="mt-5 max-w-3xl text-4xl font-semibold tracking-tight text-slate-950 md:text-6xl">
-              Welcome back
-            </h1>
-
-            <p className="mt-4 max-w-2xl text-lg leading-8 text-slate-600">
-              Checking your login session...
-            </p>
-          </section>
-
-          <section className="rounded-[32px] border border-white/70 bg-white/90 p-8 shadow-[0_24px_80px_rgba(15,23,42,0.10)] backdrop-blur">
-            <p className="text-sm text-slate-500">Please wait...</p>
-          </section>
+      <main className="min-h-screen bg-[#f7fbff] px-6 py-10">
+        <div className="mx-auto max-w-md rounded-[28px] border border-white/70 bg-white/90 p-8 shadow-[0_20px_60px_rgba(15,23,42,0.08)]">
+          <p className="text-sm text-slate-500">Loading login...</p>
         </div>
       </main>
     );
   }
 
   return (
-    <main className="min-h-screen bg-[radial-gradient(circle_at_top_left,_rgba(46,160,255,0.18),_transparent_28%),radial-gradient(circle_at_bottom_right,_rgba(15,23,42,0.10),_transparent_28%),linear-gradient(to_bottom_right,_#f8fbff,_#eef5ff)] px-6 py-10">
-      <div className="mx-auto grid min-h-[80vh] max-w-6xl items-center gap-10 lg:grid-cols-[1.05fr_520px]">
-        <section>
-          <div className="inline-flex items-center rounded-full border border-[#bfdbfe] bg-[#eff6ff] px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.22em] text-[#1d4ed8]">
-            Wild Atlantic Bootcamp
+    <main className="min-h-screen bg-[#f7fbff] px-6 py-10">
+      <div className="mx-auto max-w-md rounded-[28px] border border-white/70 bg-white/90 p-8 shadow-[0_20px_60px_rgba(15,23,42,0.08)]">
+        <div className="inline-flex items-center rounded-full border border-[#bfdbfe] bg-[#eff6ff] px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.2em] text-[#1d4ed8]">
+          Wild Atlantic Bootcamp
+        </div>
+
+        <h1 className="mt-4 text-3xl font-semibold tracking-tight text-slate-950">
+          Sign in
+        </h1>
+
+        <p className="mt-2 text-sm text-slate-600">
+          Access your dashboard and progress updates.
+        </p>
+
+        {error && (
+          <div className="mt-4 rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">
+            {error}
           </div>
+        )}
 
-          <h1 className="mt-5 max-w-3xl text-4xl font-semibold tracking-tight text-slate-950 md:text-7xl">
-            Welcome back
-          </h1>
-
-          <p className="mt-4 max-w-2xl text-lg leading-8 text-slate-600">
-            Login or create your account to continue your program, track your
-            progress, and access your personal dashboard.
-          </p>
-
-          <div className="mt-8 grid max-w-xl gap-4 sm:grid-cols-2">
-            <FeaturePill
-              title="Personal dashboard"
-              description="Access your schedule, profile, and updates."
+        <div className="mt-6 space-y-4">
+          <div>
+            <label className="mb-2 block text-sm font-medium text-slate-700">
+              Email
+            </label>
+            <input
+              type="email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none transition focus:border-[#93c5fd] focus:ring-4 focus:ring-[#dbeafe]"
+              placeholder="you@example.com"
             />
-            <FeaturePill
-              title="Progress tracking"
-              description="Keep your journey organized in one place."
+          </div>
+
+          <div>
+            <label className="mb-2 block text-sm font-medium text-slate-700">
+              Password
+            </label>
+            <input
+              type="password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none transition focus:border-[#93c5fd] focus:ring-4 focus:ring-[#dbeafe]"
+              placeholder="••••••••"
             />
           </div>
-        </section>
 
-        <section className="overflow-hidden rounded-[32px] border border-white/70 bg-white/90 shadow-[0_24px_80px_rgba(15,23,42,0.10)] backdrop-blur">
-          <div className="bg-gradient-to-r from-[#071120] via-[#123b76] to-[#2EA0FF] p-[1px]">
-            <div className="rounded-t-[31px] bg-transparent px-0 py-0" />
-          </div>
+          <button
+            type="button"
+            onClick={handleEmailLogin}
+            disabled={emailLoading || googleLoading}
+            className="w-full rounded-2xl bg-slate-950 px-4 py-3 text-sm font-medium text-white transition hover:bg-slate-800 disabled:opacity-50"
+          >
+            {emailLoading ? "Signing in..." : "Sign in"}
+          </button>
 
-          <div className="p-8">
-            <h2 className="text-3xl font-semibold tracking-tight text-slate-950">
-              Access your account
-            </h2>
-            <p className="mt-2 text-sm leading-6 text-slate-500">
-              Use email/password or continue with Google.
-            </p>
-
-            <div className="mt-6 space-y-4">
-              <input
-                className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-4 text-base text-slate-900 shadow-sm outline-none transition placeholder:text-slate-400 focus:border-[#93c5fd] focus:ring-4 focus:ring-[#dbeafe]"
-                placeholder="Email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-              />
-
-              <input
-                type="password"
-                className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-4 text-base text-slate-900 shadow-sm outline-none transition placeholder:text-slate-400 focus:border-[#93c5fd] focus:ring-4 focus:ring-[#dbeafe]"
-                placeholder="Password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-              />
-
-              <button
-                onClick={login}
-                disabled={loading}
-                className="w-full rounded-2xl bg-slate-950 py-3.5 text-sm font-medium text-white shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:bg-slate-800 hover:shadow-md disabled:opacity-50"
-              >
-                {loading ? "Loading..." : "Login"}
-              </button>
-
-              <button
-                onClick={signup}
-                disabled={loading}
-                className="w-full rounded-2xl border border-slate-200 bg-white py-3.5 text-sm font-medium text-slate-700 shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:border-slate-300 hover:shadow-md disabled:opacity-50"
-              >
-                Create account
-              </button>
-
-              <div className="flex items-center gap-3 py-1">
-                <div className="h-px flex-1 bg-slate-200" />
-                <span className="text-sm text-slate-400">OR</span>
-                <div className="h-px flex-1 bg-slate-200" />
-              </div>
-
-              <button
-                onClick={googleLogin}
-                disabled={loading}
-                className="w-full rounded-2xl border border-slate-200 bg-white py-3.5 text-sm font-medium text-slate-700 shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:border-slate-300 hover:shadow-md disabled:opacity-50"
-              >
-                {loading ? "Loading..." : "Continue with Google"}
-              </button>
-
-            </div>
-          </div>
-        </section>
+          <button
+            type="button"
+            onClick={handleGoogleLogin}
+            disabled={emailLoading || googleLoading}
+            className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-medium text-slate-700 transition hover:bg-slate-50 disabled:opacity-50"
+          >
+            {googleLoading
+              ? isRedirectMode
+                ? "Redirecting..."
+                : "Signing in..."
+              : "Continue with Google"}
+          </button>
+        </div>
       </div>
     </main>
-  );
-}
-
-function FeaturePill({
-  title,
-  description,
-}: {
-  title: string;
-  description: string;
-}) {
-  return (
-    <div className="rounded-[24px] border border-white/70 bg-white/80 p-4 shadow-[0_14px_40px_rgba(15,23,42,0.06)] backdrop-blur">
-      <p className="text-sm font-semibold text-slate-900">{title}</p>
-      <p className="mt-1 text-sm leading-6 text-slate-600">{description}</p>
-    </div>
   );
 }
