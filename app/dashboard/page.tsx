@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { auth, db } from "@/lib/firebase";
-import { signOut } from "firebase/auth";
+import { onAuthStateChanged, signOut } from "firebase/auth";
 import {
   collection,
   doc,
@@ -92,6 +92,28 @@ function formatPhotoDate(
   return "No date";
 }
 
+function waitForUser(timeoutMs = 5000): Promise<typeof auth.currentUser> {
+  return new Promise((resolve) => {
+    if (auth.currentUser) {
+      resolve(auth.currentUser);
+      return;
+    }
+
+    const timeout = window.setTimeout(() => {
+      unsubscribe();
+      resolve(auth.currentUser);
+    }, timeoutMs);
+
+    const unsubscribe = onAuthStateChanged(auth, (user) => {
+      if (user) {
+        window.clearTimeout(timeout);
+        unsubscribe();
+        resolve(user);
+      }
+    });
+  });
+}
+
 export default function DashboardPage() {
   const [user, setUser] = useState<any>(null);
   const [loading, setLoading] = useState(true);
@@ -154,7 +176,8 @@ export default function DashboardPage() {
   };
 
   const loadDashboard = async () => {
-    const currentUser = auth.currentUser;
+    const currentUser = auth.currentUser || (await waitForUser(5000));
+
     if (!currentUser) {
       window.location.replace("/login");
       return;

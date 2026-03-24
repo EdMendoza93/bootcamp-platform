@@ -6,6 +6,7 @@ import {
   GoogleAuthProvider,
   createUserWithEmailAndPassword,
   getRedirectResult,
+  onAuthStateChanged,
   setPersistence,
   signInWithEmailAndPassword,
   signInWithPopup,
@@ -63,6 +64,28 @@ async function routeUserByRole(uid: string) {
   window.location.replace("/dashboard");
 }
 
+function waitForAuthenticatedUser(timeoutMs = 5000) {
+  return new Promise<typeof auth.currentUser>((resolve) => {
+    if (auth.currentUser) {
+      resolve(auth.currentUser);
+      return;
+    }
+
+    const timeout = window.setTimeout(() => {
+      unsubscribe();
+      resolve(auth.currentUser);
+    }, timeoutMs);
+
+    const unsubscribe = onAuthStateChanged(auth, (user) => {
+      if (user) {
+        window.clearTimeout(timeout);
+        unsubscribe();
+        resolve(user);
+      }
+    });
+  });
+}
+
 export default function LoginContent() {
   const searchParams = useSearchParams();
 
@@ -77,57 +100,63 @@ export default function LoginContent() {
 
   const isRedirectMode = useMemo(() => isStandaloneIOS(), []);
 
-  useEffect(() => {
-    let cancelled = false;
+ useEffect(() => {
+  let cancelled = false;
+  let unsubscribe: (() => void) | undefined;
 
-    const init = async () => {
-      try {
-        await setPersistence(auth, browserLocalPersistence);
-        await auth.authStateReady();
+  const init = async () => {
+    try {
+      await setPersistence(auth, browserLocalPersistence);
 
-        try {
-          const redirectResult = await getRedirectResult(auth);
+      unsubscribe = onAuthStateChanged(auth, async (user) => {
+        if (cancelled) return;
 
-          if (redirectResult?.user) {
-            await ensureUserDoc(
-              redirectResult.user.uid,
-              redirectResult.user.email
-            );
+        if (user) {
+          try {
+            await ensureUserDoc(user.uid, user.email);
+            await routeUserByRole(user.uid);
+          } catch (error) {
+            console.error("Route user error:", error);
+            if (!cancelled) {
+              setError("Could not complete sign in. Please try again.");
+              setLoading(false);
+            }
           }
-        } catch (redirectError) {
-          console.error("Redirect result error:", redirectError);
+        } else {
+          if (!cancelled) {
+            const loginError = searchParams.get("error");
+            if (loginError) {
+              setError("Could not complete sign in. Please try again.");
+            }
+            setLoading(false);
+          }
         }
+      });
 
-        const currentUser = auth.currentUser;
-
-        if (currentUser && !cancelled) {
-          await ensureUserDoc(currentUser.uid, currentUser.email);
-          await routeUserByRole(currentUser.uid);
-          return;
+      try {
+        const result = await getRedirectResult(auth);
+        if (result?.user) {
+          await ensureUserDoc(result.user.uid, result.user.email);
         }
-
-        const loginError = searchParams.get("error");
-        if (loginError && !cancelled) {
-          setError("Could not complete sign in. Please try again.");
-        }
-      } catch (err) {
-        console.error("Login init error:", err);
-        if (!cancelled) {
-          setError("Could not load login. Please refresh the page.");
-        }
-      } finally {
-        if (!cancelled) {
-          setLoading(false);
-        }
+      } catch (redirectError) {
+        console.error("Redirect result error:", redirectError);
       }
-    };
+    } catch (err) {
+      console.error("Login init error:", err);
+      if (!cancelled) {
+        setError("Could not load login. Please refresh the page.");
+        setLoading(false);
+      }
+    }
+  };
 
-    init();
+  init();
 
-    return () => {
-      cancelled = true;
-    };
-  }, [searchParams]);
+  return () => {
+    cancelled = true;
+    if (unsubscribe) unsubscribe();
+  };
+}, [searchParams]);
 
   const handleEmailLogin = async () => {
     setError("");
@@ -216,7 +245,9 @@ export default function LoginContent() {
       <main className="min-h-screen bg-[radial-gradient(circle_at_top,_rgba(46,160,255,0.14),_transparent_32%),linear-gradient(to_bottom_right,_#f8fbff,_#eef6ff)] px-6 py-10">
         <div className="mx-auto flex min-h-[80vh] max-w-6xl items-center justify-center">
           <div className="w-full max-w-md rounded-[32px] border border-white/70 bg-white/90 p-8 shadow-[0_24px_80px_rgba(15,23,42,0.10)] backdrop-blur">
-            <p className="text-sm font-medium text-slate-500">Loading login...</p>
+            <p className="text-sm font-medium text-slate-500">
+              Loading login...
+            </p>
           </div>
         </div>
       </main>
