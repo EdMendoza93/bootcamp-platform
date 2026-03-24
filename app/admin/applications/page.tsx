@@ -125,7 +125,15 @@ export default function AdminApplicationsPage() {
     const existingProfileSnapshot = await getDocs(existingProfileQuery);
 
     if (!existingProfileSnapshot.empty) {
-      return existingProfileSnapshot.docs[0].id;
+      const existingProfileId = existingProfileSnapshot.docs[0].id;
+
+      await updateDoc(doc(db, "profiles", existingProfileId), {
+        applicationId: app.id,
+        approvalStatus: "approved",
+        progressPhotosEnabled: true,
+      });
+
+      return existingProfileId;
     }
 
     const profileRef = await addDoc(collection(db, "profiles"), {
@@ -145,7 +153,7 @@ export default function AdminApplicationsPage() {
       injuries: "",
       notes: "",
       internalNotes: "",
-      progressPhotosEnabled: false,
+      progressPhotosEnabled: true,
       createdAt: serverTimestamp(),
     });
 
@@ -177,7 +185,7 @@ export default function AdminApplicationsPage() {
 
       showToast({
         title: "Application approved",
-        description: "Profile created successfully.",
+        description: "Profile created and progress uploads enabled.",
         type: "success",
       });
     } catch (error) {
@@ -229,6 +237,10 @@ export default function AdminApplicationsPage() {
 
       const profileId = await ensureProfileForApplication(app);
 
+      await updateDoc(doc(db, "applications", app.id), {
+        status: "approved",
+      });
+
       setApplications((prev) =>
         prev.map((item) =>
           item.id === app.id
@@ -244,7 +256,7 @@ export default function AdminApplicationsPage() {
 
       showToast({
         title: "Profile created",
-        description: "Missing profile was created successfully.",
+        description: "Missing profile was created and uploads enabled.",
         type: "success",
       });
     } catch (error) {
