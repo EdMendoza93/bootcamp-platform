@@ -1,157 +1,240 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { auth, googleProvider } from "@/lib/firebase";
+import { useEffect, useMemo, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import {
+  GoogleAuthProvider,
+  getRedirectResult,
+  setPersistence,
   signInWithEmailAndPassword,
   signInWithPopup,
   signInWithRedirect,
-  getRedirectResult,
-  onAuthStateChanged,
+  browserLocalPersistence,
 } from "firebase/auth";
-import { useRouter } from "next/navigation";
+import { auth, db } from "@/lib/firebase";
+import { doc, getDoc } from "firebase/firestore";
+
+function isStandaloneIOS() {
+  if (typeof window === "undefined") return false;
+
+  const isIos =
+    /iPad|iPhone|iPod/.test(window.navigator.userAgent) ||
+    (window.navigator.platform === "MacIntel" &&
+      window.navigator.maxTouchPoints > 1);
+
+  const standalone =
+    window.matchMedia?.("(display-mode: standalone)")?.matches ||
+    (window.navigator as Navigator & { standalone?: boolean }).standalone === true;
+
+  return isIos && standalone;
+}
+
+async function routeUserByRole(uid: string) {
+  const userRef = doc(db, "users", uid);
+  const userSnap = await getDoc(userRef);
+
+  if (!userSnap.exists()) {
+    window.location.replace("/dashboard");
+    return;
+  }
+
+  const userData = userSnap.data() as { role?: string };
+
+  if (userData.role === "admin") {
+    window.location.replace("/admin");
+    return;
+  }
+
+  window.location.replace("/dashboard");
+}
 
 export default function LoginPage() {
-  const router = useRouter();
+  const searchParams = useSearchParams();
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const [emailLoading, setEmailLoading] = useState(false);
+  const [googleLoading, setGoogleLoading] = useState(false);
+  const [error, setError] = useState("");
 
-  // Detect iOS standalone (homescreen)
-  const isIOSStandalone =
-    typeof window !== "undefined" &&
-    (window.navigator as any).standalone === true;
+  const isRedirectMode = useMemo(() => isStandaloneIOS(), []);
 
-  // 🔥 HANDLE REDIRECT + AUTH STATE
   useEffect(() => {
-    let isMounted = true;
+    let cancelled = false;
 
-    const initAuth = async () => {
+    const init = async () => {
       try {
-        // 1. Complete redirect login (IMPORTANT)
-        const result = await getRedirectResult(auth);
+        await setPersistence(auth, browserLocalPersistence);
 
-        if (result?.user) {
-          console.log("Redirect login success:", result.user);
-          router.replace("/dashboard");
+        await auth.authStateReady();
+
+        try {
+          await getRedirectResult(auth);
+        } catch (redirectError) {
+          console.error("Redirect result error:", redirectError);
+        }
+
+        const currentUser = auth.currentUser;
+
+        if (currentUser && !cancelled) {
+          await routeUserByRole(currentUser.uid);
           return;
         }
+
+        const loginError = searchParams.get("error");
+        if (loginError && !cancelled) {
+          setError("Could not complete sign in. Please try again.");
+        }
       } catch (err) {
-        console.error("Redirect error:", err);
-      }
-
-      // 2. Fallback: listen to auth state
-      const unsubscribe = onAuthStateChanged(auth, (user) => {
-        if (!isMounted) return;
-
-        if (user) {
-          router.replace("/dashboard");
-        } else {
+        console.error("Login init error:", err);
+        if (!cancelled) {
+          setError("Could not load login. Please refresh the page.");
+        }
+      } finally {
+        if (!cancelled) {
           setLoading(false);
         }
-      });
-
-      return () => unsubscribe();
+      }
     };
 
-    initAuth();
+    init();
 
     return () => {
-      isMounted = false;
+      cancelled = true;
     };
-  }, [router]);
+  }, [searchParams]);
 
-  // 🔐 EMAIL LOGIN
   const handleEmailLogin = async () => {
-    setError(null);
+    setError("");
+    setEmailLoading(true);
+
     try {
-      await signInWithEmailAndPassword(auth, email, password);
-      router.replace("/dashboard");
-    } catch (err: any) {
-      setError(err.message);
+      await setPersistence(auth, browserLocalPersistence);
+
+      const credential = await signInWithEmailAndPassword(
+        auth,
+        email.trim(),
+        password
+      );
+
+      await routeUserByRole(credential.user.uid);
+    } catch (err) {
+      console.error("Email login error:", err);
+      setError("Incorrect email or password.");
+    } finally {
+      setEmailLoading(false);
     }
   };
 
-  // 🔐 GOOGLE LOGIN
   const handleGoogleLogin = async () => {
-    setError(null);
+    setError("");
+    setGoogleLoading(true);
 
     try {
-      if (isIOSStandalone) {
-        // 👉 iPhone homescreen → redirect
-        await signInWithRedirect(auth, googleProvider);
-      } else {
-        // 👉 Desktop → popup
-        const result = await signInWithPopup(auth, googleProvider);
-        if (result.user) {
-          router.replace("/dashboard");
-        }
+      await setPersistence(auth, browserLocalPersistence);
+
+      const provider = new GoogleAuthProvider();
+      provider.setCustomParameters({
+        prompt: "select_account",
+      });
+
+      if (isRedirectMode) {
+        await signInWithRedirect(auth, provider);
+        return;
       }
-    } catch (err: any) {
-      console.error(err);
-      setError(err.message);
+
+      const credential = await signInWithPopup(auth, provider);
+      await routeUserByRole(credential.user.uid);
+    } catch (err) {
+      console.error("Google login error:", err);
+      setError("Google sign-in failed. Please try again.");
+      setGoogleLoading(false);
     }
   };
 
-  // ⏳ Loading state (important to avoid flicker/loop)
   if (loading) {
     return (
-      <div className="flex h-screen items-center justify-center bg-black text-white">
-        <p className="text-sm opacity-70">Checking session...</p>
-      </div>
+      <main className="min-h-screen bg-[#f7fbff] px-6 py-10">
+        <div className="mx-auto max-w-md rounded-[28px] border border-white/70 bg-white/90 p-8 shadow-[0_20px_60px_rgba(15,23,42,0.08)]">
+          <p className="text-sm text-slate-500">Loading login...</p>
+        </div>
+      </main>
     );
   }
 
-  // 🎨 UI
   return (
-    <div className="flex h-screen items-center justify-center bg-black text-white px-4">
-      <div className="w-full max-w-sm space-y-6 rounded-2xl bg-zinc-900 p-6 shadow-lg">
-        <h1 className="text-xl font-semibold text-center">
-          Bootcamp Login
+    <main className="min-h-screen bg-[#f7fbff] px-6 py-10">
+      <div className="mx-auto max-w-md rounded-[28px] border border-white/70 bg-white/90 p-8 shadow-[0_20px_60px_rgba(15,23,42,0.08)]">
+        <div className="inline-flex items-center rounded-full border border-[#bfdbfe] bg-[#eff6ff] px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.2em] text-[#1d4ed8]">
+          Wild Atlantic Bootcamp
+        </div>
+
+        <h1 className="mt-4 text-3xl font-semibold tracking-tight text-slate-950">
+          Sign in
         </h1>
 
+        <p className="mt-2 text-sm text-slate-600">
+          Access your dashboard and progress updates.
+        </p>
+
         {error && (
-          <div className="text-sm text-red-400 text-center">
+          <div className="mt-4 rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">
             {error}
           </div>
         )}
 
-        <div className="space-y-3">
-          <input
-            type="email"
-            placeholder="Email"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            className="w-full rounded-lg bg-zinc-800 px-3 py-2 text-sm outline-none"
-          />
+        <div className="mt-6 space-y-4">
+          <div>
+            <label className="mb-2 block text-sm font-medium text-slate-700">
+              Email
+            </label>
+            <input
+              type="email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none transition focus:border-[#93c5fd] focus:ring-4 focus:ring-[#dbeafe]"
+              placeholder="you@example.com"
+            />
+          </div>
 
-          <input
-            type="password"
-            placeholder="Password"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            className="w-full rounded-lg bg-zinc-800 px-3 py-2 text-sm outline-none"
-          />
+          <div>
+            <label className="mb-2 block text-sm font-medium text-slate-700">
+              Password
+            </label>
+            <input
+              type="password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none transition focus:border-[#93c5fd] focus:ring-4 focus:ring-[#dbeafe]"
+              placeholder="••••••••"
+            />
+          </div>
 
           <button
+            type="button"
             onClick={handleEmailLogin}
-            className="w-full rounded-lg bg-white text-black py-2 text-sm font-medium hover:opacity-90"
+            disabled={emailLoading || googleLoading}
+            className="w-full rounded-2xl bg-slate-950 px-4 py-3 text-sm font-medium text-white transition hover:bg-slate-800 disabled:opacity-50"
           >
-            Sign in
+            {emailLoading ? "Signing in..." : "Sign in"}
+          </button>
+
+          <button
+            type="button"
+            onClick={handleGoogleLogin}
+            disabled={emailLoading || googleLoading}
+            className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-medium text-slate-700 transition hover:bg-slate-50 disabled:opacity-50"
+          >
+            {googleLoading
+              ? isRedirectMode
+                ? "Redirecting..."
+                : "Signing in..."
+              : "Continue with Google"}
           </button>
         </div>
-
-        <div className="text-center text-xs opacity-50">or</div>
-
-        <button
-          onClick={handleGoogleLogin}
-          className="w-full rounded-lg border border-white/20 py-2 text-sm hover:bg-white/10"
-        >
-          Continue with Google
-        </button>
       </div>
-    </div>
+    </main>
   );
 }
