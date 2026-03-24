@@ -299,38 +299,70 @@ export default function AdminApplicationsPage() {
   }, [applications]);
 
   if (loading) {
-    return <p className="p-10">Loading...</p>;
+    return (
+      <div className="rounded-[28px] border border-white/70 bg-white/90 p-8 shadow-[0_20px_60px_rgba(15,23,42,0.08)] backdrop-blur">
+        <p className="text-sm font-medium text-slate-500">
+          Loading applications...
+        </p>
+      </div>
+    );
   }
 
   return (
     <div className="space-y-8">
-      <div>
-        <h1 className="text-3xl font-bold tracking-tight">Applications</h1>
-        <p className="mt-2 text-gray-600">
-          Review applicants, approve decisions, and automatically create client
-          profiles.
-        </p>
-      </div>
+      <section className="overflow-hidden rounded-[32px] border border-white/70 bg-white/90 shadow-[0_24px_80px_rgba(15,23,42,0.10)] backdrop-blur">
+        <div className="bg-gradient-to-r from-[#071120] via-[#123b76] to-[#2EA0FF] p-[1px]">
+          <div className="rounded-t-[31px] bg-transparent px-0 py-0" />
+        </div>
 
-      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
-        <SummaryCard label="Total" value={String(summary.total)} />
-        <SummaryCard label="Pending" value={String(summary.pending)} />
-        <SummaryCard label="Approved" value={String(summary.approved)} />
-        <SummaryCard label="Rejected" value={String(summary.rejected)} />
+        <div className="relative overflow-hidden p-6 md:p-8">
+          <div className="absolute right-0 top-0 h-40 w-40 rounded-full bg-[#2EA0FF]/10 blur-3xl" />
+          <div className="absolute bottom-0 left-0 h-32 w-32 rounded-full bg-emerald-300/10 blur-3xl" />
+
+          <div className="relative">
+            <div className="inline-flex items-center rounded-full border border-[#bfdbfe] bg-[#eff6ff] px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.2em] text-[#1d4ed8]">
+              Applications
+            </div>
+
+            <h1 className="mt-4 text-3xl font-semibold tracking-tight text-slate-950 md:text-4xl">
+              Applicant Review
+            </h1>
+            <p className="mt-3 max-w-2xl text-sm text-slate-600 md:text-base">
+              Review applicants, approve decisions, and automatically create
+              client profiles.
+            </p>
+          </div>
+        </div>
+      </section>
+
+      <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
+        <SummaryCard label="Total" value={String(summary.total)} tone="light" />
+        <SummaryCard label="Pending" value={String(summary.pending)} tone="blue" />
+        <SummaryCard
+          label="Approved"
+          value={String(summary.approved)}
+          tone="success"
+        />
+        <SummaryCard
+          label="Rejected"
+          value={String(summary.rejected)}
+          tone="light"
+        />
         <SummaryCard
           label="Profiles Created"
           value={String(summary.profilesCreated)}
+          tone="dark"
         />
-      </div>
+      </section>
 
-      <div className="rounded-2xl border bg-white p-4 shadow-sm">
+      <section className="rounded-[28px] border border-white/70 bg-white/90 p-4 shadow-[0_18px_50px_rgba(15,23,42,0.07)] backdrop-blur md:p-5">
         <div className="flex flex-col gap-3 md:flex-row md:items-center">
           <input
             type="text"
             placeholder="Search by name, goal, or phone..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            className="w-full rounded-xl border px-4 py-3 text-sm outline-none focus:border-black md:flex-1"
+            className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-[#93c5fd] focus:ring-4 focus:ring-[#dbeafe] md:flex-1"
           />
 
           <div className="flex flex-wrap gap-2">
@@ -339,10 +371,10 @@ export default function AdminApplicationsPage() {
                 <button
                   key={status}
                   onClick={() => setStatusFilter(status)}
-                  className={`rounded-xl px-4 py-2 text-sm font-medium transition ${
+                  className={`rounded-2xl px-4 py-2 text-sm font-medium transition ${
                     statusFilter === status
-                      ? "bg-black text-white"
-                      : "bg-gray-100 text-gray-700 hover:bg-gray-200"
+                      ? "bg-slate-950 text-white shadow-sm"
+                      : "border border-slate-200 bg-white text-slate-700 hover:bg-slate-50"
                   }`}
                 >
                   {status[0].toUpperCase() + status.slice(1)}
@@ -351,37 +383,37 @@ export default function AdminApplicationsPage() {
             )}
           </div>
         </div>
-      </div>
+      </section>
 
       {filteredApplications.length === 0 ? (
-        <div className="rounded-2xl border border-dashed bg-white p-10 text-center text-sm text-gray-500">
+        <div className="rounded-[28px] border border-dashed border-slate-200 bg-white/90 p-10 text-center text-sm text-slate-500 shadow-[0_18px_50px_rgba(15,23,42,0.05)]">
           No applications found.
         </div>
       ) : (
-        <div className="grid gap-4">
+        <div className="grid gap-5">
           {filteredApplications.map((app) => {
             const isBusy = actionLoadingId === app.id;
 
             return (
               <div
                 key={app.id}
-                className="rounded-2xl border bg-white p-6 shadow-sm"
+                className="rounded-[28px] border border-white/70 bg-white/95 p-6 shadow-[0_18px_50px_rgba(15,23,42,0.07)] backdrop-blur"
               >
                 <div className="flex flex-col gap-5 xl:flex-row xl:items-start xl:justify-between">
                   <div className="min-w-0 flex-1">
                     <div className="flex flex-wrap items-center gap-2">
-                      <h2 className="text-xl font-semibold">
+                      <h2 className="text-xl font-semibold tracking-tight text-slate-950">
                         {app.fullName || "Unnamed applicant"}
                       </h2>
                       <StatusBadge status={app.status} />
                       {app.hasProfile && (
-                        <span className="rounded-full border bg-gray-50 px-3 py-1 text-xs font-medium text-gray-700">
+                        <span className="rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-xs font-medium text-emerald-700">
                           Profile created
                         </span>
                       )}
                     </div>
 
-                    <div className="mt-4 grid gap-3 md:grid-cols-2">
+                    <div className="mt-5 grid gap-3 md:grid-cols-2">
                       <InfoRow label="Age" value={app.age || "—"} />
                       <InfoRow label="Goal" value={app.goal || "—"} />
                       <InfoRow label="Phone" value={app.phone || "—"} />
@@ -392,24 +424,24 @@ export default function AdminApplicationsPage() {
                     </div>
 
                     {app.medicalNotes ? (
-                      <div className="mt-4 rounded-2xl bg-gray-50 p-4">
-                        <p className="text-sm font-medium text-gray-700">
+                      <div className="mt-4 rounded-[22px] border border-amber-100 bg-amber-50/70 p-4">
+                        <p className="text-sm font-semibold text-amber-800">
                           Medical notes
                         </p>
-                        <p className="mt-2 text-sm text-gray-600">
+                        <p className="mt-2 text-sm text-amber-700">
                           {app.medicalNotes}
                         </p>
                       </div>
                     ) : null}
                   </div>
 
-                  <div className="flex flex-wrap gap-3 xl:w-[260px] xl:flex-col">
+                  <div className="flex flex-wrap gap-3 xl:w-[270px] xl:flex-col">
                     {app.status === "pending" && (
                       <>
                         <button
                           onClick={() => approveApplication(app)}
                           disabled={isBusy}
-                          className="rounded-xl bg-black px-4 py-2.5 text-sm font-medium text-white disabled:opacity-50"
+                          className="rounded-2xl bg-slate-950 px-4 py-3 text-sm font-medium text-white shadow-sm transition hover:bg-slate-800 disabled:opacity-50"
                         >
                           {isBusy ? "Working..." : "Approve"}
                         </button>
@@ -417,7 +449,7 @@ export default function AdminApplicationsPage() {
                         <button
                           onClick={() => rejectApplication(app)}
                           disabled={isBusy}
-                          className="rounded-xl border bg-white px-4 py-2.5 text-sm font-medium disabled:opacity-50"
+                          className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-medium text-slate-700 transition hover:bg-slate-50 disabled:opacity-50"
                         >
                           {isBusy ? "Working..." : "Reject"}
                         </button>
@@ -428,12 +460,12 @@ export default function AdminApplicationsPage() {
                       <>
                         <a
                           href={`/admin/profiles/${app.profileId}`}
-                          className="rounded-xl bg-black px-4 py-2.5 text-center text-sm font-medium text-white"
+                          className="rounded-2xl bg-slate-950 px-4 py-3 text-center text-sm font-medium text-white shadow-sm transition hover:bg-slate-800"
                         >
                           Open Profile
                         </a>
 
-                        <div className="rounded-xl border bg-gray-50 px-4 py-2.5 text-sm font-medium text-gray-600">
+                        <div className="rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-medium text-emerald-700">
                           Ready for next step
                         </div>
                       </>
@@ -444,19 +476,19 @@ export default function AdminApplicationsPage() {
                         <button
                           onClick={() => createMissingProfile(app)}
                           disabled={isBusy}
-                          className="rounded-xl bg-black px-4 py-2.5 text-sm font-medium text-white disabled:opacity-50"
+                          className="rounded-2xl bg-slate-950 px-4 py-3 text-sm font-medium text-white shadow-sm transition hover:bg-slate-800 disabled:opacity-50"
                         >
                           {isBusy ? "Creating..." : "Create Missing Profile"}
                         </button>
 
-                        <div className="rounded-xl border bg-amber-50 px-4 py-2.5 text-sm font-medium text-amber-700">
+                        <div className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-medium text-amber-700">
                           Legacy approved app without profile
                         </div>
                       </>
                     )}
 
                     {app.status === "rejected" && (
-                      <div className="rounded-xl border bg-gray-50 px-4 py-2.5 text-sm font-medium text-gray-600">
+                      <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-medium text-slate-600">
                         Application closed
                       </div>
                     )}
@@ -474,14 +506,48 @@ export default function AdminApplicationsPage() {
 function SummaryCard({
   label,
   value,
+  tone,
 }: {
   label: string;
   value: string;
+  tone: "blue" | "success" | "dark" | "light";
 }) {
+  const styles: Record<
+    "blue" | "success" | "dark" | "light",
+    { card: string; label: string; value: string }
+  > = {
+    blue: {
+      card: "border-[#bfdbfe] bg-gradient-to-br from-[#eff6ff] to-white",
+      label: "text-[#1d4ed8]",
+      value: "text-slate-950",
+    },
+    success: {
+      card: "border-emerald-200 bg-gradient-to-br from-emerald-50 to-white",
+      label: "text-emerald-700",
+      value: "text-slate-950",
+    },
+    dark: {
+      card: "border-slate-800 bg-gradient-to-br from-slate-950 to-slate-800",
+      label: "text-slate-300",
+      value: "text-white",
+    },
+    light: {
+      card: "border-slate-200 bg-white",
+      label: "text-slate-500",
+      value: "text-slate-950",
+    },
+  };
+
   return (
-    <div className="rounded-2xl border bg-white p-5 shadow-sm">
-      <p className="text-sm font-medium text-gray-500">{label}</p>
-      <p className="mt-2 text-3xl font-bold tracking-tight">{value}</p>
+    <div
+      className={`rounded-[24px] border p-5 shadow-[0_14px_40px_rgba(15,23,42,0.07)] ${styles[tone].card}`}
+    >
+      <p className={`text-sm font-semibold ${styles[tone].label}`}>{label}</p>
+      <p
+        className={`mt-3 text-3xl font-semibold tracking-tight ${styles[tone].value}`}
+      >
+        {value}
+      </p>
     </div>
   );
 }
@@ -492,9 +558,9 @@ function StatusBadge({
   status: "pending" | "approved" | "rejected";
 }) {
   const styles = {
-    pending: "bg-gray-100 text-gray-700 border-gray-200",
-    approved: "bg-gray-100 text-gray-700 border-gray-200",
-    rejected: "bg-gray-100 text-gray-700 border-gray-200",
+    pending: "border-amber-200 bg-amber-50 text-amber-700",
+    approved: "border-emerald-200 bg-emerald-50 text-emerald-700",
+    rejected: "border-rose-200 bg-rose-50 text-rose-700",
   };
 
   return (
@@ -508,9 +574,9 @@ function StatusBadge({
 
 function InfoRow({ label, value }: { label: string; value: string }) {
   return (
-    <div className="rounded-2xl bg-gray-50 p-4">
-      <p className="text-sm font-medium text-gray-700">{label}</p>
-      <p className="mt-2 text-sm text-gray-600">{value}</p>
+    <div className="rounded-[22px] border border-slate-100 bg-gradient-to-br from-slate-50 to-white p-4">
+      <p className="text-sm font-semibold text-slate-700">{label}</p>
+      <p className="mt-2 text-sm text-slate-600">{value}</p>
     </div>
   );
 }
