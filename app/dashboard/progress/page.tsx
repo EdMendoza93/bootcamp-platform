@@ -14,9 +14,23 @@ import {
   updateDoc,
   where,
 } from "firebase/firestore";
-import { deleteObject, getDownloadURL, ref, uploadBytes } from "firebase/storage";
+import {
+  deleteObject,
+  getDownloadURL,
+  ref,
+  uploadBytes,
+} from "firebase/storage";
 
 type Milestone = "progress" | "start" | "final";
+
+type Measurements = {
+  chest?: string;
+  hips?: string;
+  waist?: string;
+  thighs?: string;
+  calves?: string;
+  arms?: string;
+};
 
 type Photo = {
   id: string;
@@ -26,6 +40,7 @@ type Photo = {
   note?: string;
   photoDate?: string;
   milestone?: Milestone;
+  measurements?: Measurements;
   createdAt?: {
     seconds?: number;
     nanoseconds?: number;
@@ -39,6 +54,33 @@ type PhotoModalData = {
   note: string;
   photoDate: string;
 };
+
+function emptyMeasurements(): Measurements {
+  return {
+    chest: "",
+    hips: "",
+    waist: "",
+    thighs: "",
+    calves: "",
+    arms: "",
+  };
+}
+
+function normalizeMeasurements(input?: Measurements): Measurements {
+  return {
+    chest: input?.chest || "",
+    hips: input?.hips || "",
+    waist: input?.waist || "",
+    thighs: input?.thighs || "",
+    calves: input?.calves || "",
+    arms: input?.arms || "",
+  };
+}
+
+function hasAnyMeasurements(input?: Measurements) {
+  if (!input) return false;
+  return Object.values(input).some((value) => (value || "").trim() !== "");
+}
 
 function getTodayDateInputValue() {
   const now = new Date();
@@ -94,6 +136,36 @@ function formatPhotoDate(photoDate?: string, createdAt?: { seconds?: number }) {
   return "No date";
 }
 
+async function syncLatestMeasurementsToProfile(profileId: string) {
+  const photosSnap = await getDocs(
+    query(collection(db, "progressPhotos"), where("profileId", "==", profileId))
+  );
+
+  const photos = photosSnap.docs
+    .map((docItem) => ({
+      id: docItem.id,
+      ...(docItem.data() as Omit<Photo, "id">),
+    }))
+    .sort((a, b) => getPhotoSortValue(b) - getPhotoSortValue(a)) as Photo[];
+
+  const latestWithMeasurements = photos.find((photo) =>
+    hasAnyMeasurements(photo.measurements)
+  );
+
+  if (!latestWithMeasurements) return;
+
+  const measurements = normalizeMeasurements(latestWithMeasurements.measurements);
+
+  await updateDoc(doc(db, "profiles", profileId), {
+    chest: measurements.chest,
+    hips: measurements.hips,
+    waist: measurements.waist,
+    thighs: measurements.thighs,
+    calves: measurements.calves,
+    arms: measurements.arms,
+  });
+}
+
 export default function ProgressPage() {
   const [loading, setLoading] = useState(true);
 
@@ -105,6 +177,9 @@ export default function ProgressPage() {
   const [note, setNote] = useState("");
   const [photoDate, setPhotoDate] = useState(getTodayDateInputValue());
   const [milestone, setMilestone] = useState<Milestone>("progress");
+  const [measurements, setMeasurements] = useState<Measurements>(
+    emptyMeasurements()
+  );
   const [uploading, setUploading] = useState(false);
   const [fileError, setFileError] = useState("");
   const [editingPhotoId, setEditingPhotoId] = useState<string | null>(null);
@@ -125,7 +200,10 @@ export default function ProgressPage() {
 
   const loadPhotos = async (targetProfileId: string) => {
     const photosSnap = await getDocs(
-      query(collection(db, "progressPhotos"), where("profileId", "==", targetProfileId))
+      query(
+        collection(db, "progressPhotos"),
+        where("profileId", "==", targetProfileId)
+      )
     );
 
     const photoData = photosSnap.docs
@@ -224,6 +302,7 @@ export default function ProgressPage() {
     setNote("");
     setPhotoDate(getTodayDateInputValue());
     setMilestone("progress");
+    setMeasurements(emptyMeasurements());
     setEditingPhotoId(null);
     setFileError("");
   };
@@ -245,6 +324,13 @@ export default function ProgressPage() {
     setFile(selectedFile);
   };
 
+  const updateMeasurement = (key: keyof Measurements, value: string) => {
+    setMeasurements((prev) => ({
+      ...prev,
+      [key]: value,
+    }));
+  };
+
   const startEdit = (photo: Photo) => {
     setEditingPhotoId(photo.id);
     setFile(null);
@@ -252,6 +338,7 @@ export default function ProgressPage() {
     setNote(photo.note || "");
     setPhotoDate(getFallbackDateInputValue(photo));
     setMilestone(photo.milestone || "progress");
+    setMeasurements(normalizeMeasurements(photo.measurements));
     setFileError("");
     window.scrollTo({ top: 0, behavior: "smooth" });
   };
@@ -268,8 +355,10 @@ export default function ProgressPage() {
           note: note.trim(),
           photoDate: photoDate || getTodayDateInputValue(),
           milestone,
+          measurements: normalizeMeasurements(measurements),
         });
 
+        await syncLatestMeasurementsToProfile(profileId);
         await loadPhotos(profileId);
         resetForm();
       } catch (error) {
@@ -303,6 +392,7 @@ export default function ProgressPage() {
         note: note.trim(),
         photoDate,
         milestone,
+        measurements: emptyMeasurements(),
         uploadedByRole: "user",
         createdAt: serverTimestamp(),
       });
@@ -559,6 +649,58 @@ export default function ProgressPage() {
                 </div>
               </div>
 
+              {editingPhotoId && (
+                <div>
+                  <label className="mb-2 block text-sm font-medium text-gray-700">
+                    Measurements
+                  </label>
+                  <div className="grid gap-3 sm:grid-cols-2">
+                    <input
+                      type="text"
+                      placeholder="Chest"
+                      value={measurements.chest || ""}
+                      onChange={(e) => updateMeasurement("chest", e.target.value)}
+                      className="w-full rounded-xl border p-3"
+                    />
+                    <input
+                      type="text"
+                      placeholder="Hips"
+                      value={measurements.hips || ""}
+                      onChange={(e) => updateMeasurement("hips", e.target.value)}
+                      className="w-full rounded-xl border p-3"
+                    />
+                    <input
+                      type="text"
+                      placeholder="Waist"
+                      value={measurements.waist || ""}
+                      onChange={(e) => updateMeasurement("waist", e.target.value)}
+                      className="w-full rounded-xl border p-3"
+                    />
+                    <input
+                      type="text"
+                      placeholder="Thighs"
+                      value={measurements.thighs || ""}
+                      onChange={(e) => updateMeasurement("thighs", e.target.value)}
+                      className="w-full rounded-xl border p-3"
+                    />
+                    <input
+                      type="text"
+                      placeholder="Calves"
+                      value={measurements.calves || ""}
+                      onChange={(e) => updateMeasurement("calves", e.target.value)}
+                      className="w-full rounded-xl border p-3"
+                    />
+                    <input
+                      type="text"
+                      placeholder="Arms"
+                      value={measurements.arms || ""}
+                      onChange={(e) => updateMeasurement("arms", e.target.value)}
+                      className="w-full rounded-xl border p-3"
+                    />
+                  </div>
+                </div>
+              )}
+
               <div>
                 <label className="mb-2 block text-sm font-medium text-gray-700">
                   Title
@@ -648,6 +790,19 @@ export default function ProgressPage() {
                   <p className="mt-1 text-xs text-gray-500">
                     {formatPhotoDate(photo.photoDate, photo.createdAt)}
                   </p>
+
+                  {hasAnyMeasurements(photo.measurements) && (
+                    <div className="mt-3 rounded-xl border bg-slate-50 p-3 text-xs text-slate-600">
+                      <div className="grid gap-1 sm:grid-cols-2">
+                        <span>Chest: {photo.measurements?.chest || "—"}</span>
+                        <span>Hips: {photo.measurements?.hips || "—"}</span>
+                        <span>Waist: {photo.measurements?.waist || "—"}</span>
+                        <span>Thighs: {photo.measurements?.thighs || "—"}</span>
+                        <span>Calves: {photo.measurements?.calves || "—"}</span>
+                        <span>Arms: {photo.measurements?.arms || "—"}</span>
+                      </div>
+                    </div>
+                  )}
 
                   {photo.note && (
                     <p className="mt-1 text-sm text-gray-600">{photo.note}</p>

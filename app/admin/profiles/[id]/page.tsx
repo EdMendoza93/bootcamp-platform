@@ -26,6 +26,15 @@ import { useToast } from "@/components/ui/ToastProvider";
 type ScheduleType = "training" | "nutrition" | "activity";
 type Milestone = "progress" | "start" | "final";
 
+type Measurements = {
+  chest?: string;
+  hips?: string;
+  waist?: string;
+  thighs?: string;
+  calves?: string;
+  arms?: string;
+};
+
 type ProgressPhoto = {
   id: string;
   profileId: string;
@@ -36,6 +45,7 @@ type ProgressPhoto = {
   note?: string;
   photoDate?: string;
   milestone?: Milestone;
+  measurements?: Measurements;
   uploadedByRole: "admin" | "user";
   createdAt?: {
     seconds?: number;
@@ -64,6 +74,33 @@ type PhotoModalData = {
   photoDate: string;
   uploadedByRole: "admin" | "user" | "";
 };
+
+function emptyMeasurements(): Measurements {
+  return {
+    chest: "",
+    hips: "",
+    waist: "",
+    thighs: "",
+    calves: "",
+    arms: "",
+  };
+}
+
+function normalizeMeasurements(input?: Measurements): Measurements {
+  return {
+    chest: input?.chest || "",
+    hips: input?.hips || "",
+    waist: input?.waist || "",
+    thighs: input?.thighs || "",
+    calves: input?.calves || "",
+    arms: input?.arms || "",
+  };
+}
+
+function hasAnyMeasurements(input?: Measurements) {
+  if (!input) return false;
+  return Object.values(input).some((value) => (value || "").trim() !== "");
+}
 
 function getTodayDateInputValue() {
   const now = new Date();
@@ -154,6 +191,36 @@ async function compressImage(file: File): Promise<File> {
   return new File([blob], `${safeName}.jpg`, { type: "image/jpeg" });
 }
 
+async function syncLatestMeasurementsToProfile(profileId: string) {
+  const photosSnap = await getDocs(
+    query(collection(db, "progressPhotos"), where("profileId", "==", profileId))
+  );
+
+  const photos = photosSnap.docs
+    .map((docItem) => ({
+      id: docItem.id,
+      ...(docItem.data() as Omit<ProgressPhoto, "id">),
+    }))
+    .sort((a, b) => getPhotoSortValue(b) - getPhotoSortValue(a)) as ProgressPhoto[];
+
+  const latestWithMeasurements = photos.find((photo) =>
+    hasAnyMeasurements(photo.measurements)
+  );
+
+  if (!latestWithMeasurements) return;
+
+  const measurements = normalizeMeasurements(latestWithMeasurements.measurements);
+
+  await updateDoc(doc(db, "profiles", profileId), {
+    chest: measurements.chest,
+    hips: measurements.hips,
+    waist: measurements.waist,
+    thighs: measurements.thighs,
+    calves: measurements.calves,
+    arms: measurements.arms,
+  });
+}
+
 export default function AdminProfileDetailPage() {
   const params = useParams<{ id: string }>();
   const profileRouteId = Array.isArray(params?.id) ? params.id[0] : params?.id;
@@ -179,6 +246,9 @@ export default function AdminProfileDetailPage() {
   );
   const [progressMilestone, setProgressMilestone] =
     useState<Milestone>("progress");
+  const [progressMeasurements, setProgressMeasurements] = useState<Measurements>(
+    emptyMeasurements()
+  );
   const [editingPhotoId, setEditingPhotoId] = useState<string | null>(null);
 
   const [photoModalData, setPhotoModalData] = useState<PhotoModalData>({
@@ -206,6 +276,12 @@ export default function AdminProfileDetailPage() {
     notes: "",
     internalNotes: "",
     progressPhotosEnabled: false,
+    chest: "",
+    hips: "",
+    waist: "",
+    thighs: "",
+    calves: "",
+    arms: "",
   });
 
   const { showToast } = useToast();
@@ -329,6 +405,12 @@ export default function AdminProfileDetailPage() {
           notes?: string;
           internalNotes?: string;
           progressPhotosEnabled?: boolean;
+          chest?: string;
+          hips?: string;
+          waist?: string;
+          thighs?: string;
+          calves?: string;
+          arms?: string;
         };
 
         setProfileUserId(data.userId || "");
@@ -350,6 +432,12 @@ export default function AdminProfileDetailPage() {
           notes: data.notes || "",
           internalNotes: data.internalNotes || "",
           progressPhotosEnabled: data.progressPhotosEnabled || false,
+          chest: data.chest || "",
+          hips: data.hips || "",
+          waist: data.waist || "",
+          thighs: data.thighs || "",
+          calves: data.calves || "",
+          arms: data.arms || "",
         });
 
         await Promise.all([
@@ -395,6 +483,12 @@ export default function AdminProfileDetailPage() {
         notes: form.notes.trim(),
         internalNotes: form.internalNotes.trim(),
         progressPhotosEnabled: form.progressPhotosEnabled,
+        chest: form.chest.trim(),
+        hips: form.hips.trim(),
+        waist: form.waist.trim(),
+        thighs: form.thighs.trim(),
+        calves: form.calves.trim(),
+        arms: form.arms.trim(),
       });
 
       showToast({
@@ -548,12 +642,20 @@ export default function AdminProfileDetailPage() {
     [progressPhotos, editingPhotoId]
   );
 
+  const updateProgressMeasurement = (key: keyof Measurements, value: string) => {
+    setProgressMeasurements((prev) => ({
+      ...prev,
+      [key]: value,
+    }));
+  };
+
   const resetProgressForm = () => {
     setProgressImageFile(null);
     setProgressTitle("");
     setProgressNote("");
     setProgressPhotoDate(getTodayDateInputValue());
     setProgressMilestone("progress");
+    setProgressMeasurements(emptyMeasurements());
     setEditingPhotoId(null);
   };
 
@@ -563,6 +665,7 @@ export default function AdminProfileDetailPage() {
     setProgressNote(photo.note || "");
     setProgressPhotoDate(getFallbackDateInputValue(photo));
     setProgressMilestone(photo.milestone || "progress");
+    setProgressMeasurements(normalizeMeasurements(photo.measurements));
     setProgressImageFile(null);
     window.scrollTo({ top: document.body.scrollHeight, behavior: "smooth" });
   };
@@ -601,7 +704,25 @@ export default function AdminProfileDetailPage() {
           note: progressNote.trim(),
           photoDate: progressPhotoDate || getTodayDateInputValue(),
           milestone: progressMilestone,
+          measurements: normalizeMeasurements(progressMeasurements),
         });
+
+        await syncLatestMeasurementsToProfile(profileId);
+
+        const profileSnap = await getDoc(doc(db, "profiles", profileId));
+        const profileData = profileSnap.data() as Measurements | undefined;
+
+        if (profileData) {
+          setForm((prev) => ({
+            ...prev,
+            chest: profileData.chest || "",
+            hips: profileData.hips || "",
+            waist: profileData.waist || "",
+            thighs: profileData.thighs || "",
+            calves: profileData.calves || "",
+            arms: profileData.arms || "",
+          }));
+        }
 
         resetProgressForm();
         await loadProgressPhotos(profileId);
@@ -665,9 +786,27 @@ export default function AdminProfileDetailPage() {
         note: progressNote.trim(),
         photoDate: progressPhotoDate,
         milestone: progressMilestone,
+        measurements: normalizeMeasurements(progressMeasurements),
         uploadedByRole: "admin",
         createdAt: serverTimestamp(),
       });
+
+      await syncLatestMeasurementsToProfile(profileId);
+
+      const profileSnap = await getDoc(doc(db, "profiles", profileId));
+      const profileData = profileSnap.data() as Measurements | undefined;
+
+      if (profileData) {
+        setForm((prev) => ({
+          ...prev,
+          chest: profileData.chest || "",
+          hips: profileData.hips || "",
+          waist: profileData.waist || "",
+          thighs: profileData.thighs || "",
+          calves: profileData.calves || "",
+          arms: profileData.arms || "",
+        }));
+      }
 
       resetProgressForm();
       await loadProgressPhotos(profileId);
@@ -712,6 +851,23 @@ export default function AdminProfileDetailPage() {
 
       if (editingPhotoId === photoId) {
         resetProgressForm();
+      }
+
+      await syncLatestMeasurementsToProfile(profileId);
+
+      const profileSnap = await getDoc(doc(db, "profiles", profileId));
+      const profileData = profileSnap.data() as Measurements | undefined;
+
+      if (profileData) {
+        setForm((prev) => ({
+          ...prev,
+          chest: profileData.chest || "",
+          hips: profileData.hips || "",
+          waist: profileData.waist || "",
+          thighs: profileData.thighs || "",
+          calves: profileData.calves || "",
+          arms: profileData.arms || "",
+        }));
       }
 
       await loadProgressPhotos(profileId);
@@ -1003,6 +1159,55 @@ export default function AdminProfileDetailPage() {
 
         <section className="rounded-[28px] border border-white/70 bg-white/90 p-5 shadow-[0_18px_50px_rgba(15,23,42,0.07)] backdrop-blur">
           <h2 className="text-base font-semibold text-slate-950">
+            Current Measurements
+          </h2>
+          <p className="mt-1 text-sm text-slate-500">
+            These can be edited manually. The latest photo with measurements can
+            also update these values automatically.
+          </p>
+
+          <div className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+            <input
+              className="rounded-2xl border border-slate-200 p-3"
+              placeholder="Chest"
+              value={form.chest}
+              onChange={(e) => setForm({ ...form, chest: e.target.value })}
+            />
+            <input
+              className="rounded-2xl border border-slate-200 p-3"
+              placeholder="Hips"
+              value={form.hips}
+              onChange={(e) => setForm({ ...form, hips: e.target.value })}
+            />
+            <input
+              className="rounded-2xl border border-slate-200 p-3"
+              placeholder="Waist"
+              value={form.waist}
+              onChange={(e) => setForm({ ...form, waist: e.target.value })}
+            />
+            <input
+              className="rounded-2xl border border-slate-200 p-3"
+              placeholder="Thighs"
+              value={form.thighs}
+              onChange={(e) => setForm({ ...form, thighs: e.target.value })}
+            />
+            <input
+              className="rounded-2xl border border-slate-200 p-3"
+              placeholder="Calves"
+              value={form.calves}
+              onChange={(e) => setForm({ ...form, calves: e.target.value })}
+            />
+            <input
+              className="rounded-2xl border border-slate-200 p-3"
+              placeholder="Arms"
+              value={form.arms}
+              onChange={(e) => setForm({ ...form, arms: e.target.value })}
+            />
+          </div>
+        </section>
+
+        <section className="rounded-[28px] border border-white/70 bg-white/90 p-5 shadow-[0_18px_50px_rgba(15,23,42,0.07)] backdrop-blur">
+          <h2 className="text-base font-semibold text-slate-950">
             Client Schedule
           </h2>
           <p className="mt-1 text-sm text-slate-500">
@@ -1187,6 +1392,63 @@ export default function AdminProfileDetailPage() {
                 ))}
               </div>
 
+              <div className="grid gap-3 sm:grid-cols-2">
+                <input
+                  type="text"
+                  placeholder="Chest"
+                  value={progressMeasurements.chest || ""}
+                  onChange={(e) =>
+                    updateProgressMeasurement("chest", e.target.value)
+                  }
+                  className="w-full rounded-2xl border border-slate-200 p-3"
+                />
+                <input
+                  type="text"
+                  placeholder="Hips"
+                  value={progressMeasurements.hips || ""}
+                  onChange={(e) =>
+                    updateProgressMeasurement("hips", e.target.value)
+                  }
+                  className="w-full rounded-2xl border border-slate-200 p-3"
+                />
+                <input
+                  type="text"
+                  placeholder="Waist"
+                  value={progressMeasurements.waist || ""}
+                  onChange={(e) =>
+                    updateProgressMeasurement("waist", e.target.value)
+                  }
+                  className="w-full rounded-2xl border border-slate-200 p-3"
+                />
+                <input
+                  type="text"
+                  placeholder="Thighs"
+                  value={progressMeasurements.thighs || ""}
+                  onChange={(e) =>
+                    updateProgressMeasurement("thighs", e.target.value)
+                  }
+                  className="w-full rounded-2xl border border-slate-200 p-3"
+                />
+                <input
+                  type="text"
+                  placeholder="Calves"
+                  value={progressMeasurements.calves || ""}
+                  onChange={(e) =>
+                    updateProgressMeasurement("calves", e.target.value)
+                  }
+                  className="w-full rounded-2xl border border-slate-200 p-3"
+                />
+                <input
+                  type="text"
+                  placeholder="Arms"
+                  value={progressMeasurements.arms || ""}
+                  onChange={(e) =>
+                    updateProgressMeasurement("arms", e.target.value)
+                  }
+                  className="w-full rounded-2xl border border-slate-200 p-3"
+                />
+              </div>
+
               <input
                 type="text"
                 placeholder="Title (optional)"
@@ -1272,6 +1534,19 @@ export default function AdminProfileDetailPage() {
                         <p className="mt-3 line-clamp-1 font-medium text-slate-950">
                           {photo.title || "Progress update"}
                         </p>
+
+                        {hasAnyMeasurements(photo.measurements) && (
+                          <div className="mt-3 rounded-xl border bg-slate-50 p-3 text-xs text-slate-600">
+                            <div className="grid gap-1 sm:grid-cols-2">
+                              <span>Chest: {photo.measurements?.chest || "—"}</span>
+                              <span>Hips: {photo.measurements?.hips || "—"}</span>
+                              <span>Waist: {photo.measurements?.waist || "—"}</span>
+                              <span>Thighs: {photo.measurements?.thighs || "—"}</span>
+                              <span>Calves: {photo.measurements?.calves || "—"}</span>
+                              <span>Arms: {photo.measurements?.arms || "—"}</span>
+                            </div>
+                          </div>
+                        )}
 
                         {photo.note && (
                           <p className="mt-1 line-clamp-2 text-sm text-slate-600">
