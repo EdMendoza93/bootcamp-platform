@@ -15,63 +15,53 @@ import {
 } from "firebase/firestore";
 import { useToast } from "@/components/ui/ToastProvider";
 
-type PackageConfig = {
-  enabled: boolean;
-  price: number;
-  capacity: number;
-  booked: number;
-};
-
-type AvailabilityItem = {
+type BootcampWeek = {
   id: string;
   startDate: string;
+  endDate: string;
   label: string;
   active: boolean;
+  capacity: number;
+  booked: number;
   notes?: string;
-  packages: {
-    oneWeek: PackageConfig;
-    twoWeeks: PackageConfig;
-    threeWeeks: PackageConfig;
-  };
 };
 
-type AvailabilityForm = {
+type WeekForm = {
   startDate: string;
   label: string;
-  notes: string;
   active: boolean;
-  oneWeekEnabled: boolean;
-  oneWeekPrice: string;
-  oneWeekCapacity: string;
-  twoWeeksEnabled: boolean;
-  twoWeeksPrice: string;
-  twoWeeksCapacity: string;
-  threeWeeksEnabled: boolean;
-  threeWeeksPrice: string;
-  threeWeeksCapacity: string;
+  capacity: string;
+  notes: string;
 };
 
-function getEmptyForm(): AvailabilityForm {
+function getEmptyForm(): WeekForm {
   return {
     startDate: "",
     label: "",
-    notes: "",
     active: true,
-    oneWeekEnabled: true,
-    oneWeekPrice: "900",
-    oneWeekCapacity: "8",
-    twoWeeksEnabled: true,
-    twoWeeksPrice: "1650",
-    twoWeeksCapacity: "4",
-    threeWeeksEnabled: true,
-    threeWeeksPrice: "2250",
-    threeWeeksCapacity: "2",
+    capacity: "10",
+    notes: "",
   };
+}
+
+function toMiddayDate(date: string) {
+  return new Date(`${date}T12:00:00`);
+}
+
+function addDays(date: string, days: number) {
+  const parsed = toMiddayDate(date);
+  parsed.setDate(parsed.getDate() + days);
+
+  const yyyy = parsed.getFullYear();
+  const mm = String(parsed.getMonth() + 1).padStart(2, "0");
+  const dd = String(parsed.getDate()).padStart(2, "0");
+
+  return `${yyyy}-${mm}-${dd}`;
 }
 
 function formatDateLabel(date: string) {
   if (!date) return "No date";
-  const parsed = new Date(`${date}T12:00:00`);
+  const parsed = toMiddayDate(date);
   return parsed.toLocaleDateString("en-US", {
     weekday: "long",
     month: "long",
@@ -80,79 +70,85 @@ function formatDateLabel(date: string) {
   });
 }
 
-function formatMoney(value: number) {
-  return new Intl.NumberFormat("en-IE", {
-    style: "currency",
-    currency: "EUR",
-    maximumFractionDigits: 0,
-  }).format(value || 0);
-}
-
-function getPackageStatus(pkg: PackageConfig) {
-  if (!pkg.enabled) return "disabled";
-  if (pkg.capacity <= 0) return "soldout";
-
-  const remaining = pkg.capacity - pkg.booked;
-  if (remaining <= 0) return "soldout";
-  if (remaining <= Math.max(1, Math.ceil(pkg.capacity * 0.2))) return "low";
-
-  return "open";
-}
-
 function getUsagePercent(booked: number, capacity: number) {
   if (!capacity || capacity <= 0) return 0;
   return Math.min(100, Math.round((booked / capacity) * 100));
 }
 
-function getOverallDateStatus(item: AvailabilityItem) {
+function getRemainingSpots(item: BootcampWeek) {
+  return Math.max(0, (item.capacity || 0) - (item.booked || 0));
+}
+
+function getWeekStatus(item: BootcampWeek) {
   if (!item.active) return "inactive";
 
-  const packageStatuses = [
-    getPackageStatus(item.packages.oneWeek),
-    getPackageStatus(item.packages.twoWeeks),
-    getPackageStatus(item.packages.threeWeeks),
-  ];
+  if ((item.capacity || 0) <= 0) return "soldout";
 
-  const hasOpen = packageStatuses.includes("open");
-  const hasLow = packageStatuses.includes("low");
-  const allDisabledOrSold =
-    packageStatuses.every((status) => status === "disabled" || status === "soldout");
+  const remaining = getRemainingSpots(item);
 
-  if (allDisabledOrSold) return "soldout";
-  if (hasLow) return "low";
-  if (hasOpen) return "open";
+  if (remaining <= 0) return "soldout";
+  if (remaining <= Math.max(1, Math.ceil((item.capacity || 0) * 0.2))) {
+    return "low";
+  }
 
-  return "inactive";
+  return "open";
+}
+
+function canStartDuration(
+  weeks: BootcampWeek[],
+  startIndex: number,
+  duration: 1 | 2 | 3
+) {
+  for (let i = 0; i < duration; i++) {
+    const currentWeek = weeks[startIndex + i];
+    const nextExpectedStart =
+      i === 0 ? null : addDays(weeks[startIndex + i - 1].startDate, 7);
+
+    if (!currentWeek) return false;
+    if (!currentWeek.active) return false;
+    if ((currentWeek.capacity || 0) - (currentWeek.booked || 0) <= 0) return false;
+
+    if (nextExpectedStart && currentWeek.startDate !== nextExpectedStart) {
+      return false;
+    }
+  }
+
+  return true;
 }
 
 export default function AdminAvailabilityPage() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [items, setItems] = useState<AvailabilityItem[]>([]);
-  const [form, setForm] = useState<AvailabilityForm>(getEmptyForm());
+  const [weeks, setWeeks] = useState<BootcampWeek[]>([]);
   const [editingId, setEditingId] = useState<string | null>(null);
+  const [form, setForm] = useState<WeekForm>(getEmptyForm());
 
   const { showToast } = useToast();
 
-  const loadAvailability = async () => {
+  const autoEndDate = useMemo(() => {
+    if (!form.startDate) return "";
+    return addDays(form.startDate, 7);
+  }, [form.startDate]);
+
+  const loadWeeks = async () => {
     try {
-      const availabilityQuery = query(
-        collection(db, "bootcampAvailability"),
+      const weeksQuery = query(
+        collection(db, "bootcampWeeks"),
         orderBy("startDate", "asc")
       );
 
-      const snapshot = await getDocs(availabilityQuery);
+      const snapshot = await getDocs(weeksQuery);
 
       const data = snapshot.docs.map((docItem) => ({
         id: docItem.id,
-        ...(docItem.data() as Omit<AvailabilityItem, "id">),
-      })) as AvailabilityItem[];
+        ...(docItem.data() as Omit<BootcampWeek, "id">),
+      })) as BootcampWeek[];
 
-      setItems(data);
+      setWeeks(data);
     } catch (error) {
-      console.error("Load availability error:", error);
+      console.error("Load weeks error:", error);
       showToast({
-        title: "Could not load availability",
+        title: "Could not load weekly availability",
         description: "Please refresh the page.",
         type: "error",
       });
@@ -162,65 +158,65 @@ export default function AdminAvailabilityPage() {
   };
 
   useEffect(() => {
-    loadAvailability();
+    loadWeeks();
   }, []);
 
   const summary = useMemo(() => {
-    const activeDates = items.filter((item) => item.active).length;
-    const soldOutDates = items.filter(
-      (item) => getOverallDateStatus(item) === "soldout"
+    const activeWeeks = weeks.filter((week) => week.active).length;
+    const soldOutWeeks = weeks.filter(
+      (week) => getWeekStatus(week) === "soldout"
+    ).length;
+    const totalCapacity = weeks.reduce(
+      (acc, week) => acc + (week.capacity || 0),
+      0
+    );
+    const totalBooked = weeks.reduce((acc, week) => acc + (week.booked || 0), 0);
+
+    const startableOneWeek = weeks.filter((_, index) =>
+      canStartDuration(weeks, index, 1)
     ).length;
 
-    const totalPackages = items.reduce((acc, item) => {
-      return (
-        acc +
-        Number(item.packages.oneWeek.enabled) +
-        Number(item.packages.twoWeeks.enabled) +
-        Number(item.packages.threeWeeks.enabled)
-      );
-    }, 0);
+    const startableTwoWeeks = weeks.filter((_, index) =>
+      canStartDuration(weeks, index, 2)
+    ).length;
 
-    const totalBooked = items.reduce((acc, item) => {
-      return (
-        acc +
-        (item.packages.oneWeek.booked || 0) +
-        (item.packages.twoWeeks.booked || 0) +
-        (item.packages.threeWeeks.booked || 0)
-      );
-    }, 0);
+    const startableThreeWeeks = weeks.filter((_, index) =>
+      canStartDuration(weeks, index, 3)
+    ).length;
 
     return {
-      totalDates: items.length,
-      activeDates,
-      soldOutDates,
-      totalPackages,
+      totalWeeks: weeks.length,
+      activeWeeks,
+      soldOutWeeks,
+      totalCapacity,
       totalBooked,
+      startableOneWeek,
+      startableTwoWeeks,
+      startableThreeWeeks,
     };
-  }, [items]);
+  }, [weeks]);
 
   const resetForm = () => {
     setForm(getEmptyForm());
     setEditingId(null);
   };
 
-  const saveAvailability = async () => {
+  const saveWeek = async () => {
     if (!form.startDate) {
       showToast({
         title: "Start date required",
-        description: "Please select a bootcamp start date.",
+        description: "Please enter the week start date.",
         type: "error",
       });
       return;
     }
 
-    if (
-      !form.oneWeekEnabled &&
-      !form.twoWeeksEnabled &&
-      !form.threeWeeksEnabled
-    ) {
+    const nextCapacity = Number(form.capacity || 0);
+
+    if (nextCapacity <= 0) {
       showToast({
-        title: "Enable at least one package",
-        description: "You need at least one active duration option.",
+        title: "Capacity required",
+        description: "Please enter a capacity greater than zero.",
         type: "error",
       });
       return;
@@ -229,71 +225,66 @@ export default function AdminAvailabilityPage() {
     setSaving(true);
 
     try {
+      const existingWeek = editingId
+        ? weeks.find((week) => week.id === editingId)
+        : null;
+
+      const existingBooked = existingWeek?.booked || 0;
+
+      if (editingId && nextCapacity < existingBooked) {
+        showToast({
+          title: "Capacity too low",
+          description: "Capacity cannot be lower than already booked spots.",
+          type: "error",
+        });
+        setSaving(false);
+        return;
+      }
+
+      const generatedEndDate = addDays(form.startDate, 7);
+
       const payload = {
         startDate: form.startDate,
-        label: form.label.trim() || formatDateLabel(form.startDate),
-        notes: form.notes.trim(),
+        endDate: generatedEndDate,
+        label:
+          form.label.trim() ||
+          `${formatDateLabel(form.startDate)} → ${formatDateLabel(generatedEndDate)}`,
         active: form.active,
-        packages: {
-          oneWeek: {
-            enabled: form.oneWeekEnabled,
-            price: Number(form.oneWeekPrice || 0),
-            capacity: Number(form.oneWeekCapacity || 0),
-            booked:
-              editingId
-                ? items.find((item) => item.id === editingId)?.packages.oneWeek.booked || 0
-                : 0,
-          },
-          twoWeeks: {
-            enabled: form.twoWeeksEnabled,
-            price: Number(form.twoWeeksPrice || 0),
-            capacity: Number(form.twoWeeksCapacity || 0),
-            booked:
-              editingId
-                ? items.find((item) => item.id === editingId)?.packages.twoWeeks.booked || 0
-                : 0,
-          },
-          threeWeeks: {
-            enabled: form.threeWeeksEnabled,
-            price: Number(form.threeWeeksPrice || 0),
-            capacity: Number(form.threeWeeksCapacity || 0),
-            booked:
-              editingId
-                ? items.find((item) => item.id === editingId)?.packages.threeWeeks.booked || 0
-                : 0,
-          },
-        },
+        capacity: nextCapacity,
+        booked: existingBooked,
+        notes: form.notes.trim(),
         updatedAt: serverTimestamp(),
       };
 
       if (editingId) {
-        await updateDoc(doc(db, "bootcampAvailability", editingId), payload);
+        await updateDoc(doc(db, "bootcampWeeks", editingId), payload);
 
         showToast({
-          title: "Availability updated",
-          description: "Bootcamp date was updated successfully.",
+          title: "Week updated",
+          description: "Weekly availability was updated successfully.",
           type: "success",
         });
       } else {
-        await addDoc(collection(db, "bootcampAvailability"), {
+        await addDoc(collection(db, "bootcampWeeks"), {
           ...payload,
+          booked: 0,
           createdAt: serverTimestamp(),
         });
 
         showToast({
-          title: "Date created",
-          description: "New bootcamp availability was added.",
+          title: "Week created",
+          description: "New weekly block was added.",
           type: "success",
         });
       }
 
       resetForm();
-      await loadAvailability();
+      await loadWeeks();
     } catch (error) {
-      console.error("Save availability error:", error);
+      console.error("Save week error:", error);
       showToast({
         title: "Save failed",
-        description: "Could not save the bootcamp date.",
+        description: "Could not save this weekly block.",
         type: "error",
       });
     } finally {
@@ -301,74 +292,70 @@ export default function AdminAvailabilityPage() {
     }
   };
 
-  const startEdit = (item: AvailabilityItem) => {
-    setEditingId(item.id);
+  const startEdit = (week: BootcampWeek) => {
+    setEditingId(week.id);
     setForm({
-      startDate: item.startDate || "",
-      label: item.label || "",
-      notes: item.notes || "",
-      active: item.active,
-      oneWeekEnabled: item.packages.oneWeek.enabled,
-      oneWeekPrice: String(item.packages.oneWeek.price ?? 0),
-      oneWeekCapacity: String(item.packages.oneWeek.capacity ?? 0),
-      twoWeeksEnabled: item.packages.twoWeeks.enabled,
-      twoWeeksPrice: String(item.packages.twoWeeks.price ?? 0),
-      twoWeeksCapacity: String(item.packages.twoWeeks.capacity ?? 0),
-      threeWeeksEnabled: item.packages.threeWeeks.enabled,
-      threeWeeksPrice: String(item.packages.threeWeeks.price ?? 0),
-      threeWeeksCapacity: String(item.packages.threeWeeks.capacity ?? 0),
+      startDate: week.startDate || "",
+      label: week.label || "",
+      active: week.active,
+      capacity: String(week.capacity ?? 0),
+      notes: week.notes || "",
     });
 
     window.scrollTo({ top: 0, behavior: "smooth" });
   };
 
-  const deleteAvailability = async (id: string) => {
-    const confirmed = window.confirm("Delete this bootcamp date?");
-    if (!confirmed) return;
-
+  const toggleActive = async (week: BootcampWeek) => {
     try {
-      await deleteDoc(doc(db, "bootcampAvailability", id));
-
-      if (editingId === id) {
-        resetForm();
-      }
+      await updateDoc(doc(db, "bootcampWeeks", week.id), {
+        active: !week.active,
+        updatedAt: serverTimestamp(),
+      });
 
       showToast({
-        title: "Date deleted",
-        description: "Bootcamp availability was removed.",
+        title: week.active ? "Week disabled" : "Week activated",
+        description: "Availability status was updated.",
         type: "success",
       });
 
-      await loadAvailability();
+      await loadWeeks();
     } catch (error) {
-      console.error("Delete availability error:", error);
+      console.error("Toggle week error:", error);
       showToast({
-        title: "Delete failed",
-        description: "Could not delete this date.",
+        title: "Update failed",
+        description: "Could not change the week status.",
         type: "error",
       });
     }
   };
 
-  const toggleActive = async (item: AvailabilityItem) => {
+  const deleteWeek = async (week: BootcampWeek) => {
+    const confirmed = window.confirm(
+      week.booked > 0
+        ? "This week already has bookings. Delete anyway?"
+        : "Delete this week?"
+    );
+    if (!confirmed) return;
+
     try {
-      await updateDoc(doc(db, "bootcampAvailability", item.id), {
-        active: !item.active,
-        updatedAt: serverTimestamp(),
-      });
+      await deleteDoc(doc(db, "bootcampWeeks", week.id));
+
+      if (editingId === week.id) {
+        resetForm();
+      }
 
       showToast({
-        title: item.active ? "Date disabled" : "Date activated",
-        description: "Availability status was updated.",
+        title: "Week deleted",
+        description: "Weekly block was removed.",
         type: "success",
       });
 
-      await loadAvailability();
+      await loadWeeks();
     } catch (error) {
-      console.error("Toggle active error:", error);
+      console.error("Delete week error:", error);
       showToast({
-        title: "Update failed",
-        description: "Could not change active status.",
+        title: "Delete failed",
+        description: "Could not delete this week.",
         type: "error",
       });
     }
@@ -378,7 +365,7 @@ export default function AdminAvailabilityPage() {
     return (
       <div className="rounded-[28px] border border-white/70 bg-white/90 p-8 shadow-[0_20px_60px_rgba(15,23,42,0.08)] backdrop-blur">
         <p className="text-sm font-medium text-slate-500">
-          Loading availability...
+          Loading weekly availability...
         </p>
       </div>
     );
@@ -397,27 +384,33 @@ export default function AdminAvailabilityPage() {
 
           <div className="relative">
             <div className="inline-flex items-center rounded-full border border-[#bfdbfe] bg-[#eff6ff] px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.2em] text-[#1d4ed8]">
-              Availability Control
+              Weekly Availability
             </div>
 
             <h1 className="mt-4 text-3xl font-semibold tracking-tight text-slate-950 md:text-4xl">
-              Bootcamp Dates & Packages
+              Bootcamp Weekly Blocks
             </h1>
 
             <p className="mt-3 max-w-3xl text-sm text-slate-600 md:text-base">
-              Create and manage bookable start dates, prices, and package capacity
-              for 1, 2, and 3 week bootcamp options.
+              Create weekly blocks, control room capacity, and let the system
+              calculate whether 1, 2, or 3 week stays can start from each block.
             </p>
           </div>
         </div>
       </section>
 
-      <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
-        <SummaryCard label="Total Dates" value={String(summary.totalDates)} tone="light" />
-        <SummaryCard label="Active Dates" value={String(summary.activeDates)} tone="blue" />
-        <SummaryCard label="Sold Out Dates" value={String(summary.soldOutDates)} tone="danger" />
-        <SummaryCard label="Open Packages" value={String(summary.totalPackages)} tone="success" />
-        <SummaryCard label="Total Reserved" value={String(summary.totalBooked)} tone="dark" />
+      <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        <SummaryCard label="Total Weeks" value={String(summary.totalWeeks)} tone="light" />
+        <SummaryCard label="Active Weeks" value={String(summary.activeWeeks)} tone="blue" />
+        <SummaryCard label="Sold Out Weeks" value={String(summary.soldOutWeeks)} tone="danger" />
+        <SummaryCard label="Total Reserved" value={String(summary.totalBooked)} tone="success" />
+      </section>
+
+      <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        <SummaryCard label="1 Week Starts" value={String(summary.startableOneWeek)} tone="blue" />
+        <SummaryCard label="2 Week Starts" value={String(summary.startableTwoWeeks)} tone="success" />
+        <SummaryCard label="3 Week Starts" value={String(summary.startableThreeWeeks)} tone="dark" />
+        <SummaryCard label="Total Capacity" value={String(summary.totalCapacity)} tone="light" />
       </section>
 
       <section className="grid gap-6 xl:grid-cols-[420px_1fr]">
@@ -425,10 +418,10 @@ export default function AdminAvailabilityPage() {
           <div className="flex items-center justify-between gap-3">
             <div>
               <h2 className="text-xl font-semibold text-slate-950">
-                {editingId ? "Edit date" : "Create date"}
+                {editingId ? "Edit week" : "Create week"}
               </h2>
               <p className="mt-1 text-sm text-slate-500">
-                Define duration options, pricing and capacity.
+                Set the week start date and total room capacity.
               </p>
             </div>
 
@@ -456,6 +449,18 @@ export default function AdminAvailabilityPage() {
               />
             </div>
 
+            <div className="rounded-[22px] border border-slate-200 bg-slate-50 p-4">
+              <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">
+                Auto End Date
+              </p>
+              <p className="mt-2 text-sm font-medium text-slate-900">
+                {autoEndDate ? formatDateLabel(autoEndDate) : "Select a start date first"}
+              </p>
+              <p className="mt-1 text-xs text-slate-500">
+                Weekly blocks always end 7 days after the start date.
+              </p>
+            </div>
+
             <div>
               <label className="mb-2 block text-sm font-medium text-slate-700">
                 Display label
@@ -464,7 +469,19 @@ export default function AdminAvailabilityPage() {
                 type="text"
                 value={form.label}
                 onChange={(e) => setForm({ ...form, label: e.target.value })}
-                placeholder="e.g. May 3rd - 10th"
+                placeholder="e.g. May 3rd - May 10th"
+                className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-[#93c5fd] focus:ring-4 focus:ring-[#dbeafe]"
+              />
+            </div>
+
+            <div>
+              <label className="mb-2 block text-sm font-medium text-slate-700">
+                Total room capacity
+              </label>
+              <input
+                type="number"
+                value={form.capacity}
+                onChange={(e) => setForm({ ...form, capacity: e.target.value })}
                 className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-[#93c5fd] focus:ring-4 focus:ring-[#dbeafe]"
               />
             </div>
@@ -476,60 +493,9 @@ export default function AdminAvailabilityPage() {
                 onChange={(e) => setForm({ ...form, active: e.target.checked })}
               />
               <span className="text-sm font-medium text-slate-800">
-                Date active and visible
+                Week active and available for new bookings
               </span>
             </label>
-
-            <PackageEditor
-              title="1 Week Package"
-              enabled={form.oneWeekEnabled}
-              price={form.oneWeekPrice}
-              capacity={form.oneWeekCapacity}
-              onEnabledChange={(value) =>
-                setForm({ ...form, oneWeekEnabled: value })
-              }
-              onPriceChange={(value) =>
-                setForm({ ...form, oneWeekPrice: value })
-              }
-              onCapacityChange={(value) =>
-                setForm({ ...form, oneWeekCapacity: value })
-              }
-              tone="blue"
-            />
-
-            <PackageEditor
-              title="2 Week Package"
-              enabled={form.twoWeeksEnabled}
-              price={form.twoWeeksPrice}
-              capacity={form.twoWeeksCapacity}
-              onEnabledChange={(value) =>
-                setForm({ ...form, twoWeeksEnabled: value })
-              }
-              onPriceChange={(value) =>
-                setForm({ ...form, twoWeeksPrice: value })
-              }
-              onCapacityChange={(value) =>
-                setForm({ ...form, twoWeeksCapacity: value })
-              }
-              tone="success"
-            />
-
-            <PackageEditor
-              title="3 Week Package"
-              enabled={form.threeWeeksEnabled}
-              price={form.threeWeeksPrice}
-              capacity={form.threeWeeksCapacity}
-              onEnabledChange={(value) =>
-                setForm({ ...form, threeWeeksEnabled: value })
-              }
-              onPriceChange={(value) =>
-                setForm({ ...form, threeWeeksPrice: value })
-              }
-              onCapacityChange={(value) =>
-                setForm({ ...form, threeWeeksCapacity: value })
-              }
-              tone="dark"
-            />
 
             <div>
               <label className="mb-2 block text-sm font-medium text-slate-700">
@@ -539,13 +505,13 @@ export default function AdminAvailabilityPage() {
                 value={form.notes}
                 onChange={(e) => setForm({ ...form, notes: e.target.value })}
                 placeholder="Optional internal note"
-                className="min-h-[110px] w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-[#93c5fd] focus:ring-4 focus:ring-[#dbeafe]"
+                className="min-h-[120px] w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-[#93c5fd] focus:ring-4 focus:ring-[#dbeafe]"
               />
             </div>
 
             <button
               type="button"
-              onClick={saveAvailability}
+              onClick={saveWeek}
               disabled={saving}
               className="w-full rounded-2xl bg-slate-950 px-4 py-3 text-sm font-medium text-white transition hover:bg-slate-800 disabled:opacity-50"
             >
@@ -555,24 +521,27 @@ export default function AdminAvailabilityPage() {
                   : "Creating..."
                 : editingId
                 ? "Save Changes"
-                : "Create Date"}
+                : "Create Week"}
             </button>
           </div>
         </div>
 
         <div className="space-y-4">
-          {items.length === 0 ? (
+          {weeks.length === 0 ? (
             <div className="rounded-[28px] border border-dashed border-slate-200 bg-white/80 p-10 text-center text-sm text-slate-500">
-              No bootcamp dates added yet.
+              No weekly blocks added yet.
             </div>
           ) : (
-            items.map((item) => (
-              <AvailabilityCard
-                key={item.id}
-                item={item}
-                onEdit={() => startEdit(item)}
-                onDelete={() => deleteAvailability(item.id)}
-                onToggleActive={() => toggleActive(item)}
+            weeks.map((week, index) => (
+              <WeekCard
+                key={week.id}
+                week={week}
+                startableOneWeek={canStartDuration(weeks, index, 1)}
+                startableTwoWeeks={canStartDuration(weeks, index, 2)}
+                startableThreeWeeks={canStartDuration(weeks, index, 3)}
+                onEdit={() => startEdit(week)}
+                onToggleActive={() => toggleActive(week)}
+                onDelete={() => deleteWeek(week)}
               />
             ))
           )}
@@ -634,87 +603,26 @@ function SummaryCard({
   );
 }
 
-function PackageEditor({
-  title,
-  enabled,
-  price,
-  capacity,
-  onEnabledChange,
-  onPriceChange,
-  onCapacityChange,
-  tone,
-}: {
-  title: string;
-  enabled: boolean;
-  price: string;
-  capacity: string;
-  onEnabledChange: (value: boolean) => void;
-  onPriceChange: (value: string) => void;
-  onCapacityChange: (value: string) => void;
-  tone: "blue" | "success" | "dark";
-}) {
-  const toneStyles = {
-    blue: "border-[#bfdbfe] bg-[#f8fbff]",
-    success: "border-emerald-200 bg-emerald-50/50",
-    dark: "border-slate-200 bg-slate-50",
-  };
-
-  return (
-    <div className={`rounded-[24px] border p-4 ${toneStyles[tone]}`}>
-      <div className="flex items-center justify-between gap-3">
-        <p className="text-sm font-semibold text-slate-900">{title}</p>
-
-        <label className="flex items-center gap-2 text-sm text-slate-600">
-          <input
-            type="checkbox"
-            checked={enabled}
-            onChange={(e) => onEnabledChange(e.target.checked)}
-          />
-          Enabled
-        </label>
-      </div>
-
-      <div className="mt-4 grid gap-3 sm:grid-cols-2">
-        <div>
-          <label className="mb-2 block text-xs font-semibold uppercase tracking-wide text-slate-500">
-            Price
-          </label>
-          <input
-            type="number"
-            value={price}
-            onChange={(e) => onPriceChange(e.target.value)}
-            className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-[#93c5fd] focus:ring-4 focus:ring-[#dbeafe]"
-          />
-        </div>
-
-        <div>
-          <label className="mb-2 block text-xs font-semibold uppercase tracking-wide text-slate-500">
-            Capacity
-          </label>
-          <input
-            type="number"
-            value={capacity}
-            onChange={(e) => onCapacityChange(e.target.value)}
-            className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-[#93c5fd] focus:ring-4 focus:ring-[#dbeafe]"
-          />
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function AvailabilityCard({
-  item,
+function WeekCard({
+  week,
+  startableOneWeek,
+  startableTwoWeeks,
+  startableThreeWeeks,
   onEdit,
-  onDelete,
   onToggleActive,
+  onDelete,
 }: {
-  item: AvailabilityItem;
+  week: BootcampWeek;
+  startableOneWeek: boolean;
+  startableTwoWeeks: boolean;
+  startableThreeWeeks: boolean;
   onEdit: () => void;
-  onDelete: () => void;
   onToggleActive: () => void;
+  onDelete: () => void;
 }) {
-  const status = getOverallDateStatus(item);
+  const status = getWeekStatus(week);
+  const remaining = getRemainingSpots(week);
+  const usagePercent = getUsagePercent(week.booked, week.capacity);
 
   return (
     <div className="rounded-[28px] border border-white/70 bg-white/95 p-6 shadow-[0_18px_50px_rgba(15,23,42,0.07)] backdrop-blur">
@@ -722,7 +630,7 @@ function AvailabilityCard({
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-center gap-2">
             <StatusPill status={status} />
-            {item.active ? (
+            {week.active ? (
               <span className="rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.14em] text-emerald-700">
                 Active
               </span>
@@ -731,26 +639,65 @@ function AvailabilityCard({
                 Inactive
               </span>
             )}
+            {week.booked > 0 && (
+              <span className="rounded-full border border-amber-200 bg-amber-50 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.14em] text-amber-700">
+                Existing bookings
+              </span>
+            )}
           </div>
 
           <h2 className="mt-4 text-2xl font-semibold tracking-tight text-slate-950">
-            {item.label || formatDateLabel(item.startDate)}
+            {week.label || `${formatDateLabel(week.startDate)} → ${formatDateLabel(week.endDate)}`}
           </h2>
 
           <p className="mt-2 text-sm text-slate-500">
-            {formatDateLabel(item.startDate)}
+            {formatDateLabel(week.startDate)} → {formatDateLabel(week.endDate)}
           </p>
 
-          {item.notes && (
+          {week.notes && (
             <div className="mt-4 rounded-[22px] border border-slate-100 bg-gradient-to-br from-slate-50 to-white p-4">
-              <p className="text-sm text-slate-600">{item.notes}</p>
+              <p className="text-sm text-slate-600">{week.notes}</p>
             </div>
           )}
 
+          <div className="mt-5 rounded-[24px] border border-slate-100 bg-gradient-to-br from-slate-50 to-white p-5">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div>
+                <p className="text-sm font-semibold uppercase tracking-[0.16em] text-slate-500">
+                  Weekly Capacity
+                </p>
+                <p className="mt-2 text-3xl font-semibold tracking-tight text-slate-950">
+                  {remaining} spots left
+                </p>
+              </div>
+
+              <div className="text-right">
+                <p className="text-sm text-slate-500">
+                  {week.booked} booked / {week.capacity} capacity
+                </p>
+              </div>
+            </div>
+
+            <div className="mt-4 h-2 overflow-hidden rounded-full bg-white">
+              <div
+                className={`h-full rounded-full ${
+                  status === "soldout"
+                    ? "bg-rose-400"
+                    : status === "low"
+                    ? "bg-amber-400"
+                    : status === "open"
+                    ? "bg-emerald-400"
+                    : "bg-slate-300"
+                }`}
+                style={{ width: `${status === "inactive" ? 0 : usagePercent}%` }}
+              />
+            </div>
+          </div>
+
           <div className="mt-5 grid gap-4 lg:grid-cols-3">
-            <PackageStatusCard title="1 Week" pkg={item.packages.oneWeek} tone="blue" />
-            <PackageStatusCard title="2 Weeks" pkg={item.packages.twoWeeks} tone="success" />
-            <PackageStatusCard title="3 Weeks" pkg={item.packages.threeWeeks} tone="dark" />
+            <DurationCard title="1 Week" available={startableOneWeek} tone="blue" />
+            <DurationCard title="2 Weeks" available={startableTwoWeeks} tone="success" />
+            <DurationCard title="3 Weeks" available={startableThreeWeeks} tone="dark" />
           </div>
         </div>
 
@@ -768,7 +715,7 @@ function AvailabilityCard({
             onClick={onToggleActive}
             className="rounded-2xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-medium text-slate-700 transition hover:bg-slate-50"
           >
-            {item.active ? "Disable" : "Activate"}
+            {week.active ? "Disable" : "Activate"}
           </button>
 
           <button
@@ -784,18 +731,15 @@ function AvailabilityCard({
   );
 }
 
-function PackageStatusCard({
+function DurationCard({
   title,
-  pkg,
+  available,
   tone,
 }: {
   title: string;
-  pkg: PackageConfig;
+  available: boolean;
   tone: "blue" | "success" | "dark";
 }) {
-  const status = getPackageStatus(pkg);
-  const percent = getUsagePercent(pkg.booked, pkg.capacity);
-
   const toneStyles = {
     blue: "border-[#bfdbfe] bg-gradient-to-br from-[#eff6ff] to-white",
     success: "border-emerald-200 bg-gradient-to-br from-emerald-50 to-white",
@@ -806,31 +750,22 @@ function PackageStatusCard({
     <div className={`rounded-[24px] border p-4 ${toneStyles[tone]}`}>
       <div className="flex items-center justify-between gap-2">
         <p className="text-base font-semibold text-slate-950">{title}</p>
-        <MiniPackagePill status={status} />
+        {available ? (
+          <span className="rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.14em] text-emerald-700">
+            Startable
+          </span>
+        ) : (
+          <span className="rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-600">
+            Not Available
+          </span>
+        )}
       </div>
 
-      <p className="mt-4 text-2xl font-semibold tracking-tight text-slate-950">
-        {formatMoney(pkg.price || 0)}
+      <p className="mt-4 text-sm text-slate-600">
+        {available
+          ? `Clients can start a ${title.toLowerCase()} stay from this week.`
+          : `This week cannot currently start a ${title.toLowerCase()} stay.`}
       </p>
-
-      <p className="mt-2 text-sm text-slate-600">
-        {pkg.booked || 0} booked / {pkg.capacity || 0} capacity
-      </p>
-
-      <div className="mt-4 h-2 overflow-hidden rounded-full bg-white/80">
-        <div
-          className={`h-full rounded-full ${
-            status === "soldout"
-              ? "bg-rose-400"
-              : status === "low"
-              ? "bg-amber-400"
-              : status === "open"
-              ? "bg-emerald-400"
-              : "bg-slate-300"
-          }`}
-          style={{ width: `${status === "disabled" ? 0 : percent}%` }}
-        />
-      </div>
     </div>
   );
 }
@@ -852,34 +787,6 @@ function StatusPill({
     low: "Low Availability",
     soldout: "Sold Out",
     inactive: "Inactive",
-  };
-
-  return (
-    <span
-      className={`rounded-full border px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.14em] ${styles[status]}`}
-    >
-      {labels[status]}
-    </span>
-  );
-}
-
-function MiniPackagePill({
-  status,
-}: {
-  status: "open" | "low" | "soldout" | "disabled";
-}) {
-  const styles = {
-    open: "border-emerald-200 bg-emerald-50 text-emerald-700",
-    low: "border-amber-200 bg-amber-50 text-amber-700",
-    soldout: "border-rose-200 bg-rose-50 text-rose-700",
-    disabled: "border-slate-200 bg-slate-50 text-slate-600",
-  };
-
-  const labels = {
-    open: "Open",
-    low: "Low",
-    soldout: "Sold Out",
-    disabled: "Disabled",
   };
 
   return (
