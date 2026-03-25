@@ -11,6 +11,7 @@ import {
   query,
   where,
 } from "firebase/firestore";
+import PushNotificationsCard from "@/components/dashboard/PushNotificationsCard";
 
 type ApplicationStatus = "none" | "pending" | "approved" | "rejected";
 type OnboardingStatus = "none" | "incomplete" | "active";
@@ -589,6 +590,8 @@ export default function DashboardPage() {
             />
           ))}
         </section>
+
+        <PushNotificationsCard />
 
         {applicationStatus === "none" && (
           <section className="rounded-[28px] border border-white/70 bg-white/90 p-6 shadow-[0_18px_50px_rgba(15,23,42,0.07)] backdrop-blur">
