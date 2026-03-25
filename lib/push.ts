@@ -21,6 +21,7 @@ export async function registerMessagingServiceWorker() {
   return navigator.serviceWorker.register("/firebase-messaging-sw.js");
 }
 
+// ⚠️ SOLO GENERA TOKEN (NO guarda)
 export async function getFcmToken() {
   if (!VAPID_KEY) {
     throw new Error("Missing NEXT_PUBLIC_FIREBASE_VAPID_KEY");
@@ -32,15 +33,21 @@ export async function getFcmToken() {
   }
 
   const messaging = getMessaging(app);
+
   const token = await getToken(messaging, {
     vapidKey: VAPID_KEY,
     serviceWorkerRegistration: registration,
   });
 
+  if (!token) {
+    throw new Error("No FCM token returned");
+  }
+
   return token;
 }
 
-export async function upsertPushToken(uid: string, token: string) {
+// ✅ SOLO guardar cuando usuario lo decide
+export async function savePushToken(uid: string, token: string) {
   const docId = token.replace(/[^a-zA-Z0-9_-]/g, "").slice(0, 120);
 
   await setDoc(
@@ -48,21 +55,17 @@ export async function upsertPushToken(uid: string, token: string) {
     {
       token,
       enabled: true,
-      permission: Notification.permission,
-      platform: navigator.platform || "unknown",
-      userAgent: navigator.userAgent || "unknown",
-      updatedAt: serverTimestamp(),
+      createdAt: serverTimestamp(),
     },
     { merge: true }
   );
 }
 
-export async function disablePushTokens(uid: string) {
+export async function disablePush(uid: string) {
   await setDoc(
     doc(db, "users", uid, "pushState", "status"),
     {
-      permission: Notification.permission,
-      pushSupported: false,
+      enabled: false,
       updatedAt: serverTimestamp(),
     },
     { merge: true }

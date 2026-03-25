@@ -12,6 +12,7 @@ import {
   where,
 } from "firebase/firestore";
 import PushNotificationsCard from "@/components/dashboard/PushNotificationsCard";
+import { usePushNotifications } from "@/components/providers/PushNotificationsProvider";
 
 type ApplicationStatus = "none" | "pending" | "approved" | "rejected";
 type OnboardingStatus = "none" | "incomplete" | "active";
@@ -116,6 +117,7 @@ function waitForUser(timeoutMs = 5000): Promise<typeof auth.currentUser> {
 }
 
 export default function DashboardPage() {
+  const { pushState, enablePush } = usePushNotifications();
   const [user, setUser] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -592,6 +594,28 @@ export default function DashboardPage() {
         </section>
 
         <PushNotificationsCard />
+        {/* 🔔 ENABLE PUSH (fallback simple) */}
+{pushState === "ready" && (
+  <div className="rounded-[22px] border border-slate-200 bg-white p-4">
+    <p className="text-sm text-slate-700 mb-3">
+      Enable notifications to receive updates from your coach.
+    </p>
+    <button
+      onClick={enablePush}
+      className="rounded-2xl bg-slate-950 px-4 py-2 text-sm font-medium text-white"
+    >
+      Enable Notifications
+    </button>
+  </div>
+)}
+
+{pushState === "enabled" && (
+  <div className="rounded-[22px] border border-green-200 bg-green-50 p-4">
+    <p className="text-sm text-green-700">
+      ✅ Notifications enabled
+    </p>
+  </div>
+)}
 
         {applicationStatus === "none" && (
           <section className="rounded-[28px] border border-white/70 bg-white/90 p-6 shadow-[0_18px_50px_rgba(15,23,42,0.07)] backdrop-blur">
