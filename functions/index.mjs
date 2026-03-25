@@ -7,22 +7,30 @@ initializeApp();
 
 const db = getFirestore();
 
-function assertAdmin(auth) {
+async function assertAdmin(auth) {
   if (!auth?.uid) {
     throw new HttpsError("unauthenticated", "Authentication is required.");
   }
 
-  return db
-    .collection("users")
-    .doc(auth.uid)
-    .get()
-    .then((snap) => {
-      const role = snap.exists ? snap.data()?.role : null;
+  const snap = await db.collection("users").doc(auth.uid).get();
+  const role = snap.exists ? snap.data()?.role : null;
 
-      if (role !== "admin") {
-        throw new HttpsError("permission-denied", "Admin role required.");
-      }
-    });
+  if (role !== "admin") {
+    throw new HttpsError("permission-denied", "Admin role required.");
+  }
+}
+
+async function getUserPushTokens(userId) {
+  const snap = await db
+    .collection("users")
+    .doc(userId)
+    .collection("pushTokens")
+    .where("enabled", "==", true)
+    .get();
+
+  return snap.docs
+    .map((doc) => doc.get("token"))
+    .filter((token) => typeof token === "string" && token.length > 0);
 }
 
 export const sendPushNotification = onCall(
@@ -50,34 +58,30 @@ export const sendPushNotification = onCall(
         );
       }
 
-      const tokenDocs = await db
-        .collectionGroup("pushTokens")
-        .where("enabled", "==", true)
-        .get();
+      let targetUserIds = [];
 
-      const tokenEntries = tokenDocs.docs
-        .map((snap) => {
-          const userRef = snap.ref.parent.parent;
-          const userId = userRef ? userRef.id : null;
-          const token = snap.get("token");
+      if (audience === "selected") {
+        targetUserIds = selectedUserIds;
+      } else {
+        const usersSnap = await db.collection("users").get();
+        targetUserIds = usersSnap.docs
+          .map((doc) => ({
+            id: doc.id,
+            role: doc.data()?.role || null,
+          }))
+          .filter((user) => user.role !== "admin")
+          .map((user) => user.id);
+      }
 
-          return {
-            userId,
-            token: typeof token === "string" ? token : "",
-          };
-        })
-        .filter((entry) => entry.userId && entry.token);
+      const tokenGroups = await Promise.all(
+        targetUserIds.map((userId) => getUserPushTokens(userId))
+      );
 
-      const filteredTokens =
-        audience === "all"
-          ? tokenEntries
-          : tokenEntries.filter((entry) => selectedUserIds.includes(entry.userId));
-
-      const uniqueTokens = [...new Set(filteredTokens.map((entry) => entry.token))];
+      const uniqueTokens = [...new Set(tokenGroups.flat())];
 
       if (uniqueTokens.length === 0) {
         return {
-          targetedUsers: audience === "all" ? null : selectedUserIds.length,
+          targetedUsers: audience === "all" ? targetUserIds.length : selectedUserIds.length,
           successCount: 0,
           failureCount: 0,
           message: "No eligible push tokens found.",
@@ -125,10 +129,21 @@ export const sendPushNotification = onCall(
       });
 
       if (invalidTokens.length > 0) {
-        const removals = tokenDocs.docs.filter((snap) =>
-          invalidTokens.includes(snap.get("token"))
+        await Promise.all(
+          targetUserIds.map(async (userId) => {
+            const snap = await db
+              .collection("users")
+              .doc(userId)
+              .collection("pushTokens")
+              .get();
+
+            const removals = snap.docs.filter((doc) =>
+              invalidTokens.includes(doc.get("token"))
+            );
+
+            await Promise.all(removals.map((doc) => doc.ref.delete()));
+          })
         );
-        await Promise.all(removals.map((snap) => snap.ref.delete()));
       }
 
       await db.collection("pushLogs").add({
@@ -145,7 +160,7 @@ export const sendPushNotification = onCall(
       });
 
       return {
-        targetedUsers: audience === "all" ? null : selectedUserIds.length,
+        targetedUsers: audience === "all" ? targetUserIds.length : selectedUserIds.length,
         successCount: response.successCount,
         failureCount: response.failureCount,
       };
