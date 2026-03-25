@@ -34,3 +34,29 @@ You can check out [the Next.js GitHub repository](https://github.com/vercel/next
 The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
 
 Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+
+## Web push setup
+
+This project now includes Firebase Cloud Functions + Web Push plumbing.
+
+### Environment variables (Next.js)
+
+Create `.env.local` with:
+
+```bash
+NEXT_PUBLIC_FIREBASE_VAPID_KEY=YOUR_WEB_PUSH_CERTIFICATE_KEY_PAIR_PUBLIC_KEY
+```
+
+### Deploy functions
+
+```bash
+cd functions
+npm install
+cd ..
+firebase deploy --only functions
+```
+
+### Notes
+
+- Admin send UI is available at `/admin/notifications`.
+- iOS web push is constrained and only works where iOS/browser support it, generally in Home Screen apps.

@@ -13,6 +13,7 @@ const navItems = [
   { label: "Training", href: "/admin/training" },
   { label: "Nutrition", href: "/admin/nutrition" },
   { label: "Activities", href: "/admin/activities" },
+  { label: "Notifications", href: "/admin/notifications" },
 ];
 
 export default function AdminSideBar() {
