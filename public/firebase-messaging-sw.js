@@ -14,8 +14,8 @@ firebase.initializeApp({
 const messaging = firebase.messaging();
 
 messaging.onBackgroundMessage((payload) => {
-  const title = payload?.notification?.title || "Wild Atlantic Bootcamp";
-  const body = payload?.notification?.body || "You have a new notification.";
+  const title = payload?.data?.title || "Wild Atlantic Bootcamp";
+  const body = payload?.data?.body || "You have a new notification.";
   const url = payload?.data?.url || "/dashboard";
 
   self.registration.showNotification(title, {
