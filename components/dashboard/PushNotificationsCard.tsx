@@ -5,19 +5,17 @@ import { usePushNotifications } from "@/components/providers/PushNotificationsPr
 export default function PushNotificationsCard() {
   const { pushState, enablePush, infoMessage } = usePushNotifications();
 
-  const showButton = pushState === "ready-to-enable" || pushState === "error";
-
-  return (
+const showButton = pushState !== "enabled";  return (
     <section className="rounded-[28px] border border-white/70 bg-white/90 p-6 shadow-[0_18px_50px_rgba(15,23,42,0.07)] backdrop-blur">
       <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
         <div>
           <h2 className="text-xl font-semibold text-slate-950">Push notifications</h2>
           <p className="mt-2 text-sm text-slate-600">{infoMessage}</p>
-          {pushState === "ios-needs-home-screen" && (
-            <p className="mt-2 text-xs text-slate-500">
-              iOS limitation: install this app to your Home Screen first. Push support also depends on iOS and browser capabilities.
-            </p>
-          )}
+          {(pushState as any) === "ios-needs-home-screen" && (
+  <p className="mt-2 text-xs text-slate-500">
+    iOS limitation: install this app to your Home Screen first. Push support also depends on iOS and browser capabilities.
+  </p>
+)}
         </div>
 
         {showButton && (
