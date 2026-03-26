@@ -1,8 +1,9 @@
 "use client";
 
 import { onAuthStateChanged } from "firebase/auth";
+import { collection, getDocs, query, where } from "firebase/firestore";
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
-import { auth } from "@/lib/firebase";
+import { auth, db } from "@/lib/firebase";
 import {
   getFcmToken,
   isWebPushSupported,
@@ -30,38 +31,54 @@ const PushContext = createContext<PushContextType>({
   infoMessage: "",
 });
 
+async function hasEnabledPushToken(uid: string) {
+  const snap = await getDocs(
+    query(
+      collection(db, "users", uid, "pushTokens"),
+      where("enabled", "==", true)
+    )
+  );
+
+  return !snap.empty;
+}
+
 export function PushNotificationsProvider({ children }: { children: React.ReactNode }) {
   const [pushState, setPushState] = useState<PushState>("checking");
-  const [infoMessage, setInfoMessage] = useState("");
+  const [infoMessage, setInfoMessage] = useState("Checking push notifications...");
 
-  // 🚫 YA NO auto-activa nada
-  const checkSupport = useCallback(async () => {
+  const checkPushState = useCallback(async (uid: string) => {
     const supported = await isWebPushSupported();
 
     if (!supported) {
       setPushState("unsupported");
-      setInfoMessage("Push not supported");
+      setInfoMessage("Push notifications are not supported on this device/browser.");
       return;
     }
 
     if (Notification.permission === "denied") {
       setPushState("denied");
-      setInfoMessage("Notifications blocked");
+      setInfoMessage("Notifications are blocked in browser settings.");
       return;
     }
 
-    // 👉 SIEMPRE pedir acción manual
+    const alreadyEnabled = await hasEnabledPushToken(uid);
+
+    if (alreadyEnabled) {
+      setPushState("enabled");
+      setInfoMessage("Push notifications are enabled.");
+      return;
+    }
+
     setPushState("ready");
-    setInfoMessage("Enable notifications");
+    setInfoMessage("Enable push notifications to receive updates.");
   }, []);
 
-  // ✅ SOLO cuando usuario hace click
   const enablePush = useCallback(async () => {
     const user = auth.currentUser;
 
     if (!user) {
       setPushState("error");
-      setInfoMessage("Login first");
+      setInfoMessage("You must be signed in first.");
       return;
     }
 
@@ -70,50 +87,66 @@ export function PushNotificationsProvider({ children }: { children: React.ReactN
 
       if (permission !== "granted") {
         setPushState("denied");
-        setInfoMessage("Permission denied");
+        setInfoMessage("Notifications permission was denied.");
         return;
       }
 
       const token = await getFcmToken();
-
       await savePushToken(user.uid, token);
 
       setPushState("enabled");
-      setInfoMessage("Notifications enabled");
-    } catch (e) {
-      console.error(e);
+      setInfoMessage("Push notifications are enabled.");
+    } catch (error) {
+      console.error("Enable push error:", error);
       setPushState("error");
-      setInfoMessage("Error enabling push");
+      setInfoMessage("Failed to enable push notifications.");
     }
   }, []);
 
   useEffect(() => {
-    let unsub: (() => void) | null = null;
+    let unsubscribeForeground: (() => void) | null = null;
 
-    const authUnsub = onAuthStateChanged(auth, async (user) => {
-      if (!user) return;
+    const unsubscribeAuth = onAuthStateChanged(auth, async (user) => {
+      if (!user) {
+        setPushState("checking");
+        setInfoMessage("Checking push notifications...");
+        return;
+      }
 
-      await checkSupport();
+      try {
+        await checkPushState(user.uid);
 
-      const supported = await isWebPushSupported();
+        const supported = await isWebPushSupported();
 
-      if (supported) {
-        unsub = subscribeToForegroundMessages((payload: any) => {
-          const title = payload?.notification?.title || "Notification";
-          const body = payload?.notification?.body || "";
+        if (supported) {
+          unsubscribeForeground = subscribeToForegroundMessages((payload: any) => {
+            const title = payload?.notification?.title || "Wild Atlantic Bootcamp";
+            const body = payload?.notification?.body || "";
+            const url = payload?.data?.url || "/dashboard";
 
-          navigator.serviceWorker.getRegistration().then((reg) => {
-            reg?.showNotification(title, { body });
+            navigator.serviceWorker.getRegistration().then((registration) => {
+              if (registration && Notification.permission === "granted") {
+                registration.showNotification(title, {
+                  body,
+                  icon: "/icon.png",
+                  data: { url },
+                });
+              }
+            });
           });
-        });
+        }
+      } catch (error) {
+        console.error("Push init error:", error);
+        setPushState("error");
+        setInfoMessage("Failed to initialize push notifications.");
       }
     });
 
     return () => {
-      authUnsub();
-      if (unsub) unsub();
+      unsubscribeAuth();
+      if (unsubscribeForeground) unsubscribeForeground();
     };
-  }, [checkSupport]);
+  }, [checkPushState]);
 
   const value = useMemo(
     () => ({
