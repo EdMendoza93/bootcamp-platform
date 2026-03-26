@@ -16,6 +16,7 @@ type PushState =
   | "unsupported"
   | "ready"
   | "enabled"
+  | "hidden"
   | "denied"
   | "error";
 
@@ -64,8 +65,8 @@ export function PushNotificationsProvider({ children }: { children: React.ReactN
     const alreadyEnabled = await hasEnabledPushToken(uid);
 
     if (alreadyEnabled) {
-      setPushState("enabled");
-      setInfoMessage("Push notifications are enabled.");
+      setPushState("hidden");
+      setInfoMessage("");
       return;
     }
 
@@ -96,6 +97,11 @@ export function PushNotificationsProvider({ children }: { children: React.ReactN
 
       setPushState("enabled");
       setInfoMessage("Push notifications are enabled.");
+
+      window.setTimeout(() => {
+        setPushState("hidden");
+        setInfoMessage("");
+      }, 2500);
     } catch (error) {
       console.error("Enable push error:", error);
       setPushState("error");
