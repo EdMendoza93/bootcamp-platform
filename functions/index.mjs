@@ -92,14 +92,25 @@ export const sendPushNotification = onCall(
 
       const response = await getMessaging().sendEachForMulticast({
         tokens: uniqueTokens,
-        data: {
+        notification: {
           title,
           body,
+        },
+        data: {
           url: safeUrl,
         },
         webpush: {
           headers: {
             Urgency: "high",
+          },
+          fcmOptions: {
+            link: safeUrl,
+          },
+          notification: {
+            title,
+            body,
+            icon: "/icon.png",
+            badge: "/icon.png",
           },
         },
       });
