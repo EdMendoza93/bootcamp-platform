@@ -92,20 +92,6 @@ export default function AdminSideBar() {
             );
           })}
         </nav>
-
-        <div className="shrink-0 pt-8">
-          <div className="rounded-[24px] border border-[#bfdbfe] bg-[radial-gradient(circle_at_top_right,rgba(46,160,255,0.14),transparent_32%),linear-gradient(135deg,#eff6ff,#ffffff)] p-4 shadow-[0_16px_35px_rgba(46,160,255,0.08)]">
-            <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[#1d4ed8]">
-              Platform
-            </p>
-            <p className="mt-2 text-sm font-semibold text-slate-900">
-              Premium admin experience
-            </p>
-            <p className="mt-1 text-sm leading-6 text-slate-600">
-              Built to scale for Wild Atlantic Bootcamp and future Rivcor clients.
-            </p>
-          </div>
-        </div>
       </div>
     </aside>
   );
