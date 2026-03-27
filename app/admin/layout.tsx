@@ -1,4 +1,5 @@
 import AdminShell from "@/components/admin/AdminShell";
+import AdminRoute from "@/components/auth/AdminRoute";
 
 export default function AdminLayout({
   children,
@@ -6,8 +7,10 @@ export default function AdminLayout({
   children: React.ReactNode;
 }) {
   return (
-    <AdminShell>
-      <div className="p-6 md:p-8">{children}</div>
-    </AdminShell>
+    <AdminRoute>
+      <AdminShell>
+        <div className="p-6 md:p-8">{children}</div>
+      </AdminShell>
+    </AdminRoute>
   );
 }

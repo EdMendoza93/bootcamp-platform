@@ -13,17 +13,78 @@ import {
   browserLocalPersistence,
 } from "firebase/auth";
 import { auth, db } from "@/lib/firebase";
-import { doc, getDoc, setDoc, serverTimestamp } from "firebase/firestore";
+import {
+  collection,
+  doc,
+  getDoc,
+  getDocs,
+  query,
+  serverTimestamp,
+  setDoc,
+  updateDoc,
+  where,
+} from "firebase/firestore";
+import { getHomeRouteForRole, normalizeRole } from "@/lib/roles";
 
-async function ensureUserDoc(uid: string, email?: string | null) {
+async function findPendingInvite(email?: string | null) {
+  const normalizedEmail = String(email || "").trim().toLowerCase();
+  if (!normalizedEmail) return null;
+
+  const invitesSnap = await getDocs(
+    query(
+      collection(db, "staffInvites"),
+      where("email", "==", normalizedEmail),
+      where("status", "==", "invited")
+    )
+  );
+
+  if (invitesSnap.empty) return null;
+  return invitesSnap.docs[0];
+}
+
+async function ensureUserDoc(
+  uid: string,
+  email?: string | null,
+  displayName?: string | null
+) {
   const userRef = doc(db, "users", uid);
   const userSnap = await getDoc(userRef);
+  const inviteSnap = await findPendingInvite(email);
+  const inviteData = inviteSnap?.data() as
+    | {
+        role?: string;
+        fullName?: string;
+      }
+    | undefined;
+  const nextRole = normalizeRole(inviteData?.role);
+  const nextName = inviteData?.fullName || displayName || "";
 
   if (!userSnap.exists()) {
     await setDoc(userRef, {
-      email: email || "",
-      role: "user",
+      email: String(email || "").trim().toLowerCase(),
+      name: nextName,
+      role: nextRole,
       createdAt: serverTimestamp(),
+      updatedAt: serverTimestamp(),
+    });
+  } else {
+    await setDoc(
+      userRef,
+      {
+        email: String(email || "").trim().toLowerCase(),
+        name: nextName,
+        role: nextRole,
+        updatedAt: serverTimestamp(),
+      },
+      { merge: true }
+    );
+  }
+
+  if (inviteSnap) {
+    await updateDoc(inviteSnap.ref, {
+      status: "accepted",
+      acceptedByUid: uid,
+      acceptedAt: serverTimestamp(),
     });
   }
 }
@@ -38,12 +99,7 @@ async function routeUserByRole(uid: string) {
   }
 
   const data = userSnap.data() as { role?: string };
-
-  if (data.role === "admin") {
-    window.location.replace("/admin");
-  } else {
-    window.location.replace("/dashboard");
-  }
+  window.location.replace(getHomeRouteForRole(data.role));
 }
 
 export default function LoginContent() {
@@ -71,7 +127,7 @@ export default function LoginContent() {
 
           if (user) {
             try {
-              await ensureUserDoc(user.uid, user.email);
+              await ensureUserDoc(user.uid, user.email, user.displayName);
               await routeUserByRole(user.uid);
             } catch (err) {
               console.error("Route user error:", err);
@@ -94,7 +150,11 @@ export default function LoginContent() {
         try {
           const result = await getRedirectResult(auth);
           if (result?.user) {
-            await ensureUserDoc(result.user.uid, result.user.email);
+            await ensureUserDoc(
+              result.user.uid,
+              result.user.email,
+              result.user.displayName
+            );
           }
         } catch (err) {
           console.error("Redirect error:", err);
@@ -129,7 +189,7 @@ export default function LoginContent() {
         password
       );
 
-      await ensureUserDoc(cred.user.uid, cred.user.email);
+      await ensureUserDoc(cred.user.uid, cred.user.email, cred.user.displayName);
       await routeUserByRole(cred.user.uid);
     } catch (err) {
       console.error("Email login error:", err);
@@ -152,16 +212,21 @@ export default function LoginContent() {
         password
       );
 
-      await ensureUserDoc(cred.user.uid, cred.user.email);
+      await ensureUserDoc(cred.user.uid, cred.user.email, cred.user.displayName);
       await routeUserByRole(cred.user.uid);
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error("Create account error:", err);
 
-      if (err?.code === "auth/email-already-in-use") {
+      const errorCode =
+        typeof err === "object" && err && "code" in err
+          ? String((err as { code?: string }).code || "")
+          : "";
+
+      if (errorCode === "auth/email-already-in-use") {
         setError("That email is already in use.");
-      } else if (err?.code === "auth/weak-password") {
+      } else if (errorCode === "auth/weak-password") {
         setError("Password should be at least 6 characters.");
-      } else if (err?.code === "auth/invalid-email") {
+      } else if (errorCode === "auth/invalid-email") {
         setError("Please enter a valid email address.");
       } else {
         setError("Could not create account.");
@@ -185,7 +250,7 @@ export default function LoginContent() {
 
       const cred = await signInWithPopup(auth, provider);
 
-      await ensureUserDoc(cred.user.uid, cred.user.email);
+      await ensureUserDoc(cred.user.uid, cred.user.email, cred.user.displayName);
       await routeUserByRole(cred.user.uid);
     } catch (err) {
       console.error("Google login error:", err);

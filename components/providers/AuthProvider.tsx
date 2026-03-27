@@ -10,12 +10,13 @@ import {
 import { onAuthStateChanged, User } from "firebase/auth";
 import { doc, getDoc } from "firebase/firestore";
 import { auth, db } from "@/lib/firebase";
+import { AppRole, normalizeRole } from "@/lib/roles";
 
 type AppUser = {
   uid: string;
   email: string | null;
   name: string | null;
-  role: "admin" | "user";
+  role: AppRole;
 };
 
 type AuthContextType = {
@@ -56,7 +57,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         const userSnap = await getDoc(userRef);
 
         if (userSnap.exists()) {
-          setAppUser(userSnap.data() as AppUser);
+          const data = userSnap.data() as Partial<AppUser> & { role?: string };
+          setAppUser({
+            uid: currentUser.uid,
+            email: data.email ?? currentUser.email,
+            name: data.name ?? currentUser.displayName ?? "",
+            role: normalizeRole(data.role),
+          });
         } else {
           setAppUser({
             uid: currentUser.uid,
@@ -71,7 +78,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           uid: currentUser.uid,
           email: currentUser.email,
           name: currentUser.displayName || "",
-          role: "user",
+          role: normalizeRole("user"),
         });
       } finally {
         setProfileLoading(false);

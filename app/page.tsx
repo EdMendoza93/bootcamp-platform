@@ -4,6 +4,7 @@ import { useEffect } from "react";
 import { auth, db } from "@/lib/firebase";
 import { onAuthStateChanged } from "firebase/auth";
 import { doc, getDoc } from "firebase/firestore";
+import { getHomeRouteForRole } from "@/lib/roles";
 
 export default function HomePage() {
   useEffect(() => {
@@ -25,14 +26,7 @@ export default function HomePage() {
         }
 
         const data = userSnap.data() as { role?: string };
-
-        // Admin → admin panel
-        if (data.role === "admin") {
-          window.location.replace("/admin");
-        } else {
-          // Client → dashboard
-          window.location.replace("/dashboard");
-        }
+        window.location.replace(getHomeRouteForRole(data.role));
       } catch (error) {
         console.error("Root redirect error:", error);
         window.location.replace("/dashboard");

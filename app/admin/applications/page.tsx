@@ -15,6 +15,7 @@ import {
   where,
 } from "firebase/firestore";
 import { useToast } from "@/components/ui/ToastProvider";
+import { getHomeRouteForRole, normalizeRole } from "@/lib/roles";
 
 type Application = {
   id: string;
@@ -29,6 +30,18 @@ type Application = {
   hasProfile?: boolean;
   profileId?: string;
 };
+
+function getApplicantInitials(name: string) {
+  const parts = String(name || "")
+    .trim()
+    .split(/\s+/)
+    .filter(Boolean)
+    .slice(0, 2);
+
+  if (parts.length === 0) return "AP";
+
+  return parts.map((part) => part.charAt(0).toUpperCase()).join("");
+}
 
 export default function AdminApplicationsPage() {
   const [loading, setLoading] = useState(true);
@@ -99,14 +112,15 @@ export default function AdminApplicationsPage() {
       const userSnap = await getDoc(userRef);
 
       if (!userSnap.exists()) {
-        window.location.replace("/dashboard");
+        window.location.replace("/login");
         return;
       }
 
       const userData = userSnap.data() as { role?: string };
 
-      if (userData.role !== "admin") {
-        window.location.replace("/dashboard");
+      const role = normalizeRole(userData.role);
+      if (role !== "admin") {
+        window.location.replace(getHomeRouteForRole(role));
         return;
       }
 
@@ -331,6 +345,15 @@ export default function AdminApplicationsPage() {
               Review applicants, approve decisions, and automatically create
               client profiles.
             </p>
+
+            <div className="mt-5 flex flex-wrap gap-2">
+              <HeaderPill label="Pending" value={String(summary.pending)} />
+              <HeaderPill label="Approved" value={String(summary.approved)} />
+              <HeaderPill
+                label="Profiles created"
+                value={String(summary.profilesCreated)}
+              />
+            </div>
           </div>
         </div>
       </section>
@@ -356,30 +379,60 @@ export default function AdminApplicationsPage() {
       </section>
 
       <section className="rounded-[28px] border border-white/70 bg-white/90 p-4 shadow-[0_18px_50px_rgba(15,23,42,0.07)] backdrop-blur md:p-5">
-        <div className="flex flex-col gap-3 md:flex-row md:items-center">
+        <div className="grid gap-3 md:grid-cols-[minmax(0,1.2fr)_220px]">
           <input
             type="text"
             placeholder="Search by name, goal, or phone..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-[#93c5fd] focus:ring-4 focus:ring-[#dbeafe] md:flex-1"
+            className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-[#93c5fd] focus:ring-4 focus:ring-[#dbeafe]"
           />
 
-          <div className="flex flex-wrap gap-2">
-            {(["all", "pending", "approved", "rejected"] as const).map(
-              (status) => (
-                <button
-                  key={status}
-                  onClick={() => setStatusFilter(status)}
-                  className={`rounded-2xl px-4 py-2 text-sm font-medium transition ${
-                    statusFilter === status
-                      ? "bg-slate-950 text-white shadow-sm"
-                      : "border border-slate-200 bg-white text-slate-700 hover:bg-slate-50"
-                  }`}
-                >
-                  {status[0].toUpperCase() + status.slice(1)}
-                </button>
+          <select
+            value={statusFilter}
+            onChange={(e) =>
+              setStatusFilter(
+                e.target.value as "all" | "pending" | "approved" | "rejected"
               )
+            }
+            className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-[#93c5fd] focus:ring-4 focus:ring-[#dbeafe]"
+          >
+            <option value="all">All statuses</option>
+            <option value="pending">Pending</option>
+            <option value="approved">Approved</option>
+            <option value="rejected">Rejected</option>
+          </select>
+        </div>
+
+        <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
+          <div className="flex flex-wrap gap-2">
+            {statusFilter !== "all" && (
+              <StatusBadge status={statusFilter as "pending" | "approved" | "rejected"} />
+            )}
+            {search.trim() && (
+              <span className="rounded-full border border-[#bfdbfe] bg-[#eff6ff] px-3 py-1 text-xs font-semibold text-[#1d4ed8]">
+                search active
+              </span>
+            )}
+          </div>
+
+          <div className="flex items-center gap-3">
+            <p className="text-sm text-slate-500">
+              Showing {filteredApplications.length} application
+              {filteredApplications.length === 1 ? "" : "s"}
+            </p>
+
+            {(search.trim() || statusFilter !== "all") && (
+              <button
+                type="button"
+                onClick={() => {
+                  setSearch("");
+                  setStatusFilter("all");
+                }}
+                className="rounded-2xl border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-50"
+              >
+                Clear filters
+              </button>
             )}
           </div>
         </div>
@@ -401,16 +454,28 @@ export default function AdminApplicationsPage() {
               >
                 <div className="flex flex-col gap-5 xl:flex-row xl:items-start xl:justify-between">
                   <div className="min-w-0 flex-1">
-                    <div className="flex flex-wrap items-center gap-2">
-                      <h2 className="text-xl font-semibold tracking-tight text-slate-950">
-                        {app.fullName || "Unnamed applicant"}
-                      </h2>
-                      <StatusBadge status={app.status} />
-                      {app.hasProfile && (
-                        <span className="rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-xs font-medium text-emerald-700">
-                          Profile created
-                        </span>
-                      )}
+                    <div className="flex items-start gap-4">
+                      <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-[20px] bg-slate-950 text-sm font-semibold text-white shadow-sm">
+                        {getApplicantInitials(app.fullName || "Applicant")}
+                      </div>
+
+                      <div className="min-w-0 flex-1">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <h2 className="text-xl font-semibold tracking-tight text-slate-950">
+                            {app.fullName || "Unnamed applicant"}
+                          </h2>
+                          <StatusBadge status={app.status} />
+                          {app.hasProfile && (
+                            <span className="rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-xs font-medium text-emerald-700">
+                              Profile created
+                            </span>
+                          )}
+                        </div>
+
+                        <p className="mt-2 text-sm text-slate-500">
+                          {app.userId}
+                        </p>
+                      </div>
                     </div>
 
                     <div className="mt-5 grid gap-3 md:grid-cols-2">
@@ -433,6 +498,15 @@ export default function AdminApplicationsPage() {
                         </p>
                       </div>
                     ) : null}
+
+                    <div className="mt-4 rounded-[22px] border border-slate-100 bg-gradient-to-br from-slate-50 to-white p-4">
+                      <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">
+                        Next action
+                      </p>
+                      <p className="mt-2 text-sm font-medium text-slate-900">
+                        {getApplicationNextAction(app)}
+                      </p>
+                    </div>
                   </div>
 
                   <div className="flex flex-wrap gap-3 xl:w-[270px] xl:flex-col">
@@ -579,4 +653,34 @@ function InfoRow({ label, value }: { label: string; value: string }) {
       <p className="mt-2 text-sm text-slate-600">{value}</p>
     </div>
   );
+}
+
+function HeaderPill({
+  label,
+  value,
+}: {
+  label: string;
+  value: string;
+}) {
+  return (
+    <div className="rounded-full border border-slate-200 bg-white/90 px-3 py-1.5 text-xs font-semibold text-slate-700 shadow-sm">
+      {label}: <span className="text-slate-950">{value}</span>
+    </div>
+  );
+}
+
+function getApplicationNextAction(app: Application) {
+  if (app.status === "pending") {
+    return "Approve or reject application";
+  }
+
+  if (app.status === "approved" && !app.hasProfile) {
+    return "Create missing profile";
+  }
+
+  if (app.status === "approved" && app.hasProfile) {
+    return "Open profile and continue onboarding";
+  }
+
+  return "No further action required";
 }

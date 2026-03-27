@@ -6,6 +6,7 @@ import { collection, doc, getDoc, getDocs } from "firebase/firestore";
 import { httpsCallable } from "firebase/functions";
 import { auth, db, functions } from "@/lib/firebase";
 import { useToast } from "@/components/ui/ToastProvider";
+import { getHomeRouteForRole, normalizeRole } from "@/lib/roles";
 
 type UserRow = {
   id: string;
@@ -55,6 +56,7 @@ export default function AdminNotificationsPage() {
   const [selectedUserIds, setSelectedUserIds] = useState<string[]>([]);
   const [recipientVisibility, setRecipientVisibility] =
     useState<RecipientVisibility>("active");
+  const [recipientSearch, setRecipientSearch] = useState("");
   const [sending, setSending] = useState(false);
 
   const { showToast } = useToast();
@@ -71,14 +73,15 @@ export default function AdminNotificationsPage() {
         const userSnap = await getDoc(userRef);
 
         if (!userSnap.exists()) {
-          window.location.replace("/dashboard");
+          window.location.replace("/login");
           return;
         }
 
         const authData = userSnap.data() as { role?: string };
 
-        if (authData.role !== "admin") {
-          window.location.replace("/dashboard");
+        const role = normalizeRole(authData.role);
+        if (role !== "admin") {
+          window.location.replace(getHomeRouteForRole(role));
           return;
         }
 
@@ -158,9 +161,20 @@ export default function AdminNotificationsPage() {
   }, [profiles, users]);
 
   const visibleRecipients = useMemo(() => {
-    if (recipientVisibility === "all") return recipients;
-    return recipients.filter((recipient) => recipient.clientStatus === "active");
-  }, [recipientVisibility, recipients]);
+    const filteredByVisibility =
+      recipientVisibility === "all"
+        ? recipients
+        : recipients.filter((recipient) => recipient.clientStatus === "active");
+
+    const query = recipientSearch.trim().toLowerCase();
+
+    if (!query) return filteredByVisibility;
+
+    return filteredByVisibility.filter((recipient) => {
+      const haystack = `${recipient.displayName} ${recipient.email} ${recipient.id}`.toLowerCase();
+      return haystack.includes(query);
+    });
+  }, [recipientSearch, recipientVisibility, recipients]);
 
   const toggleUser = (userId: string) => {
     setSelectedUserIds((prev) =>
@@ -230,14 +244,38 @@ export default function AdminNotificationsPage() {
 
   return (
     <div className="space-y-6">
-      <section className="rounded-[32px] border border-white/70 bg-white/90 p-6 shadow-[0_24px_80px_rgba(15,23,42,0.10)] backdrop-blur md:p-8">
-        <h1 className="text-3xl font-semibold tracking-tight text-slate-950">Push Notification Center</h1>
-        <p className="mt-2 text-sm text-slate-600">
-          Send web push notifications to all users or selected users. Default deep link is /dashboard.
-        </p>
+      <section className="overflow-hidden rounded-[32px] border border-white/70 bg-white/90 shadow-[0_24px_80px_rgba(15,23,42,0.10)] backdrop-blur">
+        <div className="bg-gradient-to-r from-[#071120] via-[#123b76] to-[#2EA0FF] p-[1px]">
+          <div className="rounded-t-[31px] bg-transparent px-0 py-0" />
+        </div>
+
+        <div className="relative overflow-hidden p-6 md:p-8">
+          <div className="absolute right-0 top-0 h-40 w-40 rounded-full bg-[#2EA0FF]/10 blur-3xl" />
+          <div className="absolute bottom-0 left-0 h-32 w-32 rounded-full bg-emerald-300/10 blur-3xl" />
+
+          <div className="relative">
+            <div className="inline-flex items-center rounded-full border border-[#bfdbfe] bg-[#eff6ff] px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.2em] text-[#1d4ed8]">
+              Notifications
+            </div>
+
+            <h1 className="mt-4 text-3xl font-semibold tracking-tight text-slate-950 md:text-4xl">
+              Push Notification Center
+            </h1>
+            <p className="mt-3 max-w-3xl text-sm text-slate-600 md:text-base">
+              Send web push notifications to all users or selected users. Default deep link is <code>/dashboard</code>.
+            </p>
+
+            <div className="mt-5 flex flex-wrap gap-2">
+              <HeaderPill label="Recipients" value={String(recipients.length)} />
+              <HeaderPill label="Selected" value={String(selectedUserIds.length)} />
+              <HeaderPill label="Audience" value={audience} />
+            </div>
+          </div>
+        </div>
       </section>
 
-      <section className="rounded-[28px] border border-white/70 bg-white/90 p-6 shadow-[0_18px_50px_rgba(15,23,42,0.07)] backdrop-blur">
+      <section className="grid gap-6 xl:grid-cols-[1.05fr_0.95fr]">
+        <div className="rounded-[28px] border border-white/70 bg-white/90 p-6 shadow-[0_18px_50px_rgba(15,23,42,0.07)] backdrop-blur">
         <div className="grid gap-4 md:grid-cols-2">
           <div>
             <label className="mb-2 block text-sm font-semibold text-slate-700">Title</label>
@@ -320,6 +358,13 @@ export default function AdminNotificationsPage() {
               ))}
             </div>
 
+            <input
+              value={recipientSearch}
+              onChange={(e) => setRecipientSearch(e.target.value)}
+              placeholder="Search selected recipients by name or email"
+              className="mt-3 w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-[#93c5fd] focus:ring-4 focus:ring-[#dbeafe]"
+            />
+
             <div className="mt-3 grid max-h-64 gap-2 overflow-y-auto pr-1">
               {visibleRecipients.map((item) => (
                 <label
@@ -368,14 +413,75 @@ export default function AdminNotificationsPage() {
 
           <p className="text-xs text-slate-500">Only users with a valid push token will receive notifications.</p>
         </div>
-      </section>
+        </div>
 
-      <section className="rounded-[28px] border border-[#bfdbfe] bg-gradient-to-br from-[#eff6ff] to-white p-6 shadow-[0_18px_50px_rgba(15,23,42,0.07)]">
-        <h2 className="text-lg font-semibold text-slate-950">iPhone limitation</h2>
-        <p className="mt-2 text-sm text-slate-700">
-          Push on iPhone/iPad web apps is constrained. It only works where iOS and browser support web push, and generally requires Home Screen installation.
-        </p>
+        <div className="space-y-6">
+          <section className="rounded-[28px] border border-white/70 bg-white/90 p-6 shadow-[0_18px_50px_rgba(15,23,42,0.07)] backdrop-blur">
+            <h2 className="text-xl font-semibold text-slate-950">Live preview</h2>
+            <p className="mt-2 text-sm text-slate-600">
+              This is roughly how the notification content will appear when a device receives it.
+            </p>
+
+            <div className="mt-5 rounded-[26px] border border-slate-200 bg-gradient-to-br from-slate-950 to-slate-800 p-5 text-white shadow-[0_18px_40px_rgba(15,23,42,0.18)]">
+              <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-300">
+                Bootcamp
+              </p>
+              <p className="mt-3 text-lg font-semibold">
+                {title.trim() || "Notification title"}
+              </p>
+              <p className="mt-2 text-sm leading-6 text-slate-200">
+                {body.trim() || "Notification message preview will appear here."}
+              </p>
+              <div className="mt-4 flex flex-wrap gap-2">
+                <PreviewPill label="Link" value={(url.trim() || "/dashboard").startsWith("/") ? url.trim() || "/dashboard" : "/dashboard"} />
+                <PreviewPill
+                  label="Audience"
+                  value={
+                    audience === "all"
+                      ? "All users"
+                      : `${selectedUserIds.length} selected`
+                  }
+                />
+              </div>
+            </div>
+          </section>
+
+          <section className="rounded-[28px] border border-[#bfdbfe] bg-gradient-to-br from-[#eff6ff] to-white p-6 shadow-[0_18px_50px_rgba(15,23,42,0.07)]">
+            <h2 className="text-lg font-semibold text-slate-950">iPhone limitation</h2>
+            <p className="mt-2 text-sm text-slate-700">
+              Push on iPhone and iPad web apps is constrained. It generally needs Home Screen installation and compatible iOS browser support.
+            </p>
+          </section>
+        </div>
       </section>
+    </div>
+  );
+}
+
+function HeaderPill({
+  label,
+  value,
+}: {
+  label: string;
+  value: string;
+}) {
+  return (
+    <div className="rounded-full border border-slate-200 bg-white/90 px-3 py-1.5 text-xs font-semibold text-slate-700 shadow-sm">
+      {label}: <span className="text-slate-950 capitalize">{value}</span>
+    </div>
+  );
+}
+
+function PreviewPill({
+  label,
+  value,
+}: {
+  label: string;
+  value: string;
+}) {
+  return (
+    <div className="rounded-full border border-white/10 bg-white/10 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.14em] text-white/90">
+      {label}: {value}
     </div>
   );
 }

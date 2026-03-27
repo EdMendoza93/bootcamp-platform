@@ -12,6 +12,7 @@ import {
   where,
 } from "firebase/firestore";
 import PushNotificationsCard from "@/components/dashboard/PushNotificationsCard";
+import { getHomeRouteForRole, normalizeRole } from "@/lib/roles";
 
 type ApplicationStatus = "none" | "pending" | "approved" | "rejected";
 type OnboardingStatus = "none" | "incomplete" | "active";
@@ -191,8 +192,9 @@ export default function DashboardPage() {
 
     if (userSnap.exists()) {
       const userData = userSnap.data() as { role?: string };
-      if (userData.role === "admin") {
-        window.location.replace("/admin");
+      const role = normalizeRole(userData.role);
+      if (role !== "user") {
+        window.location.replace(getHomeRouteForRole(role));
         return;
       }
     }

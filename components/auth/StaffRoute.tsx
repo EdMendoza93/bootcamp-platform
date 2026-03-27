@@ -3,9 +3,9 @@
 import { useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/components/providers/AuthProvider";
-import { getHomeRouteForRole } from "@/lib/roles";
+import { canAccessStaff, getHomeRouteForRole } from "@/lib/roles";
 
-export default function AdminRoute({
+export default function StaffRoute({
   children,
 }: {
   children: React.ReactNode;
@@ -23,22 +23,17 @@ export default function AdminRoute({
       return;
     }
 
-    if (appUser && appUser.role !== "admin") {
+    if (appUser && !canAccessStaff(appUser.role)) {
       router.replace(getHomeRouteForRole(appUser.role));
     }
-  }, [firebaseUser, appUser, loading, router]);
+  }, [appUser, firebaseUser, loading, router]);
 
   if (loading) {
     return <p className="p-10">Loading...</p>;
   }
 
-  if (!firebaseUser) {
-    return null;
-  }
-
-  if (!appUser || appUser.role !== "admin") {
-    return null;
-  }
+  if (!firebaseUser) return null;
+  if (!appUser || !canAccessStaff(appUser.role)) return null;
 
   return <>{children}</>;
 }
