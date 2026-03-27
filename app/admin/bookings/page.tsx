@@ -65,6 +65,8 @@ type BookingFormState = {
   notes: string;
 };
 
+type BookingViewFilter = "recent" | "confirmed" | "cancelled" | "all";
+
 function getEmptyBookingForm(): BookingFormState {
   return {
     userId: "",
@@ -133,6 +135,8 @@ export default function AdminBookingsPage() {
   const [profiles, setProfiles] = useState<ProfileRow[]>([]);
   const [form, setForm] = useState<BookingFormState>(getEmptyBookingForm());
   const [editingBookingId, setEditingBookingId] = useState<string | null>(null);
+  const [bookingViewFilter, setBookingViewFilter] =
+    useState<BookingViewFilter>("recent");
 
   const { showToast } = useToast();
 
@@ -270,6 +274,22 @@ export default function AdminBookingsPage() {
       return bValue - aValue;
     });
   }, [bookings]);
+
+  const visibleBookings = useMemo(() => {
+    if (bookingViewFilter === "recent") {
+      return recentBookings.slice(0, 8);
+    }
+
+    if (bookingViewFilter === "confirmed") {
+      return recentBookings.filter((booking) => booking.status === "confirmed");
+    }
+
+    if (bookingViewFilter === "cancelled") {
+      return recentBookings.filter((booking) => booking.status === "cancelled");
+    }
+
+    return recentBookings;
+  }, [bookingViewFilter, recentBookings]);
 
   const startableWeeks = useMemo(() => {
     return editableHydratedWeeks.filter(
@@ -799,16 +819,40 @@ export default function AdminBookingsPage() {
             </div>
           </div>
 
-          {recentBookings.length === 0 ? (
+          <div className="mt-5 flex flex-wrap gap-2">
+            {(
+              [
+                ["recent", "Recent"],
+                ["confirmed", "Confirmed"],
+                ["cancelled", "Cancelled"],
+                ["all", "All"],
+              ] as const
+            ).map(([value, label]) => (
+              <button
+                key={value}
+                type="button"
+                onClick={() => setBookingViewFilter(value)}
+                className={`rounded-full px-3 py-1.5 text-xs font-semibold transition ${
+                  bookingViewFilter === value
+                    ? "bg-slate-950 text-white"
+                    : "border border-slate-200 bg-white text-slate-700"
+                }`}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+
+          {visibleBookings.length === 0 ? (
             <div className="mt-6 rounded-[24px] border border-dashed border-slate-200 bg-slate-50/70 p-8 text-center">
-              <p className="text-base font-semibold text-slate-900">No bookings yet</p>
+              <p className="text-base font-semibold text-slate-900">No bookings in this view</p>
               <p className="mt-2 text-sm leading-6 text-slate-600">
-                The booking engine is now scaffolded. Next we can add manual admin booking creation and then connect the public website flow.
+                Try another filter or create a new booking from the panel on the left.
               </p>
             </div>
           ) : (
             <div className="mt-6 space-y-3">
-              {recentBookings.map((booking) => (
+              {visibleBookings.map((booking) => (
                 <div
                   key={booking.id}
                   className="rounded-[24px] border border-slate-100 bg-gradient-to-br from-slate-50 to-white p-4"
