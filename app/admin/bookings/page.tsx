@@ -31,7 +31,24 @@ type BookingRow = BookingRecord & {
   };
 };
 
+type UserRow = {
+  id: string;
+  email?: string;
+  role?: string;
+  name?: string;
+  displayName?: string;
+  username?: string;
+};
+
+type ProfileRow = {
+  id: string;
+  userId?: string;
+  fullName?: string;
+  clientStatus?: "active" | "inactive";
+};
+
 type BookingFormState = {
+  userId: string;
   customerName: string;
   customerEmail: string;
   startWeekId: string;
@@ -50,6 +67,7 @@ type BookingFormState = {
 
 function getEmptyBookingForm(): BookingFormState {
   return {
+    userId: "",
     customerName: "",
     customerEmail: "",
     startWeekId: "",
@@ -111,6 +129,8 @@ export default function AdminBookingsPage() {
   const [saving, setSaving] = useState(false);
   const [weeks, setWeeks] = useState<BootcampWeekRecord[]>([]);
   const [bookings, setBookings] = useState<BookingRow[]>([]);
+  const [users, setUsers] = useState<UserRow[]>([]);
+  const [profiles, setProfiles] = useState<ProfileRow[]>([]);
   const [form, setForm] = useState<BookingFormState>(getEmptyBookingForm());
   const [editingBookingId, setEditingBookingId] = useState<string | null>(null);
 
@@ -123,10 +143,14 @@ export default function AdminBookingsPage() {
         orderBy("startDate", "asc")
       );
       const bookingsQuery = query(collection(db, "bookings"));
+      const usersQuery = query(collection(db, "users"));
+      const profilesQuery = query(collection(db, "profiles"));
 
-      const [weeksSnap, bookingsSnap] = await Promise.all([
+      const [weeksSnap, bookingsSnap, usersSnap, profilesSnap] = await Promise.all([
         getDocs(weeksQuery),
         getDocs(bookingsQuery),
+        getDocs(usersQuery),
+        getDocs(profilesQuery),
       ]);
 
       const weekData = weeksSnap.docs.map((docItem) => ({
@@ -139,8 +163,22 @@ export default function AdminBookingsPage() {
         ...(docItem.data() as Omit<BookingRow, "id">),
       })) as BookingRow[];
 
+      const userData = usersSnap.docs
+        .map((docItem) => ({
+          id: docItem.id,
+          ...(docItem.data() as Omit<UserRow, "id">),
+        }))
+        .filter((item) => item.role !== "admin") as UserRow[];
+
+      const profileData = profilesSnap.docs.map((docItem) => ({
+        id: docItem.id,
+        ...(docItem.data() as Omit<ProfileRow, "id">),
+      })) as ProfileRow[];
+
       setWeeks(weekData);
       setBookings(bookingData);
+      setUsers(userData);
+      setProfiles(profileData);
     } catch (error) {
       console.error("Load bookings error:", error);
       showToast({
@@ -161,6 +199,38 @@ export default function AdminBookingsPage() {
     () => hydrateWeeksWithBookings(weeks, bookings),
     [weeks, bookings]
   );
+
+  const recipientOptions = useMemo(() => {
+    const profileByUserId = new Map(
+      profiles
+        .filter((profile) => profile.userId)
+        .map((profile) => [profile.userId as string, profile])
+    );
+
+    return users
+      .map((user) => {
+        const profile = profileByUserId.get(user.id);
+        const displayName =
+          profile?.fullName ||
+          user.displayName ||
+          user.name ||
+          user.username ||
+          user.email ||
+          user.id;
+
+        return {
+          id: user.id,
+          displayName,
+          email: user.email || "",
+          clientStatus: profile?.clientStatus || "active",
+        };
+      })
+      .sort((a, b) => a.displayName.localeCompare(b.displayName));
+  }, [profiles, users]);
+
+  const selectedRecipient = useMemo(() => {
+    return recipientOptions.find((recipient) => recipient.id === form.userId) || null;
+  }, [form.userId, recipientOptions]);
 
   const bookingDraftWeeks = useMemo(() => {
     if (!editingBookingId) return bookings;
@@ -217,8 +287,7 @@ export default function AdminBookingsPage() {
   }, [editableHydratedWeeks, form.durationWeeks, form.startWeekId]);
 
   const canSaveBooking =
-    form.customerName.trim().length > 0 &&
-    form.customerEmail.trim().length > 0 &&
+    form.userId.trim().length > 0 &&
     (!form.shortStay || Number(form.shortStayNights || 0) > 0) &&
     selectedWeeks.length === form.durationWeeks;
 
@@ -230,6 +299,7 @@ export default function AdminBookingsPage() {
   const startEdit = (booking: BookingRow) => {
     setEditingBookingId(booking.id);
     setForm({
+      userId: booking.userId || "",
       customerName: booking.customerName || "",
       customerEmail: booking.customerEmail || "",
       startWeekId: booking.startWeekId || "",
@@ -296,15 +366,16 @@ export default function AdminBookingsPage() {
       const parsedCustomPrice = Number(form.customPrice || 0);
 
       const payload = {
+        userId: form.userId,
         startWeekId: form.startWeekId,
         durationWeeks: form.durationWeeks,
         status: form.status,
         source: form.source,
         paymentStatus: form.paymentStatus,
         paymentMethod: form.paymentMethod,
-        consumesCapacity: form.consumesCapacity,
-        customerName: form.customerName.trim(),
-        customerEmail: form.customerEmail.trim().toLowerCase(),
+        consumesCapacity: form.shortStay ? true : form.consumesCapacity,
+        customerName: selectedRecipient?.displayName || form.customerName.trim(),
+        customerEmail: selectedRecipient?.email || form.customerEmail.trim().toLowerCase(),
         shortStay: form.shortStay,
         shortStayNights:
           form.shortStay && parsedShortStayNights > 0 ? parsedShortStayNights : null,
@@ -414,26 +485,46 @@ export default function AdminBookingsPage() {
             <div className="grid gap-4 md:grid-cols-2">
               <div>
                 <label className="mb-2 block text-sm font-medium text-slate-700">
-                  Guest name
+                  Platform user
                 </label>
-                <input
-                  value={form.customerName}
-                  onChange={(e) => setForm((prev) => ({ ...prev, customerName: e.target.value }))}
-                  placeholder="John Doe"
+                <select
+                  value={form.userId}
+                  onChange={(e) => {
+                    const nextUserId = e.target.value;
+                    const recipient =
+                      recipientOptions.find((item) => item.id === nextUserId) || null;
+
+                    setForm((prev) => ({
+                      ...prev,
+                      userId: nextUserId,
+                      customerName: recipient?.displayName || "",
+                      customerEmail: recipient?.email || "",
+                    }));
+                  }}
                   className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-[#93c5fd] focus:ring-4 focus:ring-[#dbeafe]"
-                />
+                >
+                  <option value="">Select an existing user</option>
+                  {recipientOptions.map((recipient) => (
+                    <option key={recipient.id} value={recipient.id}>
+                      {`${recipient.displayName} - ${recipient.email || recipient.id}`}
+                    </option>
+                  ))}
+                </select>
               </div>
 
               <div>
                 <label className="mb-2 block text-sm font-medium text-slate-700">
-                  Guest email
+                  Linked account
                 </label>
                 <input
-                  type="email"
-                  value={form.customerEmail}
-                  onChange={(e) => setForm((prev) => ({ ...prev, customerEmail: e.target.value }))}
-                  placeholder="john@example.com"
-                  className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-[#93c5fd] focus:ring-4 focus:ring-[#dbeafe]"
+                  value={
+                    selectedRecipient
+                      ? `${selectedRecipient.displayName} · ${selectedRecipient.email || selectedRecipient.id}`
+                      : ""
+                  }
+                  readOnly
+                  placeholder="Select a platform user first"
+                  className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-700 outline-none"
                 />
               </div>
             </div>
@@ -555,6 +646,12 @@ export default function AdminBookingsPage() {
                 This booking consumes weekly capacity
               </span>
             </label>
+
+            {form.shortStay && (
+              <p className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+                Short stays still reserve the full weekly room block, so capacity is always consumed.
+              </p>
+            )}
 
             <div className="grid gap-4 md:grid-cols-[1fr_180px]">
               <label className="flex items-center gap-3 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3">
