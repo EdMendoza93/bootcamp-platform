@@ -8,12 +8,28 @@ import { collection, getDocs } from "firebase/firestore";
 type Profile = {
   id: string;
   fullName: string;
+  userId?: string;
   approvalStatus?: string;
   onboardingStatus?: string;
   paymentStatus?: string;
   assignedProgram?: string;
   clientStatus?: "active" | "inactive";
 };
+
+type PaymentFilter = "all" | "paid" | "pending" | "cash" | "manual";
+type OnboardingFilter = "all" | "active" | "incomplete";
+
+function getInitials(name: string) {
+  const parts = String(name || "")
+    .trim()
+    .split(/\s+/)
+    .filter(Boolean)
+    .slice(0, 2);
+
+  if (parts.length === 0) return "CL";
+
+  return parts.map((part) => part.charAt(0).toUpperCase()).join("");
+}
 
 export default function AdminProfilesPage() {
   const [loading, setLoading] = useState(true);
@@ -22,6 +38,9 @@ export default function AdminProfilesPage() {
   const [statusFilter, setStatusFilter] = useState<"all" | "active" | "inactive">(
     "all"
   );
+  const [paymentFilter, setPaymentFilter] = useState<PaymentFilter>("all");
+  const [onboardingFilter, setOnboardingFilter] =
+    useState<OnboardingFilter>("all");
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
@@ -54,18 +73,38 @@ export default function AdminProfilesPage() {
   const filteredProfiles = useMemo(() => {
     return profiles.filter((profile) => {
       const name = (profile.fullName || "").toLowerCase();
+      const program = (profile.assignedProgram || "").toLowerCase();
+      const payment = (profile.paymentStatus || "").toLowerCase();
+      const onboarding = (profile.onboardingStatus || "").toLowerCase();
       const query = search.trim().toLowerCase();
 
-      const matchesSearch = !query || name.includes(query);
+      const matchesSearch =
+        !query ||
+        name.includes(query) ||
+        program.includes(query) ||
+        payment.includes(query) ||
+        onboarding.includes(query);
 
       const currentStatus = profile.clientStatus || "active";
 
       const matchesStatus =
         statusFilter === "all" ? true : currentStatus === statusFilter;
 
-      return matchesSearch && matchesStatus;
+      const currentPayment = String(profile.paymentStatus || "pending").toLowerCase();
+      const matchesPayment =
+        paymentFilter === "all" ? true : currentPayment === paymentFilter;
+
+      const currentOnboarding = String(
+        profile.onboardingStatus || "incomplete"
+      ).toLowerCase();
+      const matchesOnboarding =
+        onboardingFilter === "all"
+          ? true
+          : currentOnboarding === onboardingFilter;
+
+      return matchesSearch && matchesStatus && matchesPayment && matchesOnboarding;
     });
-  }, [profiles, search, statusFilter]);
+  }, [onboardingFilter, paymentFilter, profiles, search, statusFilter]);
 
   const summary = useMemo(() => {
     return {
@@ -78,6 +117,12 @@ export default function AdminProfilesPage() {
       ).length,
       assigned: profiles.filter((profile) => Boolean(profile.assignedProgram))
         .length,
+      pendingPayment: profiles.filter(
+        (profile) => (profile.paymentStatus || "pending") === "pending"
+      ).length,
+      incompleteOnboarding: profiles.filter(
+        (profile) => (profile.onboardingStatus || "incomplete") === "incomplete"
+      ).length,
     };
   }, [profiles]);
 
@@ -111,6 +156,15 @@ export default function AdminProfilesPage() {
             Search and manage your bootcamp clients, view their status, and open
             their individual profiles.
           </p>
+
+          <div className="mt-5 flex flex-wrap gap-2">
+            <HeaderPill label="Profiles" value={String(summary.total)} />
+            <HeaderPill label="Pending payment" value={String(summary.pendingPayment)} />
+            <HeaderPill
+              label="Onboarding incomplete"
+              value={String(summary.incompleteOnboarding)}
+            />
+          </div>
         </div>
       </section>
 
@@ -121,30 +175,99 @@ export default function AdminProfilesPage() {
         <SummaryCard label="Programs Assigned" value={String(summary.assigned)} tone="blue" />
       </section>
 
+      <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-2">
+        <SummaryCard
+          label="Pending Payment"
+          value={String(summary.pendingPayment)}
+          tone="danger"
+        />
+        <SummaryCard
+          label="Incomplete Onboarding"
+          value={String(summary.incompleteOnboarding)}
+          tone="blue"
+        />
+      </section>
+
       <section className="rounded-[28px] border border-white/70 bg-white/90 p-4 shadow-[0_18px_50px_rgba(15,23,42,0.07)] backdrop-blur md:p-6">
-        <div className="flex flex-col gap-4 md:flex-row md:items-center">
+        <div className="grid gap-3 lg:grid-cols-[minmax(0,1.2fr)_180px_180px_180px]">
           <input
             type="text"
-            placeholder="Search by client name..."
+            placeholder="Search by client, program, payment, onboarding..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 shadow-sm outline-none transition focus:border-[#93c5fd] focus:ring-4 focus:ring-[#dbeafe] md:flex-1"
+            className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 shadow-sm outline-none transition focus:border-[#93c5fd] focus:ring-4 focus:ring-[#dbeafe]"
           />
 
+          <select
+            value={statusFilter}
+            onChange={(e) =>
+              setStatusFilter(e.target.value as "all" | "active" | "inactive")
+            }
+            className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 shadow-sm outline-none transition focus:border-[#93c5fd] focus:ring-4 focus:ring-[#dbeafe]"
+          >
+            <option value="all">All status</option>
+            <option value="active">Active</option>
+            <option value="inactive">Inactive</option>
+          </select>
+
+          <select
+            value={paymentFilter}
+            onChange={(e) => setPaymentFilter(e.target.value as PaymentFilter)}
+            className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 shadow-sm outline-none transition focus:border-[#93c5fd] focus:ring-4 focus:ring-[#dbeafe]"
+          >
+            <option value="all">All payments</option>
+            <option value="pending">Pending</option>
+            <option value="paid">Paid</option>
+            <option value="cash">Cash</option>
+            <option value="manual">Manual</option>
+          </select>
+
+          <select
+            value={onboardingFilter}
+            onChange={(e) =>
+              setOnboardingFilter(e.target.value as OnboardingFilter)
+            }
+            className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 shadow-sm outline-none transition focus:border-[#93c5fd] focus:ring-4 focus:ring-[#dbeafe]"
+          >
+            <option value="all">All onboarding</option>
+            <option value="active">Active</option>
+            <option value="incomplete">Incomplete</option>
+          </select>
+        </div>
+
+        <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
           <div className="flex flex-wrap gap-2">
-            {(["all", "active", "inactive"] as const).map((status) => (
+            {statusFilter !== "all" && <StatusBadge tone="neutral">{statusFilter}</StatusBadge>}
+            {paymentFilter !== "all" && <StatusBadge tone="neutral">{paymentFilter}</StatusBadge>}
+            {onboardingFilter !== "all" && (
+              <StatusBadge tone="blue">{onboardingFilter}</StatusBadge>
+            )}
+            {search.trim() && <StatusBadge tone="blue">search active</StatusBadge>}
+          </div>
+
+          <div className="flex items-center gap-3">
+            <p className="text-sm text-slate-500">
+              Showing {filteredProfiles.length} profile
+              {filteredProfiles.length === 1 ? "" : "s"}
+            </p>
+
+            {(search.trim() ||
+              statusFilter !== "all" ||
+              paymentFilter !== "all" ||
+              onboardingFilter !== "all") && (
               <button
-                key={status}
-                onClick={() => setStatusFilter(status)}
-                className={`rounded-2xl px-4 py-2 text-sm font-medium transition-all duration-200 ${
-                  statusFilter === status
-                    ? "bg-slate-950 text-white shadow-sm"
-                    : "border border-slate-200 bg-white text-slate-700 hover:-translate-y-0.5 hover:border-slate-300 hover:shadow-sm"
-                }`}
+                type="button"
+                onClick={() => {
+                  setSearch("");
+                  setStatusFilter("all");
+                  setPaymentFilter("all");
+                  setOnboardingFilter("all");
+                }}
+                className="rounded-2xl border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-700 transition-all duration-200 hover:-translate-y-0.5 hover:border-slate-300 hover:shadow-sm"
               >
-                {status[0].toUpperCase() + status.slice(1)}
+                Clear filters
               </button>
-            ))}
+            )}
           </div>
         </div>
       </section>
@@ -162,9 +285,21 @@ export default function AdminProfilesPage() {
             >
               <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
                 <div className="min-w-0 flex-1">
-                  <h2 className="text-xl font-semibold text-slate-950">
-                    {profile.fullName || "Unnamed profile"}
-                  </h2>
+                  <div className="flex items-start gap-4">
+                    <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-[20px] bg-slate-950 text-sm font-semibold text-white shadow-sm">
+                      {getInitials(profile.fullName || "Client")}
+                    </div>
+
+                    <div className="min-w-0 flex-1">
+                      <h2 className="text-xl font-semibold text-slate-950">
+                        {profile.fullName || "Unnamed profile"}
+                      </h2>
+
+                      <p className="mt-1 text-sm text-slate-500">
+                        {profile.userId || profile.id}
+                      </p>
+                    </div>
+                  </div>
 
                   <div className="mt-3 flex flex-wrap gap-2">
                     <StatusBadge tone={profile.clientStatus === "inactive" ? "danger" : "success"}>
@@ -184,11 +319,15 @@ export default function AdminProfilesPage() {
                     </StatusBadge>
                   </div>
 
-                  <div className="mt-4 rounded-[22px] border border-slate-100 bg-gradient-to-br from-slate-50 to-white p-4">
-                    <p className="text-sm font-semibold text-slate-700">Program</p>
-                    <p className="mt-2 text-sm text-slate-600">
-                      {profile.assignedProgram || "Not assigned"}
-                    </p>
+                  <div className="mt-4 grid gap-3 md:grid-cols-2">
+                    <ProfileMetaCard
+                      label="Assigned program"
+                      value={profile.assignedProgram || "Not assigned"}
+                    />
+                    <ProfileMetaCard
+                      label="Next action"
+                      value={getProfileNextAction(profile)}
+                    />
                   </div>
                 </div>
 
@@ -281,4 +420,59 @@ function StatusBadge({
       {children}
     </span>
   );
+}
+
+function HeaderPill({
+  label,
+  value,
+}: {
+  label: string;
+  value: string;
+}) {
+  return (
+    <div className="rounded-full border border-slate-200 bg-white/90 px-3 py-1.5 text-xs font-semibold text-slate-700 shadow-sm">
+      {label}: <span className="text-slate-950">{value}</span>
+    </div>
+  );
+}
+
+function ProfileMetaCard({
+  label,
+  value,
+}: {
+  label: string;
+  value: string;
+}) {
+  return (
+    <div className="rounded-[22px] border border-slate-100 bg-gradient-to-br from-slate-50 to-white p-4">
+      <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">
+        {label}
+      </p>
+      <p className="mt-2 text-sm font-medium text-slate-900">{value}</p>
+    </div>
+  );
+}
+
+function getProfileNextAction(profile: Profile) {
+  if ((profile.approvalStatus || "approved") !== "approved") {
+    return "Review approval";
+  }
+
+  if ((profile.paymentStatus || "pending") === "pending") {
+    return "Confirm payment";
+  }
+
+  if ((profile.onboardingStatus || "incomplete") !== "active") {
+    return "Complete onboarding";
+  }
+
+  if (!profile.assignedProgram) {
+    return "Assign program";
+  }
+
+  if ((profile.clientStatus || "active") === "inactive") {
+    return "Check inactive status";
+  }
+
+  return "Profile healthy";
 }
