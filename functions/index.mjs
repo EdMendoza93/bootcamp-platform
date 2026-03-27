@@ -2,10 +2,47 @@ import { onCall, HttpsError } from "firebase-functions/v2/https";
 import { initializeApp } from "firebase-admin/app";
 import { getFirestore, FieldValue } from "firebase-admin/firestore";
 import { getMessaging } from "firebase-admin/messaging";
+import { randomUUID } from "node:crypto";
+import Stripe from "stripe";
 
 initializeApp();
 
 const db = getFirestore();
+
+function getStripeClient() {
+  const secretKey = process.env.STRIPE_SECRET_KEY;
+
+  if (!secretKey) {
+    throw new HttpsError(
+      "failed-precondition",
+      "Missing STRIPE_SECRET_KEY in functions environment."
+    );
+  }
+
+  return new Stripe(secretKey, {
+    apiVersion: "2025-02-24.acacia",
+  });
+}
+
+function getStripeAdminReturnUrl() {
+  return (
+    process.env.STRIPE_CONNECT_RETURN_URL ||
+    "https://app.bootcamp.rivcor.com/admin/payments"
+  );
+}
+
+function getStripeConnectClientId() {
+  const clientId = process.env.STRIPE_CONNECT_CLIENT_ID;
+
+  if (!clientId) {
+    throw new HttpsError(
+      "failed-precondition",
+      "Missing STRIPE_CONNECT_CLIENT_ID in functions environment."
+    );
+  }
+
+  return clientId;
+}
 
 async function assertAdmin(auth) {
   if (!auth?.uid) {
@@ -628,6 +665,191 @@ export const deleteAdminBooking = onCall(
       throw new HttpsError(
         "internal",
         error instanceof Error ? error.message : "Booking deletion failed."
+      );
+    }
+  }
+);
+
+export const createStripeConnectAuthorizeUrl = onCall(
+  { region: "us-central1" },
+  async (request) => {
+    try {
+      await assertAdmin(request.auth);
+
+      const paymentsRef = db.collection("settings").doc("payments");
+      const clientId = getStripeConnectClientId();
+      const state = randomUUID();
+      const redirectUri = getStripeAdminReturnUrl();
+
+      await paymentsRef.set(
+        {
+          provider: "stripe_connect",
+          accountType: "standard",
+          connectionMode: "oauth",
+          pendingOauthState: state,
+          pendingOauthUserId: request.auth.uid,
+          oauthRedirectUri: redirectUri,
+          updatedAt: FieldValue.serverTimestamp(),
+        },
+        { merge: true }
+      );
+
+      return {
+        url:
+          "https://connect.stripe.com/oauth/authorize" +
+          `?response_type=code&client_id=${encodeURIComponent(clientId)}` +
+          `&scope=read_write&state=${encodeURIComponent(state)}` +
+          `&redirect_uri=${encodeURIComponent(redirectUri)}`,
+      };
+    } catch (error) {
+      console.error("createStripeConnectAuthorizeUrl error:", error);
+      if (error instanceof HttpsError) throw error;
+      throw new HttpsError(
+        "internal",
+        error instanceof Error ? error.message : "Stripe authorization link failed."
+      );
+    }
+  }
+);
+
+export const completeStripeConnectStandard = onCall(
+  { region: "us-central1" },
+  async (request) => {
+    try {
+      await assertAdmin(request.auth);
+
+      const code = String(request.data?.code || "").trim();
+      const state = String(request.data?.state || "").trim();
+
+      if (!code || !state) {
+        throw new HttpsError(
+          "invalid-argument",
+          "Both code and state are required."
+        );
+      }
+
+      const stripe = getStripeClient();
+      const paymentsRef = db.collection("settings").doc("payments");
+      const paymentsSnap = await paymentsRef.get();
+
+      if (!paymentsSnap.exists) {
+        throw new HttpsError(
+          "failed-precondition",
+          "Payments settings were not initialized."
+        );
+      }
+
+      const paymentsData = paymentsSnap.data() || {};
+
+      if (
+        state !== String(paymentsData.pendingOauthState || "") ||
+        request.auth.uid !== String(paymentsData.pendingOauthUserId || "")
+      ) {
+        throw new HttpsError(
+          "permission-denied",
+          "Stripe connection session is not valid anymore."
+        );
+      }
+
+      const tokenResponse = await stripe.oauth.token({
+        grant_type: "authorization_code",
+        code,
+      });
+
+      await paymentsRef.set(
+        {
+          provider: "stripe_connect",
+          accountType: "standard",
+          connectionMode: "oauth",
+          stripeAccountId: tokenResponse.stripe_user_id,
+          scope: tokenResponse.scope || "read_write",
+          livemode: Boolean(tokenResponse.livemode),
+          onboardingComplete: true,
+          pendingOauthState: FieldValue.delete(),
+          pendingOauthUserId: FieldValue.delete(),
+          oauthRedirectUri: FieldValue.delete(),
+          updatedAt: FieldValue.serverTimestamp(),
+          connectedAt: FieldValue.serverTimestamp(),
+        },
+        { merge: true }
+      );
+
+      return {
+        stripeAccountId: tokenResponse.stripe_user_id,
+        livemode: Boolean(tokenResponse.livemode),
+        scope: tokenResponse.scope || "read_write",
+      };
+    } catch (error) {
+      console.error("completeStripeConnectStandard error:", error);
+      if (error instanceof HttpsError) throw error;
+      throw new HttpsError(
+        "internal",
+        error instanceof Error ? error.message : "Stripe connection failed."
+      );
+    }
+  }
+);
+
+export const refreshStripeConnectStatus = onCall(
+  { region: "us-central1" },
+  async (request) => {
+    try {
+      await assertAdmin(request.auth);
+
+      const stripe = getStripeClient();
+      const paymentsRef = db.collection("settings").doc("payments");
+      const paymentsSnap = await paymentsRef.get();
+
+      if (!paymentsSnap.exists) {
+        throw new HttpsError(
+          "failed-precondition",
+          "Payments settings not initialized."
+        );
+      }
+
+      const paymentsData = paymentsSnap.data() || {};
+      const stripeAccountId = String(paymentsData.stripeAccountId || "").trim();
+
+      if (!stripeAccountId) {
+        throw new HttpsError(
+          "failed-precondition",
+          "Stripe account is not connected yet."
+        );
+      }
+
+      const account = await stripe.accounts.retrieve(stripeAccountId);
+
+      await paymentsRef.set(
+        {
+          provider: "stripe_connect",
+          stripeAccountId: account.id,
+          accountEmail: account.email || paymentsData.accountEmail || "",
+          country: account.country || "",
+          currency: account.default_currency || "",
+          chargesEnabled: Boolean(account.charges_enabled),
+          payoutsEnabled: Boolean(account.payouts_enabled),
+          detailsSubmitted: Boolean(account.details_submitted),
+          onboardingComplete: Boolean(
+            account.details_submitted &&
+              account.charges_enabled
+          ),
+          updatedAt: FieldValue.serverTimestamp(),
+        },
+        { merge: true }
+      );
+
+      return {
+        stripeAccountId: account.id,
+        chargesEnabled: Boolean(account.charges_enabled),
+        payoutsEnabled: Boolean(account.payouts_enabled),
+        detailsSubmitted: Boolean(account.details_submitted),
+      };
+    } catch (error) {
+      console.error("refreshStripeConnectStatus error:", error);
+      if (error instanceof HttpsError) throw error;
+      throw new HttpsError(
+        "internal",
+        error instanceof Error ? error.message : "Stripe status refresh failed."
       );
     }
   }

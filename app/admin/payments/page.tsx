@@ -2,7 +2,8 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { doc, getDoc } from "firebase/firestore";
-import { db } from "@/lib/firebase";
+import { httpsCallable } from "firebase/functions";
+import { db, functions } from "@/lib/firebase";
 import { useToast } from "@/components/ui/ToastProvider";
 
 type PaymentsSettings = {
@@ -14,6 +15,10 @@ type PaymentsSettings = {
   accountEmail?: string;
   country?: string;
   currency?: string;
+  accountType?: "standard";
+  connectionMode?: "oauth";
+  livemode?: boolean;
+  scope?: string;
   provider?: "stripe_connect";
   updatedAt?: {
     seconds?: number;
@@ -40,6 +45,9 @@ function formatTimestamp(
 
 export default function AdminPaymentsPage() {
   const [loading, setLoading] = useState(true);
+  const [connecting, setConnecting] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
+  const [completing, setCompleting] = useState(false);
   const [settings, setSettings] = useState<PaymentsSettings | null>(null);
 
   const { showToast } = useToast();
@@ -64,11 +72,135 @@ export default function AdminPaymentsPage() {
     loadSettings();
   }, [loadSettings]);
 
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+
+    const params = new URLSearchParams(window.location.search);
+    const code = params.get("code");
+    const state = params.get("state");
+    const stripeError = params.get("error");
+    const stripeErrorDescription = params.get("error_description");
+
+    if (stripeError) {
+      showToast({
+        title: "Stripe connection was not completed",
+        description:
+          stripeErrorDescription || "The owner cancelled or Stripe returned an error.",
+        type: "error",
+      });
+      window.history.replaceState({}, "", window.location.pathname);
+      return;
+    }
+
+    if (!code || !state) {
+      return;
+    }
+
+    let cancelled = false;
+
+    const finalizeConnection = async () => {
+      try {
+        setCompleting(true);
+
+        const completeStripeCall = httpsCallable(
+          functions,
+          "completeStripeConnectStandard"
+        );
+        await completeStripeCall({ code, state });
+
+        if (cancelled) return;
+
+        await loadSettings();
+        showToast({
+          title: "Stripe connected",
+          description: "The owner's Stripe account is now linked to this platform.",
+          type: "success",
+        });
+      } catch (error) {
+        if (cancelled) return;
+
+        console.error("Complete Stripe connection error:", error);
+        showToast({
+          title: "Could not complete Stripe connection",
+          description: "Please try connecting Stripe again from this page.",
+          type: "error",
+        });
+      } finally {
+        if (!cancelled) {
+          setCompleting(false);
+          window.history.replaceState({}, "", window.location.pathname);
+        }
+      }
+    };
+
+    void finalizeConnection();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [loadSettings, showToast]);
+
   const connectionState = useMemo(() => {
     if (!settings?.stripeAccountId) return "not_connected";
     if (settings.onboardingComplete && settings.chargesEnabled) return "ready";
     return "incomplete";
   }, [settings]);
+
+  const startStripeConnect = async () => {
+    try {
+      setConnecting(true);
+
+      const connectStripeCall = httpsCallable(
+        functions,
+        "createStripeConnectAuthorizeUrl"
+      );
+      const result = await connectStripeCall();
+      const data = (result.data || {}) as { url?: string };
+
+      if (!data.url) {
+        throw new Error("Stripe onboarding URL was not returned.");
+      }
+
+      window.location.assign(data.url);
+    } catch (error) {
+      console.error("Connect Stripe error:", error);
+      showToast({
+        title: "Could not start Stripe onboarding",
+        description: "Please verify functions deployment and Stripe configuration.",
+        type: "error",
+      });
+    } finally {
+      setConnecting(false);
+    }
+  };
+
+  const refreshStripeStatus = async () => {
+    try {
+      setRefreshing(true);
+
+      const refreshStripeCall = httpsCallable(
+        functions,
+        "refreshStripeConnectStatus"
+      );
+      await refreshStripeCall();
+      await loadSettings();
+
+      showToast({
+        title: "Stripe status refreshed",
+        description: "Latest Stripe capabilities were loaded successfully.",
+        type: "success",
+      });
+    } catch (error) {
+      console.error("Refresh Stripe status error:", error);
+      showToast({
+        title: "Could not refresh Stripe status",
+        description: "Please verify the Stripe account is connected and functions are deployed.",
+        type: "error",
+      });
+    } finally {
+      setRefreshing(false);
+    }
+  };
 
   if (loading) {
     return (
@@ -95,12 +227,38 @@ export default function AdminPaymentsPage() {
             </div>
 
             <h1 className="mt-4 text-3xl font-semibold tracking-tight text-slate-950 md:text-4xl">
-              Stripe Connect Readiness
+              Stripe Connect Setup
             </h1>
 
             <p className="mt-3 max-w-3xl text-sm text-slate-600 md:text-base">
-              This area is designed so the bootcamp owner can connect Stripe directly inside the app, without sharing secret keys with you as the developer.
+              The bootcamp owner can connect Stripe directly from this area. They do not need to send you their Stripe keys or log into Firebase.
             </p>
+
+            <div className="mt-6 flex flex-wrap gap-3">
+              <button
+                type="button"
+                onClick={startStripeConnect}
+                disabled={connecting || completing}
+                className="rounded-2xl bg-slate-950 px-4 py-2.5 text-sm font-medium text-white transition hover:bg-slate-800 disabled:opacity-50"
+              >
+                {completing
+                  ? "Completing connection..."
+                  : connecting
+                  ? "Opening Stripe..."
+                  : connectionState === "not_connected"
+                  ? "Connect Stripe"
+                  : "Reconnect Stripe"}
+              </button>
+
+              <button
+                type="button"
+                onClick={refreshStripeStatus}
+                disabled={refreshing || completing || !settings?.stripeAccountId}
+                className="rounded-2xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-medium text-slate-700 transition hover:bg-slate-50 disabled:opacity-50"
+              >
+                {refreshing ? "Refreshing..." : "Refresh Stripe status"}
+              </button>
+            </div>
           </div>
         </div>
       </section>
@@ -109,6 +267,11 @@ export default function AdminPaymentsPage() {
         <SummaryCard
           label="Provider"
           value={settings?.provider === "stripe_connect" ? "Stripe Connect" : "Pending"}
+          tone="blue"
+        />
+        <SummaryCard
+          label="Account Type"
+          value={settings?.accountType === "standard" ? "Standard" : "Pending"}
           tone="blue"
         />
         <SummaryCard
@@ -134,9 +297,9 @@ export default function AdminPaymentsPage() {
           tone={settings?.chargesEnabled ? "success" : "light"}
         />
         <SummaryCard
-          label="Payouts"
-          value={settings?.payoutsEnabled ? "Enabled" : "Not Enabled"}
-          tone={settings?.payoutsEnabled ? "success" : "light"}
+          label="Mode"
+          value={settings?.livemode ? "Live" : settings?.stripeAccountId ? "Test" : "Pending"}
+          tone={settings?.livemode ? "success" : "light"}
         />
       </section>
 
@@ -144,7 +307,7 @@ export default function AdminPaymentsPage() {
         <div className="rounded-[28px] border border-white/70 bg-white/95 p-6 shadow-[0_18px_50px_rgba(15,23,42,0.07)] backdrop-blur">
           <h2 className="text-xl font-semibold text-slate-950">Owner-controlled setup</h2>
           <p className="mt-2 text-sm leading-6 text-slate-600">
-            The intended flow is that the bootcamp owner signs in here, clicks Connect Stripe, and completes onboarding with Stripe directly. No manual sharing of secret keys should be required.
+            The owner signs in here, clicks Connect Stripe, and authorizes their Stripe account with Stripe directly. This keeps onboarding self-service inside admin.
           </p>
 
           <div className="mt-6 space-y-4">
@@ -165,6 +328,10 @@ export default function AdminPaymentsPage() {
               value={settings?.currency || "Not set"}
             />
             <StatusRow
+              label="Access scope"
+              value={settings?.scope || "Not connected yet"}
+            />
+            <StatusRow
               label="Last update"
               value={formatTimestamp(settings?.updatedAt)}
             />
@@ -173,7 +340,7 @@ export default function AdminPaymentsPage() {
           <div className="mt-6 rounded-[24px] border border-amber-200 bg-amber-50 p-5">
             <p className="text-sm font-semibold text-amber-900">Current status</p>
             <p className="mt-2 text-sm leading-6 text-amber-800">
-              This page is the payments foundation only. The real Stripe Connect onboarding button and webhook lifecycle are the next implementation step.
+              Stripe connection now uses a Standard Connect style flow. The next step after connection is payment session creation and webhook synchronization for booking payments.
             </p>
           </div>
         </div>
@@ -183,16 +350,16 @@ export default function AdminPaymentsPage() {
             <h2 className="text-xl font-semibold text-slate-950">Architecture decisions</h2>
             <div className="mt-5 space-y-3">
               <RuleCard title="Owner connects Stripe directly">
-                The platform should open Stripe onboarding from the admin panel so the owner authorizes and completes setup without giving you secret keys.
+                The platform opens Stripe authorization from the admin panel so the owner connects their own Stripe account without handing you credentials.
               </RuleCard>
-              <RuleCard title="Developer should not hold Stripe secrets">
-                Secrets belong in the deployment environment of the project, not in your personal Stripe account or shared manually over chat.
+              <RuleCard title="Client never enters Firebase">
+                The owner should only use this admin panel and Stripe&apos;s own screens. They should not have to log into Firebase or touch deployment settings.
+              </RuleCard>
+              <RuleCard title="Platform configuration happens once">
+                This app still needs one Stripe Connect application behind the scenes, but that is product setup, not a per-client key-sharing step.
               </RuleCard>
               <RuleCard title="Bookings will link to payments">
-                Each booking will eventually store Stripe payment references such as checkout session or payment intent IDs.
-              </RuleCard>
-              <RuleCard title="Stripe Connect is justified here">
-                Even with one bootcamp owner today, Connect helps keep account ownership and onboarding in the owner&apos;s hands.
+                Each booking will eventually store Stripe references such as a checkout session or payment intent tied to the connected Stripe account.
               </RuleCard>
             </div>
           </div>
@@ -200,7 +367,7 @@ export default function AdminPaymentsPage() {
           <div className="rounded-[28px] border border-[#bfdbfe] bg-gradient-to-br from-[#eff6ff] to-white p-6 shadow-[0_18px_50px_rgba(15,23,42,0.07)]">
             <h2 className="text-lg font-semibold text-slate-950">Next implementation step</h2>
             <p className="mt-2 text-sm leading-6 text-slate-700">
-              Build the real Connect onboarding flow: create account link, return link, refresh link, and webhook synchronization into <code>settings/payments</code>.
+              Build payment collection on top of the connected Stripe account: create checkout or payment intents for bookings, then sync payment results back through webhooks.
             </p>
           </div>
         </div>
