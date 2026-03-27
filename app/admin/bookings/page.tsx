@@ -376,6 +376,39 @@ export default function AdminBookingsPage() {
     }
   };
 
+  const deleteBooking = async (booking: BookingRow) => {
+    const confirmed = window.confirm(
+      "Delete this cancelled booking permanently?"
+    );
+    if (!confirmed) return;
+
+    try {
+      const deleteBookingCall = httpsCallable(functions, "deleteAdminBooking");
+      await deleteBookingCall({
+        bookingId: booking.id,
+      });
+
+      showToast({
+        title: "Booking deleted",
+        description: "The cancelled booking was removed permanently.",
+        type: "success",
+      });
+
+      if (editingBookingId === booking.id) {
+        resetForm();
+      }
+
+      await loadData();
+    } catch (error) {
+      console.error("Delete booking error:", error);
+      showToast({
+        title: "Could not delete booking",
+        description: "Please try again.",
+        type: "error",
+      });
+    }
+  };
+
   const saveBooking = async () => {
     if (!canSaveBooking || saving) return;
 
@@ -913,6 +946,16 @@ export default function AdminBookingsPage() {
                         className="rounded-2xl border border-rose-200 bg-rose-50 px-4 py-2 text-sm font-medium text-rose-700 transition hover:bg-rose-100"
                       >
                         Cancel booking
+                      </button>
+                    )}
+
+                    {booking.status === "cancelled" && (
+                      <button
+                        type="button"
+                        onClick={() => deleteBooking(booking)}
+                        className="rounded-2xl border border-rose-200 bg-white px-4 py-2 text-sm font-medium text-rose-700 transition hover:bg-rose-50"
+                      >
+                        Delete permanently
                       </button>
                     )}
                   </div>

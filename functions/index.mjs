@@ -591,3 +591,44 @@ export const cancelAdminBooking = onCall(
     }
   }
 );
+
+export const deleteAdminBooking = onCall(
+  { region: "us-central1" },
+  async (request) => {
+    try {
+      await assertAdmin(request.auth);
+
+      const bookingId = String(request.data?.bookingId || "").trim();
+      if (!bookingId) {
+        throw new HttpsError("invalid-argument", "bookingId is required.");
+      }
+
+      const bookingRef = db.collection("bookings").doc(bookingId);
+      const bookingSnap = await bookingRef.get();
+
+      if (!bookingSnap.exists) {
+        throw new HttpsError("not-found", "Booking not found.");
+      }
+
+      const bookingData = bookingSnap.data() || {};
+
+      if (bookingData.status !== "cancelled") {
+        throw new HttpsError(
+          "failed-precondition",
+          "Only cancelled bookings can be permanently deleted."
+        );
+      }
+
+      await bookingRef.delete();
+
+      return { id: bookingId };
+    } catch (error) {
+      console.error("deleteAdminBooking error:", error);
+      if (error instanceof HttpsError) throw error;
+      throw new HttpsError(
+        "internal",
+        error instanceof Error ? error.message : "Booking deletion failed."
+      );
+    }
+  }
+);
