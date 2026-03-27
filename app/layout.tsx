@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import { ToastProvider } from "@/components/ui/ToastProvider";
+import { AuthProvider } from "@/components/providers/AuthProvider";
 import { PushNotificationsProvider } from "@/components/providers/PushNotificationsProvider";
 
 const geistSans = Geist({
@@ -46,9 +47,11 @@ export default function RootLayout({
         className={`${geistSans.variable} ${geistMono.variable} min-h-full bg-[#f7fbff] text-slate-950 antialiased`}
       >
         <ToastProvider>
-          <PushNotificationsProvider>
-            <div className="min-h-screen">{children}</div>
-          </PushNotificationsProvider>
+          <AuthProvider>
+            <PushNotificationsProvider>
+              <div className="min-h-screen">{children}</div>
+            </PushNotificationsProvider>
+          </AuthProvider>
         </ToastProvider>
       </body>
     </html>
