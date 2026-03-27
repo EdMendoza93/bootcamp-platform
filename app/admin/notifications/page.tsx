@@ -18,6 +18,7 @@ type UserRow = {
 
 type ProfileRow = {
   id: string;
+  userId?: string;
   email?: string;
   fullName?: string;
   clientStatus?: "active" | "inactive";
@@ -127,7 +128,11 @@ export default function AdminNotificationsPage() {
   }, [title, body, audience, selectedUserIds]);
 
   const recipients = useMemo(() => {
-    const profileById = new Map(profiles.map((profile) => [profile.id, profile]));
+    const profileByUserId = new Map(
+      profiles
+        .filter((profile) => normalizeLookupValue(profile.userId))
+        .map((profile) => [normalizeLookupValue(profile.userId), profile])
+    );
     const profileByEmail = new Map(
       profiles
         .filter((profile) => normalizeLookupValue(profile.email))
@@ -137,7 +142,7 @@ export default function AdminNotificationsPage() {
     return users
       .map((user) => {
         const profile =
-          profileById.get(user.id) ||
+          profileByUserId.get(normalizeLookupValue(user.id)) ||
           profileByEmail.get(normalizeLookupValue(user.email));
         const clientStatus = profile?.clientStatus || "active";
         const displayName = getRecipientName(user, profile);
