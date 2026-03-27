@@ -182,10 +182,6 @@ export const sendPushNotification = onCall(
 
       const response = await getMessaging().sendEachForMulticast({
         tokens: uniqueTokens,
-        notification: {
-          title,
-          body,
-        },
         data: {
           title,
           body,
@@ -197,12 +193,6 @@ export const sendPushNotification = onCall(
           },
           fcmOptions: {
             link: safeUrl,
-          },
-          notification: {
-            title,
-            body,
-            icon: "/icon.png",
-            badge: "/icon.png",
           },
         },
       });

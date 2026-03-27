@@ -126,8 +126,8 @@ export function PushNotificationsProvider({ children }: { children: React.ReactN
 
         if (supported) {
           unsubscribeForeground = subscribeToForegroundMessages((payload: any) => {
-            const title = payload?.notification?.title || "Wild Atlantic Bootcamp";
-            const body = payload?.notification?.body || "";
+            const title = payload?.data?.title || "Wild Atlantic Bootcamp";
+            const body = payload?.data?.body || "You have a new notification.";
             const url = payload?.data?.url || "/dashboard";
 
             navigator.serviceWorker.getRegistration().then((registration) => {
@@ -135,6 +135,7 @@ export function PushNotificationsProvider({ children }: { children: React.ReactN
                 registration.showNotification(title, {
                   body,
                   icon: "/icon.png",
+                  badge: "/icon.png",
                   data: { url },
                 });
               }
