@@ -10,10 +10,36 @@ import { useToast } from "@/components/ui/ToastProvider";
 type UserRow = {
   id: string;
   email?: string;
+  name?: string;
+  displayName?: string;
+  username?: string;
   role?: string;
 };
 
+type ProfileRow = {
+  id: string;
+  email?: string;
+  fullName?: string;
+  clientStatus?: "active" | "inactive";
+};
+
 type Audience = "all" | "selected";
+type RecipientVisibility = "active" | "all";
+
+function normalizeLookupValue(value?: string) {
+  return (value || "").trim().toLowerCase();
+}
+
+function getRecipientName(user: UserRow, profile?: ProfileRow) {
+  return (
+    profile?.fullName ||
+    user.displayName ||
+    user.name ||
+    user.username ||
+    user.email ||
+    user.id
+  );
+}
 
 export default function AdminNotificationsPage() {
   const [loading, setLoading] = useState(true);
@@ -24,7 +50,10 @@ export default function AdminNotificationsPage() {
   const [url, setUrl] = useState("/dashboard");
   const [audience, setAudience] = useState<Audience>("all");
   const [users, setUsers] = useState<UserRow[]>([]);
+  const [profiles, setProfiles] = useState<ProfileRow[]>([]);
   const [selectedUserIds, setSelectedUserIds] = useState<string[]>([]);
+  const [recipientVisibility, setRecipientVisibility] =
+    useState<RecipientVisibility>("active");
   const [sending, setSending] = useState(false);
 
   const { showToast } = useToast();
@@ -54,7 +83,11 @@ export default function AdminNotificationsPage() {
 
         setAllowed(true);
 
-        const usersSnap = await getDocs(collection(db, "users"));
+        const [usersSnap, profilesSnap] = await Promise.all([
+          getDocs(collection(db, "users")),
+          getDocs(collection(db, "profiles")),
+        ]);
+
         const rows = usersSnap.docs
           .map((userDoc) => ({
             id: userDoc.id,
@@ -62,8 +95,16 @@ export default function AdminNotificationsPage() {
           }))
           .filter((item) => item.role !== "admin") as UserRow[];
 
-        rows.sort((a, b) => (a.email || a.id).localeCompare(b.email || b.id));
+        const profileRows = profilesSnap.docs.map((profileDoc) => ({
+          id: profileDoc.id,
+          ...(profileDoc.data() as Omit<ProfileRow, "id">),
+        })) as ProfileRow[];
+
+        rows.sort((a, b) =>
+          getRecipientName(a).localeCompare(getRecipientName(b))
+        );
         setUsers(rows);
+        setProfiles(profileRows);
       } catch (error) {
         console.error("Notifications admin screen error:", error);
         showToast({
@@ -84,6 +125,37 @@ export default function AdminNotificationsPage() {
     const hasAudience = audience === "all" || selectedUserIds.length > 0;
     return title.trim().length > 0 && body.trim().length > 0 && hasAudience;
   }, [title, body, audience, selectedUserIds]);
+
+  const recipients = useMemo(() => {
+    const profileById = new Map(profiles.map((profile) => [profile.id, profile]));
+    const profileByEmail = new Map(
+      profiles
+        .filter((profile) => normalizeLookupValue(profile.email))
+        .map((profile) => [normalizeLookupValue(profile.email), profile])
+    );
+
+    return users
+      .map((user) => {
+        const profile =
+          profileById.get(user.id) ||
+          profileByEmail.get(normalizeLookupValue(user.email));
+        const clientStatus = profile?.clientStatus || "active";
+        const displayName = getRecipientName(user, profile);
+
+        return {
+          id: user.id,
+          email: user.email || "",
+          displayName,
+          clientStatus,
+        };
+      })
+      .sort((a, b) => a.displayName.localeCompare(b.displayName));
+  }, [profiles, users]);
+
+  const visibleRecipients = useMemo(() => {
+    if (recipientVisibility === "all") return recipients;
+    return recipients.filter((recipient) => recipient.clientStatus === "active");
+  }, [recipientVisibility, recipients]);
 
   const toggleUser = (userId: string) => {
     setSelectedUserIds((prev) =>
@@ -226,18 +298,54 @@ export default function AdminNotificationsPage() {
               Select recipients ({selectedUserIds.length} selected)
             </p>
 
+            <div className="mt-3 flex flex-wrap gap-2">
+              {(["active", "all"] as const).map((visibility) => (
+                <button
+                  key={visibility}
+                  type="button"
+                  onClick={() => setRecipientVisibility(visibility)}
+                  className={`rounded-full px-3 py-1.5 text-xs font-semibold transition ${
+                    recipientVisibility === visibility
+                      ? "bg-slate-950 text-white"
+                      : "border border-slate-200 bg-white text-slate-700"
+                  }`}
+                >
+                  {visibility === "active" ? "Active only" : "All users"}
+                </button>
+              ))}
+            </div>
+
             <div className="mt-3 grid max-h-64 gap-2 overflow-y-auto pr-1">
-              {users.map((item) => (
+              {visibleRecipients.map((item) => (
                 <label
                   key={item.id}
-                  className="flex items-center gap-3 rounded-xl border border-slate-200 bg-white px-3 py-2"
+                  className="flex items-start gap-3 rounded-xl border border-slate-200 bg-white px-3 py-3"
                 >
                   <input
                     type="checkbox"
                     checked={selectedUserIds.includes(item.id)}
                     onChange={() => toggleUser(item.id)}
+                    className="mt-1"
                   />
-                  <span className="text-sm text-slate-700">{item.email || item.id}</span>
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center gap-2">
+                      <span className="truncate text-sm font-medium text-slate-900">
+                        {item.displayName}
+                      </span>
+                      <span
+                        className={`rounded-full px-2 py-0.5 text-[11px] font-semibold ${
+                          item.clientStatus === "inactive"
+                            ? "bg-rose-100 text-rose-700"
+                            : "bg-emerald-100 text-emerald-700"
+                        }`}
+                      >
+                        {item.clientStatus}
+                      </span>
+                    </div>
+                    <p className="truncate text-xs text-slate-500">
+                      {item.email || item.id}
+                    </p>
+                  </div>
                 </label>
               ))}
             </div>
