@@ -126,9 +126,19 @@ export function PushNotificationsProvider({ children }: { children: React.ReactN
 
         if (supported) {
           unsubscribeForeground = subscribeToForegroundMessages((payload: any) => {
-            console.log("Foreground push received:", payload);
-            // No mostrar notification manual aquí.
-            // Si FCM ya la muestra, evitarás duplicados.
+            const title = payload?.notification?.title || "Wild Atlantic Bootcamp";
+            const body = payload?.notification?.body || "";
+            const url = payload?.data?.url || "/dashboard";
+
+            navigator.serviceWorker.getRegistration().then((registration) => {
+              if (registration && Notification.permission === "granted") {
+                registration.showNotification(title, {
+                  body,
+                  icon: "/icon.png",
+                  data: { url },
+                });
+              }
+            });
           });
         }
       } catch (error) {
