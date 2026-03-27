@@ -128,6 +128,18 @@ function formatMoney(amount?: number | null, currency = "EUR") {
   }).format(amount);
 }
 
+function getRecipientInitials(name: string) {
+  const parts = String(name || "")
+    .trim()
+    .split(/\s+/)
+    .filter(Boolean)
+    .slice(0, 2);
+
+  if (parts.length === 0) return "U";
+
+  return parts.map((part) => part.charAt(0).toUpperCase()).join("");
+}
+
 export default function AdminBookingsPage() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -139,6 +151,7 @@ export default function AdminBookingsPage() {
   const [editingBookingId, setEditingBookingId] = useState<string | null>(null);
   const [bookingViewFilter, setBookingViewFilter] =
     useState<BookingViewFilter>("recent");
+  const [recipientSearch, setRecipientSearch] = useState("");
   const [bookingSearch, setBookingSearch] = useState("");
   const [bookingPaymentFilter, setBookingPaymentFilter] =
     useState<BookingPaymentFilter>("all");
@@ -242,6 +255,19 @@ export default function AdminBookingsPage() {
   const selectedRecipient = useMemo(() => {
     return recipientOptions.find((recipient) => recipient.id === form.userId) || null;
   }, [form.userId, recipientOptions]);
+
+  const filteredRecipientOptions = useMemo(() => {
+    const normalizedSearch = recipientSearch.trim().toLowerCase();
+
+    if (!normalizedSearch) {
+      return recipientOptions;
+    }
+
+    return recipientOptions.filter((recipient) => {
+      const haystack = `${recipient.displayName} ${recipient.email} ${recipient.id}`.toLowerCase();
+      return haystack.includes(normalizedSearch);
+    });
+  }, [recipientOptions, recipientSearch]);
 
   const bookingDraftWeeks = useMemo(() => {
     if (!editingBookingId) return bookings;
@@ -356,6 +382,7 @@ export default function AdminBookingsPage() {
   const resetForm = () => {
     setForm(getEmptyBookingForm());
     setEditingBookingId(null);
+    setRecipientSearch("");
   };
 
   const startEdit = (booking: BookingRow) => {
@@ -383,6 +410,7 @@ export default function AdminBookingsPage() {
       currency: booking.currency || "EUR",
       notes: booking.notes || "",
     });
+    setRecipientSearch("");
 
     window.scrollTo({ top: 0, behavior: "smooth" });
   };
@@ -582,29 +610,125 @@ export default function AdminBookingsPage() {
                 <label className="mb-2 block text-sm font-medium text-slate-700">
                   Platform user
                 </label>
-                <select
-                  value={form.userId}
-                  onChange={(e) => {
-                    const nextUserId = e.target.value;
-                    const recipient =
-                      recipientOptions.find((item) => item.id === nextUserId) || null;
+                <input
+                  value={recipientSearch}
+                  onChange={(e) => setRecipientSearch(e.target.value)}
+                  placeholder="Search user by name or email"
+                  className="mb-3 w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-[#93c5fd] focus:ring-4 focus:ring-[#dbeafe]"
+                />
+                <div className="rounded-[24px] border border-slate-200 bg-slate-50/70 p-3">
+                  {selectedRecipient ? (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setForm((prev) => ({
+                          ...prev,
+                          userId: "",
+                          customerName: "",
+                          customerEmail: "",
+                        }));
+                        setRecipientSearch("");
+                      }}
+                      className="flex w-full items-center gap-3 rounded-[20px] border border-[#bfdbfe] bg-white px-4 py-3 text-left shadow-sm transition hover:border-[#93c5fd]"
+                    >
+                      <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-slate-950 text-sm font-semibold text-white">
+                        {getRecipientInitials(selectedRecipient.displayName)}
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <p className="truncate text-sm font-semibold text-slate-950">
+                          {selectedRecipient.displayName}
+                        </p>
+                        <p className="truncate text-xs text-slate-500">
+                          {selectedRecipient.email || selectedRecipient.id}
+                        </p>
+                      </div>
+                      <StatusBadge
+                        tone={
+                          selectedRecipient.clientStatus === "inactive"
+                            ? "neutral"
+                            : "success"
+                        }
+                      >
+                        {selectedRecipient.clientStatus}
+                      </StatusBadge>
+                    </button>
+                  ) : (
+                    <div className="rounded-[20px] border border-dashed border-slate-200 bg-white px-4 py-6 text-center">
+                      <p className="text-sm font-medium text-slate-700">
+                        No user selected yet
+                      </p>
+                      <p className="mt-1 text-xs leading-5 text-slate-500">
+                        Search by name or email, then choose a client below.
+                      </p>
+                    </div>
+                  )}
 
-                    setForm((prev) => ({
-                      ...prev,
-                      userId: nextUserId,
-                      customerName: recipient?.displayName || "",
-                      customerEmail: recipient?.email || "",
-                    }));
-                  }}
-                  className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-[#93c5fd] focus:ring-4 focus:ring-[#dbeafe]"
-                >
-                  <option value="">Select an existing user</option>
-                  {recipientOptions.map((recipient) => (
-                    <option key={recipient.id} value={recipient.id}>
-                      {`${recipient.displayName} - ${recipient.email || recipient.id}`}
-                    </option>
-                  ))}
-                </select>
+                  <div className="mt-3 max-h-64 space-y-2 overflow-y-auto pr-1">
+                    {filteredRecipientOptions.slice(0, 10).map((recipient) => {
+                      const isSelected = recipient.id === form.userId;
+
+                      return (
+                        <button
+                          key={recipient.id}
+                          type="button"
+                          onClick={() =>
+                            setForm((prev) => ({
+                              ...prev,
+                              userId: recipient.id,
+                              customerName: recipient.displayName || "",
+                              customerEmail: recipient.email || "",
+                            }))
+                          }
+                          className={`flex w-full items-center gap-3 rounded-[18px] border px-3 py-3 text-left transition ${
+                            isSelected
+                              ? "border-[#93c5fd] bg-[#eff6ff]"
+                              : "border-slate-200 bg-white hover:border-slate-300 hover:bg-slate-50"
+                          }`}
+                        >
+                          <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-slate-100 text-xs font-semibold text-slate-700">
+                            {getRecipientInitials(recipient.displayName)}
+                          </div>
+                          <div className="min-w-0 flex-1">
+                            <p className="truncate text-sm font-semibold text-slate-950">
+                              {recipient.displayName}
+                            </p>
+                            <p className="truncate text-xs text-slate-500">
+                              {recipient.email || recipient.id}
+                            </p>
+                          </div>
+                          <div className="flex flex-col items-end gap-1">
+                            <StatusBadge
+                              tone={
+                                recipient.clientStatus === "inactive"
+                                  ? "neutral"
+                                  : "success"
+                              }
+                            >
+                              {recipient.clientStatus}
+                            </StatusBadge>
+                            {isSelected && (
+                              <span className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[#1d4ed8]">
+                                selected
+                              </span>
+                            )}
+                          </div>
+                        </button>
+                      );
+                    })}
+
+                    {filteredRecipientOptions.length === 0 && (
+                      <div className="rounded-[18px] border border-dashed border-slate-200 bg-white px-4 py-5 text-center text-sm text-slate-500">
+                        No users matched your search.
+                      </div>
+                    )}
+                  </div>
+
+                  <p className="mt-3 text-xs text-slate-500">
+                    {filteredRecipientOptions.length} matching user
+                    {filteredRecipientOptions.length === 1 ? "" : "s"}
+                    {filteredRecipientOptions.length > 10 ? " · showing first 10" : ""}
+                  </p>
+                </div>
               </div>
 
               <div>
@@ -926,7 +1050,8 @@ export default function AdminBookingsPage() {
             ))}
           </div>
 
-          <div className="mt-5 grid gap-3 md:grid-cols-[minmax(0,1.2fr)_180px_180px]">
+          <div className="mt-5 rounded-[24px] border border-slate-200 bg-slate-50/70 p-3 md:p-4">
+            <div className="grid gap-3 md:grid-cols-[minmax(0,1.2fr)_180px_180px]">
             <input
               value={bookingSearch}
               onChange={(e) => setBookingSearch(e.target.value)}
@@ -962,28 +1087,38 @@ export default function AdminBookingsPage() {
               <option value="consumes">Consumes capacity</option>
               <option value="no_capacity">No capacity</option>
             </select>
-          </div>
+            </div>
 
-          <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
-            <p className="text-sm text-slate-500">
-              Showing {visibleBookings.length} booking{visibleBookings.length === 1 ? "" : "s"}
-            </p>
+            <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
+              <p className="text-sm text-slate-500">
+                Showing {visibleBookings.length} booking{visibleBookings.length === 1 ? "" : "s"}
+              </p>
 
-            {(bookingSearch ||
-              bookingPaymentFilter !== "all" ||
-              bookingCapacityFilter !== "all") && (
-              <button
-                type="button"
-                onClick={() => {
-                  setBookingSearch("");
-                  setBookingPaymentFilter("all");
-                  setBookingCapacityFilter("all");
-                }}
-                className="rounded-2xl border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-50"
-              >
-                Clear filters
-              </button>
-            )}
+              <div className="flex flex-wrap gap-2">
+                {bookingSearch && <StatusBadge tone="blue">search active</StatusBadge>}
+                {bookingPaymentFilter !== "all" && (
+                  <StatusBadge tone="neutral">{bookingPaymentFilter}</StatusBadge>
+                )}
+                {bookingCapacityFilter !== "all" && (
+                  <StatusBadge tone="neutral">{bookingCapacityFilter}</StatusBadge>
+                )}
+                {(bookingSearch ||
+                  bookingPaymentFilter !== "all" ||
+                  bookingCapacityFilter !== "all") && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setBookingSearch("");
+                      setBookingPaymentFilter("all");
+                      setBookingCapacityFilter("all");
+                    }}
+                    className="rounded-2xl border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-50"
+                  >
+                    Clear filters
+                  </button>
+                )}
+              </div>
+            </div>
           </div>
 
           {visibleBookings.length === 0 ? (
@@ -1018,6 +1153,19 @@ export default function AdminBookingsPage() {
                     </p>
                   </div>
 
+                  <div className="mt-3 rounded-[18px] border border-white/80 bg-white/80 px-4 py-3">
+                    <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">
+                      Booking window
+                    </p>
+                    <p className="mt-2 text-sm font-medium text-slate-900">
+                      {booking.weekIds?.length
+                        ? `${booking.weekIds.length} reserved week${
+                            booking.weekIds.length === 1 ? "" : "s"
+                          } linked to this booking`
+                        : "No weeks linked"}
+                    </p>
+                  </div>
+
                   <div className="mt-4 grid gap-3 sm:grid-cols-3">
                     <MetaItem label="Duration" value={`${booking.durationWeeks} week${booking.durationWeeks === 1 ? "" : "s"}`} />
                     <MetaItem label="Weeks used" value={String(booking.weekIds?.length || 0)} />
@@ -1039,6 +1187,15 @@ export default function AdminBookingsPage() {
                     <MetaItem label="Capacity" value={booking.consumesCapacity ? "Consumes room" : "No capacity"} />
                     <MetaItem label="Created" value={formatCreatedAt(booking.createdAt)} />
                   </div>
+
+                  {booking.notes && (
+                    <div className="mt-3 rounded-[18px] border border-amber-200 bg-amber-50 px-4 py-3">
+                      <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-amber-800">
+                        Internal note
+                      </p>
+                      <p className="mt-2 text-sm leading-6 text-amber-900">{booking.notes}</p>
+                    </div>
+                  )}
 
                   <div className="mt-4 flex flex-wrap gap-3">
                     <button
