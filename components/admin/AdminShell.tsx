@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import { signOut } from "firebase/auth";
 import AdminSideBar from "@/components/admin/AdminSideBar";
 import { auth } from "@/lib/firebase";
@@ -9,6 +10,8 @@ export default function AdminShell({
 }: {
   children: React.ReactNode;
 }) {
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+
   const handleLogout = async () => {
     await signOut(auth);
     window.location.replace("/login");
@@ -39,6 +42,14 @@ export default function AdminShell({
               </div>
 
               <div className="flex items-center gap-3">
+                <button
+                  type="button"
+                  onClick={() => setMobileMenuOpen(true)}
+                  className="rounded-2xl border border-slate-200 bg-white/90 px-4 py-2.5 text-sm font-medium text-slate-700 shadow-sm transition hover:bg-white md:hidden"
+                >
+                  Menu
+                </button>
+
                 <div className="hidden rounded-full border border-[#bfdbfe] bg-gradient-to-r from-white to-[#eff6ff] px-4 py-2 text-[11px] font-semibold uppercase tracking-[0.18em] text-[#1d4ed8] shadow-sm md:block">
                   Rivcor Platform
                 </div>
@@ -59,6 +70,21 @@ export default function AdminShell({
           </main>
         </div>
       </div>
+
+      {mobileMenuOpen && (
+        <div className="fixed inset-0 z-40 md:hidden">
+          <button
+            type="button"
+            aria-label="Close menu overlay"
+            className="absolute inset-0 bg-slate-950/40 backdrop-blur-sm"
+            onClick={() => setMobileMenuOpen(false)}
+          />
+
+          <div className="absolute inset-y-0 left-0 w-[86vw] max-w-[320px] overflow-y-auto shadow-[0_24px_60px_rgba(15,23,42,0.28)]">
+            <AdminSideBar onNavigate={() => setMobileMenuOpen(false)} />
+          </div>
+        </div>
+      )}
     </div>
   );
 }

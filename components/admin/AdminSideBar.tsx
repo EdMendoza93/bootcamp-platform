@@ -17,7 +17,11 @@ const navItems = [
   { label: "Notifications", href: "/admin/notifications" },
 ];
 
-export default function AdminSideBar() {
+export default function AdminSideBar({
+  onNavigate,
+}: {
+  onNavigate?: () => void;
+}) {
   const pathname = usePathname();
 
   return (
@@ -71,6 +75,7 @@ export default function AdminSideBar() {
               <Link
                 key={item.href}
                 href={item.href}
+                onClick={onNavigate}
                 className={[
                   "group flex items-center justify-between rounded-[20px] px-4 py-3 text-sm font-medium transition-all duration-200",
                   isActive

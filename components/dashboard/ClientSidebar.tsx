@@ -10,7 +10,11 @@ const navItems = [
   { label: "Progress", href: "/dashboard/progress" },
 ];
 
-export default function ClientSidebar() {
+export default function ClientSidebar({
+  onNavigate,
+}: {
+  onNavigate?: () => void;
+}) {
   const pathname = usePathname();
 
   return (
@@ -50,6 +54,7 @@ export default function ClientSidebar() {
               <Link
                 key={item.href}
                 href={item.href}
+                onClick={onNavigate}
                 className={[
                   "group flex items-center justify-between rounded-[20px] px-4 py-3 text-sm font-medium transition-all duration-200",
                   isActive
