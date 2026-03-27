@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { auth, db } from "@/lib/firebase";
-import { onAuthStateChanged, signOut } from "firebase/auth";
+import { onAuthStateChanged } from "firebase/auth";
 import { collection, doc, getDoc, getDocs } from "firebase/firestore";
 import { useToast } from "@/components/ui/ToastProvider";
 
@@ -258,11 +258,6 @@ export default function AdminPage() {
     return actions.slice(0, 3);
   }, [pendingApplications, pendingPayments]);
 
-  const logout = async () => {
-    await signOut(auth);
-    window.location.replace("/login");
-  };
-
   if (loading) {
     return (
       <div className="rounded-[28px] border border-white/70 bg-white/90 p-8 shadow-[0_20px_60px_rgba(15,23,42,0.08)] backdrop-blur">
@@ -307,13 +302,6 @@ export default function AdminPage() {
               >
                 Review Applications
               </a>
-
-              <button
-                onClick={logout}
-                className="rounded-2xl bg-slate-950 px-4 py-2.5 text-sm font-medium text-white shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:bg-slate-800 hover:shadow-md"
-              >
-                Logout
-              </button>
             </div>
           </div>
         </div>

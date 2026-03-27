@@ -48,6 +48,10 @@ function toMiddayDate(date: string) {
   return new Date(`${date}T12:00:00`);
 }
 
+function getDateValue(date: string) {
+  return toMiddayDate(date).getTime();
+}
+
 function addDays(date: string, days: number) {
   const parsed = toMiddayDate(date);
   parsed.setDate(parsed.getDate() + days);
@@ -92,6 +96,24 @@ function getWeekStatus(item: BootcampWeek) {
   }
 
   return "open";
+}
+
+function hasWeekOverlap(
+  weeks: BootcampWeek[],
+  nextWeek: { startDate: string; endDate: string },
+  excludedWeekId?: string | null
+) {
+  const nextStart = getDateValue(nextWeek.startDate);
+  const nextEnd = getDateValue(nextWeek.endDate);
+
+  return weeks.some((week) => {
+    if (excludedWeekId && week.id === excludedWeekId) return false;
+
+    const currentStart = getDateValue(week.startDate);
+    const currentEnd = getDateValue(week.endDate);
+
+    return nextStart < currentEnd && nextEnd > currentStart;
+  });
 }
 
 function canStartDuration(
@@ -242,6 +264,26 @@ export default function AdminAvailabilityPage() {
       }
 
       const generatedEndDate = addDays(form.startDate, 7);
+
+      if (
+        hasWeekOverlap(
+          weeks,
+          {
+            startDate: form.startDate,
+            endDate: generatedEndDate,
+          },
+          editingId
+        )
+      ) {
+        showToast({
+          title: "Overlapping week",
+          description:
+            "This weekly block overlaps an existing one. Weeks must stay as non-overlapping 7-day blocks.",
+          type: "error",
+        });
+        setSaving(false);
+        return;
+      }
 
       const payload = {
         startDate: form.startDate,

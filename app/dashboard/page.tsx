@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { auth, db } from "@/lib/firebase";
-import { onAuthStateChanged, signOut } from "firebase/auth";
+import { onAuthStateChanged } from "firebase/auth";
 import {
   collection,
   doc,
@@ -459,11 +459,6 @@ export default function DashboardPage() {
     });
   };
 
-  const logout = async () => {
-    await signOut(auth);
-    window.location.replace("/login");
-  };
-
   const groupedSchedule = useMemo(() => {
     return scheduleItems.reduce((acc, item) => {
       if (!acc[item.date]) acc[item.date] = [];
@@ -568,13 +563,6 @@ export default function DashboardPage() {
                   className="rounded-2xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-medium text-slate-700 shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:border-slate-300 hover:shadow-md disabled:opacity-50"
                 >
                   {refreshing ? "Refreshing..." : "Refresh"}
-                </button>
-
-                <button
-                  onClick={logout}
-                  className="rounded-2xl bg-slate-950 px-4 py-2.5 text-sm font-medium text-white shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:bg-slate-800 hover:shadow-md"
-                >
-                  Logout
                 </button>
               </div>
             </div>
