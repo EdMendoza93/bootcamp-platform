@@ -59,7 +59,7 @@ export default function AdminSideBar() {
           </p>
         </div>
 
-        <nav className="flex gap-2 overflow-x-auto md:min-h-0 md:flex-1 md:space-y-2 md:overflow-y-auto md:overflow-x-visible md:pr-1">
+        <nav className="flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto pr-1">
           {navItems.map((item) => {
             const isOverview = item.href === "/admin";
 

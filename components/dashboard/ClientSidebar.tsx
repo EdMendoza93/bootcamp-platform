@@ -38,7 +38,7 @@ export default function ClientSidebar() {
           </p>
         </div>
 
-        <nav className="space-y-2">
+        <nav className="flex flex-col gap-2">
           {navItems.map((item) => {
             const isDashboard = item.href === "/dashboard";
 
