@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { auth, db } from "@/lib/firebase";
-import { onAuthStateChanged } from "firebase/auth";
+import { onAuthStateChanged, User } from "firebase/auth";
 import {
   collection,
   doc,
@@ -116,7 +116,7 @@ function waitForUser(timeoutMs = 5000): Promise<typeof auth.currentUser> {
 }
 
 export default function DashboardPage() {
-  const [user, setUser] = useState<any>(null);
+  const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
 
@@ -554,6 +554,12 @@ export default function DashboardPage() {
                 <p className="mt-4 text-sm font-medium text-slate-500">
                   {user?.email}
                 </p>
+
+                <div className="mt-5 flex flex-wrap gap-2">
+                  <DashboardPill label="Application" value={applicationStatus} />
+                  <DashboardPill label="Profile" value={hasProfile ? onboardingStatus : "not ready"} />
+                  <DashboardPill label="Payment" value={hasProfile ? paymentStatus : "pending"} />
+                </div>
               </div>
 
               <div className="flex flex-wrap gap-3">
@@ -598,6 +604,10 @@ export default function DashboardPage() {
               >
                 Complete Application
               </a>
+            </div>
+
+            <div className="mt-5 rounded-[22px] border border-slate-100 bg-gradient-to-br from-slate-50 to-white p-4 text-sm leading-6 text-slate-600">
+              Once your application is submitted, the team can review it and start preparing the rest of your onboarding flow.
             </div>
           </section>
         )}
@@ -743,6 +753,9 @@ export default function DashboardPage() {
                             <TypeBadge type={item.type} />
                             <p className="mt-3 text-base font-semibold text-slate-900">
                               {item.displayTitle}
+                            </p>
+                            <p className="mt-1 text-xs uppercase tracking-[0.14em] text-slate-500">
+                              Tap to open details
                             </p>
                           </div>
 
@@ -963,11 +976,25 @@ function StatusCard({
   value: string;
 }) {
   return (
-    <div className="rounded-[24px] border border-white/80 bg-white/95 p-5 shadow-[0_14px_40px_rgba(15,23,42,0.07)]">
-      <p className="text-sm font-semibold text-slate-500">{label}</p>
+    <div className="rounded-[24px] border border-white/80 bg-gradient-to-br from-white to-slate-50 p-5 shadow-[0_14px_40px_rgba(15,23,42,0.07)]">
+      <p className="text-sm font-semibold uppercase tracking-[0.14em] text-slate-500">{label}</p>
       <p className="mt-2 text-xl font-semibold capitalize text-slate-950">
         {value}
       </p>
+    </div>
+  );
+}
+
+function DashboardPill({
+  label,
+  value,
+}: {
+  label: string;
+  value: string;
+}) {
+  return (
+    <div className="rounded-full border border-slate-200 bg-white/90 px-3 py-1.5 text-xs font-semibold capitalize text-slate-700 shadow-sm">
+      {label}: <span className="text-slate-950">{value}</span>
     </div>
   );
 }

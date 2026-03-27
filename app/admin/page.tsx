@@ -293,6 +293,12 @@ export default function AdminPage() {
               <p className="mt-3 max-w-2xl text-sm text-slate-600 md:text-base">
                 Monitor applications, clients, schedule, templates, and uploads from one place.
               </p>
+
+              <div className="mt-5 flex flex-wrap gap-2">
+                <HeroPill label="Applications" value={String(applications.length)} />
+                <HeroPill label="Clients" value={String(profiles.length)} />
+                <HeroPill label="Schedule" value={String(scheduleItems.length)} />
+              </div>
             </div>
 
             <div className="flex flex-wrap gap-3">
@@ -369,6 +375,15 @@ export default function AdminPage() {
             <MiniStat label="Rejected Applications" value={String(rejectedApplications)} />
             <MiniStat label="Schedule Items" value={String(scheduleItems.length)} />
             <MiniStat label="Photo Uploads" value={String(progressPhotos.length)} />
+          </div>
+
+          <div className="mt-6 rounded-[22px] border border-[#bfdbfe] bg-gradient-to-br from-[#eff6ff] to-white p-4">
+            <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[#1d4ed8]">
+              Operational note
+            </p>
+            <p className="mt-2 text-sm leading-6 text-slate-700">
+              This overview now acts as a fast daily checkpoint so pending work, client movement, and schedule pressure are easier to read at a glance.
+            </p>
           </div>
         </div>
       </section>
@@ -573,8 +588,11 @@ function QuickLinkCard({
   return (
     <a
       href={href}
-      className="rounded-[24px] border border-white/80 bg-white/95 p-6 shadow-[0_14px_40px_rgba(15,23,42,0.07)] transition-all duration-200 hover:-translate-y-1 hover:shadow-[0_20px_45px_rgba(15,23,42,0.10)]"
+      className="group rounded-[24px] border border-white/80 bg-white/95 p-6 shadow-[0_14px_40px_rgba(15,23,42,0.07)] transition-all duration-200 hover:-translate-y-1 hover:shadow-[0_20px_45px_rgba(15,23,42,0.10)]"
     >
+      <div className="mb-4 inline-flex rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-600 transition group-hover:border-[#bfdbfe] group-hover:bg-[#eff6ff] group-hover:text-[#1d4ed8]">
+        Open
+      </div>
       <h2 className="text-lg font-semibold text-slate-950">{title}</h2>
       <p className="mt-2 text-sm leading-6 text-slate-600">{description}</p>
     </a>
@@ -620,6 +638,20 @@ function MiniStat({
     <div className="flex items-center justify-between rounded-[18px] border border-slate-100 bg-gradient-to-br from-slate-50 to-white px-4 py-3">
       <span className="text-sm font-medium text-slate-600">{label}</span>
       <span className="text-sm font-semibold text-slate-950">{value}</span>
+    </div>
+  );
+}
+
+function HeroPill({
+  label,
+  value,
+}: {
+  label: string;
+  value: string;
+}) {
+  return (
+    <div className="rounded-full border border-slate-200 bg-white/90 px-3 py-1.5 text-xs font-semibold text-slate-700 shadow-sm">
+      {label}: <span className="text-slate-950">{value}</span>
     </div>
   );
 }

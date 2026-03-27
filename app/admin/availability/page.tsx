@@ -373,6 +373,12 @@ export default function AdminAvailabilityPage() {
               Create weekly blocks, control room capacity, and let the system
               calculate whether 1, 2, or 3 week stays can start from each block.
             </p>
+
+            <div className="mt-5 flex flex-wrap gap-2">
+              <HeaderPill label="Total blocks" value={String(summary.totalWeeks)} />
+              <HeaderPill label="Reserved" value={String(summary.totalBooked)} />
+              <HeaderPill label="Capacity" value={String(summary.totalCapacity)} />
+            </div>
           </div>
         </div>
       </section>
@@ -436,6 +442,15 @@ export default function AdminAvailabilityPage() {
               </p>
               <p className="mt-1 text-xs text-slate-500">
                 Weekly blocks always end 7 days after the start date.
+              </p>
+            </div>
+
+            <div className="rounded-[22px] border border-[#bfdbfe] bg-gradient-to-br from-[#eff6ff] to-white p-4">
+              <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[#1d4ed8]">
+                Block logic
+              </p>
+              <p className="mt-2 text-sm leading-6 text-slate-700">
+                Each week stays a clean 7-day capacity block. This premium pass only changes presentation, not overlap rules or booking behavior.
               </p>
             </div>
 
@@ -510,18 +525,23 @@ export default function AdminAvailabilityPage() {
               No weekly blocks added yet.
             </div>
           ) : (
-            weeks.map((week, index) => (
-              <WeekCard
-                key={week.id}
-                week={week}
-                startableOneWeek={canStartDuration(weeks, index, 1)}
-                startableTwoWeeks={canStartDuration(weeks, index, 2)}
-                startableThreeWeeks={canStartDuration(weeks, index, 3)}
-                onEdit={() => startEdit(week)}
-                onToggleActive={() => toggleActive(week)}
-                onDelete={() => deleteWeek(week)}
-              />
-            ))
+            <>
+              <div className="rounded-[24px] border border-slate-200 bg-slate-50/70 px-4 py-3 text-sm text-slate-600">
+                {weeks.length} weekly block{weeks.length === 1 ? "" : "s"} in the system
+              </div>
+              {weeks.map((week, index) => (
+                <WeekCard
+                  key={week.id}
+                  week={week}
+                  startableOneWeek={canStartDuration(weeks, index, 1)}
+                  startableTwoWeeks={canStartDuration(weeks, index, 2)}
+                  startableThreeWeeks={canStartDuration(weeks, index, 3)}
+                  onEdit={() => startEdit(week)}
+                  onToggleActive={() => toggleActive(week)}
+                  onDelete={() => deleteWeek(week)}
+                />
+              ))}
+            </>
           )}
         </div>
       </section>
@@ -631,6 +651,11 @@ function WeekCard({
           <p className="mt-2 text-sm text-slate-500">
             {formatDateLabel(week.startDate)} → {formatDateLabel(week.endDate)}
           </p>
+
+          <div className="mt-4 flex flex-wrap gap-2">
+            <MetaChip label="Start" value={week.startDate} />
+            <MetaChip label="End" value={week.endDate} />
+          </div>
 
           {week.notes && (
             <div className="mt-4 rounded-[22px] border border-slate-100 bg-gradient-to-br from-slate-50 to-white p-4">
@@ -773,5 +798,33 @@ function StatusPill({
     >
       {labels[status]}
     </span>
+  );
+}
+
+function HeaderPill({
+  label,
+  value,
+}: {
+  label: string;
+  value: string;
+}) {
+  return (
+    <div className="rounded-full border border-slate-200 bg-white/90 px-3 py-1.5 text-xs font-semibold text-slate-700 shadow-sm">
+      {label}: <span className="text-slate-950">{value}</span>
+    </div>
+  );
+}
+
+function MetaChip({
+  label,
+  value,
+}: {
+  label: string;
+  value: string;
+}) {
+  return (
+    <div className="rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-600">
+      {label}: {value || "—"}
+    </div>
   );
 }
