@@ -226,6 +226,12 @@ export default function AdminTemplatesPage() {
             Create reusable training, nutrition, and activity templates for faster
             plan building.
           </p>
+
+          <div className="mt-5 flex flex-wrap gap-2">
+            <HeaderPill label="Training" value={String(summary.training)} />
+            <HeaderPill label="Nutrition" value={String(summary.nutrition)} />
+            <HeaderPill label="Activity" value={String(summary.activity)} />
+          </div>
         </div>
       </section>
 
@@ -259,6 +265,10 @@ export default function AdminTemplatesPage() {
               </button>
             );
           })}
+        </div>
+
+        <div className="mt-4 rounded-[22px] border border-[#bfdbfe] bg-gradient-to-br from-[#eff6ff] to-white p-4 text-sm leading-6 text-slate-700">
+          Templates keep content reusable across the whole platform. This pass improves clarity and library feel without changing how templates are saved or used.
         </div>
       </section>
 
@@ -483,6 +493,20 @@ function FieldGroup({
         {required && <span className="ml-1 text-[#1d4ed8]">*</span>}
       </label>
       {children}
+    </div>
+  );
+}
+
+function HeaderPill({
+  label,
+  value,
+}: {
+  label: string;
+  value: string;
+}) {
+  return (
+    <div className="rounded-full border border-slate-200 bg-white/90 px-3 py-1.5 text-xs font-semibold text-slate-700 shadow-sm">
+      {label}: <span className="text-slate-950">{value}</span>
     </div>
   );
 }

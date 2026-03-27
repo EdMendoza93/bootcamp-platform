@@ -399,23 +399,52 @@ export default function AdminProgressPage() {
   };
 
   if (loading) {
-    return <p className="p-10">Loading...</p>;
+    return (
+      <div className="rounded-[28px] border border-white/70 bg-white/90 p-8 shadow-[0_20px_60px_rgba(15,23,42,0.08)] backdrop-blur">
+        <p className="text-sm font-medium text-slate-500">
+          Loading progress photos...
+        </p>
+      </div>
+    );
   }
 
   return (
     <>
       <div className="space-y-8">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight">Progress</h1>
-          <p className="mt-2 text-gray-600">
-            Review, edit, and manage progress photo uploads.
-          </p>
-        </div>
+        <section className="overflow-hidden rounded-[32px] border border-white/70 bg-white/90 shadow-[0_24px_80px_rgba(15,23,42,0.10)] backdrop-blur">
+          <div className="bg-gradient-to-r from-[#071120] via-[#123b76] to-[#2EA0FF] p-[1px]">
+            <div className="rounded-t-[31px] bg-transparent px-0 py-0" />
+          </div>
+
+          <div className="relative overflow-hidden p-6 md:p-8">
+            <div className="absolute right-0 top-0 h-40 w-40 rounded-full bg-[#2EA0FF]/10 blur-3xl" />
+            <div className="absolute bottom-0 left-0 h-32 w-32 rounded-full bg-emerald-300/10 blur-3xl" />
+
+            <div className="relative">
+              <div className="inline-flex items-center rounded-full border border-[#bfdbfe] bg-[#eff6ff] px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.2em] text-[#1d4ed8]">
+                Progress
+              </div>
+
+              <h1 className="mt-4 text-3xl font-semibold tracking-tight text-slate-950 md:text-4xl">
+                Progress Review
+              </h1>
+              <p className="mt-3 max-w-3xl text-sm text-slate-600 md:text-base">
+                Review, edit, and manage progress photo uploads across the whole platform.
+              </p>
+
+              <div className="mt-5 flex flex-wrap gap-2">
+                <HeaderPill label="Photos" value={String(photos.length)} />
+                <HeaderPill label="Profiles" value={String(profiles.length)} />
+                <HeaderPill label="Filtered" value={String(filteredPhotos.length)} />
+              </div>
+            </div>
+          </div>
+        </section>
 
         {editingPhotoId && (
-          <section className="rounded-3xl border bg-white p-6 shadow-sm">
+          <section className="rounded-[28px] border border-white/70 bg-white/95 p-6 shadow-[0_18px_50px_rgba(15,23,42,0.07)] backdrop-blur">
             <div className="flex flex-wrap items-center gap-3">
-              <h2 className="text-xl font-semibold">Edit Photo Details</h2>
+              <h2 className="text-xl font-semibold text-slate-950">Edit Photo Details</h2>
               <span className="rounded-full border border-amber-200 bg-amber-50 px-3 py-1 text-xs font-medium text-amber-700">
                 Editing photo
               </span>
@@ -545,8 +574,8 @@ export default function AdminProgressPage() {
           </section>
         )}
 
-        <section className="rounded-3xl border bg-white p-6 shadow-sm">
-          <div className="flex flex-col gap-3 md:flex-row md:items-center">
+          <section className="rounded-[28px] border border-white/70 bg-white/95 p-6 shadow-[0_18px_50px_rgba(15,23,42,0.07)] backdrop-blur">
+            <div className="flex flex-col gap-3 md:flex-row md:items-center">
             <input
               type="text"
               placeholder="Search by client, title, or note..."
@@ -574,11 +603,15 @@ export default function AdminProgressPage() {
                 </button>
               ))}
             </div>
-          </div>
-        </section>
+            </div>
+
+            <div className="mt-4 rounded-[22px] border border-[#bfdbfe] bg-gradient-to-br from-[#eff6ff] to-white p-4 text-sm leading-6 text-slate-700">
+              Progress photos are now presented as an admin review surface. This visual pass improves scanning and editing comfort without changing how uploads or measurements are stored.
+            </div>
+          </section>
 
         {filteredPhotos.length === 0 ? (
-          <div className="rounded-3xl border border-dashed bg-white p-10 text-center text-sm text-gray-500">
+          <div className="rounded-[28px] border border-dashed border-slate-200 bg-white/90 p-10 text-center text-sm text-slate-500 shadow-[0_18px_50px_rgba(15,23,42,0.05)]">
             No progress photos found.
           </div>
         ) : (
@@ -744,5 +777,19 @@ function MilestoneBadge({ milestone }: { milestone: Milestone }) {
     >
       {label}
     </span>
+  );
+}
+
+function HeaderPill({
+  label,
+  value,
+}: {
+  label: string;
+  value: string;
+}) {
+  return (
+    <div className="rounded-full border border-slate-200 bg-white/90 px-3 py-1.5 text-xs font-semibold text-slate-700 shadow-sm">
+      {label}: <span className="text-slate-950">{value}</span>
+    </div>
   );
 }

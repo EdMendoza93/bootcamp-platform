@@ -396,6 +396,12 @@ export default function AdminSchedulePage() {
           <p className="mt-3 max-w-2xl text-sm text-slate-600 md:text-base">
             Build structured itineraries for each client using templates or custom notes.
           </p>
+
+          <div className="mt-5 flex flex-wrap gap-2">
+            <HeaderPill label="Clients" value={String(profiles.length)} />
+            <HeaderPill label="Loaded items" value={String(scheduleItems.length)} />
+            <HeaderPill label="Templates" value={String(trainingTemplates.length + nutritionTemplates.length + activityTemplates.length)} />
+          </div>
         </div>
       </section>
 
@@ -461,6 +467,15 @@ export default function AdminSchedulePage() {
                 </p>
               </div>
             ) : null}
+
+            <div className="rounded-[22px] border border-[#bfdbfe] bg-gradient-to-br from-[#eff6ff] to-white p-4">
+              <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[#1d4ed8]">
+                Planning note
+              </p>
+              <p className="mt-2 text-sm leading-6 text-slate-700">
+                This page is optimized for fast session building. The premium pass only improves scanability and planning flow, not the schedule logic itself.
+              </p>
+            </div>
 
             <div className="grid gap-4 sm:grid-cols-2">
               <FieldGroup label="Date">
@@ -747,6 +762,20 @@ function TypeBadge({ type }: { type: ScheduleType }) {
     >
       {label}
     </span>
+  );
+}
+
+function HeaderPill({
+  label,
+  value,
+}: {
+  label: string;
+  value: string;
+}) {
+  return (
+    <div className="rounded-full border border-slate-200 bg-white/90 px-3 py-1.5 text-xs font-semibold text-slate-700 shadow-sm">
+      {label}: <span className="text-slate-950">{value}</span>
+    </div>
   );
 }
 
