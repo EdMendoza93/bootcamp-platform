@@ -66,6 +66,8 @@ type BookingFormState = {
 };
 
 type BookingViewFilter = "recent" | "confirmed" | "cancelled" | "all";
+type BookingPaymentFilter = "all" | "manual" | "paid" | "pending";
+type BookingCapacityFilter = "all" | "consumes" | "no_capacity";
 
 function getEmptyBookingForm(): BookingFormState {
   return {
@@ -137,6 +139,11 @@ export default function AdminBookingsPage() {
   const [editingBookingId, setEditingBookingId] = useState<string | null>(null);
   const [bookingViewFilter, setBookingViewFilter] =
     useState<BookingViewFilter>("recent");
+  const [bookingSearch, setBookingSearch] = useState("");
+  const [bookingPaymentFilter, setBookingPaymentFilter] =
+    useState<BookingPaymentFilter>("all");
+  const [bookingCapacityFilter, setBookingCapacityFilter] =
+    useState<BookingCapacityFilter>("all");
 
   const { showToast } = useToast();
 
@@ -276,20 +283,55 @@ export default function AdminBookingsPage() {
   }, [bookings]);
 
   const visibleBookings = useMemo(() => {
-    if (bookingViewFilter === "recent") {
-      return recentBookings.slice(0, 8);
-    }
+    let nextBookings =
+      bookingViewFilter === "recent" ? recentBookings.slice(0, 8) : recentBookings;
 
     if (bookingViewFilter === "confirmed") {
-      return recentBookings.filter((booking) => booking.status === "confirmed");
+      nextBookings = nextBookings.filter((booking) => booking.status === "confirmed");
+    } else if (bookingViewFilter === "cancelled") {
+      nextBookings = nextBookings.filter((booking) => booking.status === "cancelled");
     }
 
-    if (bookingViewFilter === "cancelled") {
-      return recentBookings.filter((booking) => booking.status === "cancelled");
+    if (bookingPaymentFilter !== "all") {
+      nextBookings = nextBookings.filter(
+        (booking) => booking.paymentStatus === bookingPaymentFilter
+      );
     }
 
-    return recentBookings;
-  }, [bookingViewFilter, recentBookings]);
+    if (bookingCapacityFilter === "consumes") {
+      nextBookings = nextBookings.filter((booking) => booking.consumesCapacity);
+    } else if (bookingCapacityFilter === "no_capacity") {
+      nextBookings = nextBookings.filter((booking) => !booking.consumesCapacity);
+    }
+
+    const normalizedSearch = bookingSearch.trim().toLowerCase();
+
+    if (normalizedSearch) {
+      nextBookings = nextBookings.filter((booking) => {
+        const haystack = [
+          booking.customerName,
+          booking.customerEmail,
+          booking.userId,
+          booking.notes,
+          booking.paymentMethod,
+          booking.status,
+          booking.paymentStatus,
+        ]
+          .map((value) => String(value || "").toLowerCase())
+          .join(" ");
+
+        return haystack.includes(normalizedSearch);
+      });
+    }
+
+    return nextBookings;
+  }, [
+    bookingCapacityFilter,
+    bookingPaymentFilter,
+    bookingSearch,
+    bookingViewFilter,
+    recentBookings,
+  ]);
 
   const startableWeeks = useMemo(() => {
     return editableHydratedWeeks.filter(
@@ -845,7 +887,15 @@ export default function AdminBookingsPage() {
         <div className="rounded-[28px] border border-white/70 bg-white/95 p-6 shadow-[0_18px_50px_rgba(15,23,42,0.07)] backdrop-blur">
           <div className="flex items-center justify-between gap-3">
             <div>
-              <h2 className="text-xl font-semibold text-slate-950">Recent bookings</h2>
+              <h2 className="text-xl font-semibold text-slate-950">
+                {bookingViewFilter === "recent"
+                  ? "Recent bookings"
+                  : bookingViewFilter === "confirmed"
+                  ? "Confirmed bookings"
+                  : bookingViewFilter === "cancelled"
+                  ? "Cancelled bookings"
+                  : "All bookings"}
+              </h2>
               <p className="mt-1 text-sm text-slate-500">
                 Manual admin booking and public booking flows will live on top of this dataset.
               </p>
@@ -874,6 +924,66 @@ export default function AdminBookingsPage() {
                 {label}
               </button>
             ))}
+          </div>
+
+          <div className="mt-5 grid gap-3 md:grid-cols-[minmax(0,1.2fr)_180px_180px]">
+            <input
+              value={bookingSearch}
+              onChange={(e) => setBookingSearch(e.target.value)}
+              placeholder="Search by name, email, notes, status..."
+              className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-[#93c5fd] focus:ring-4 focus:ring-[#dbeafe]"
+            />
+
+            <select
+              value={bookingPaymentFilter}
+              onChange={(e) =>
+                setBookingPaymentFilter(
+                  e.target.value as BookingPaymentFilter
+                )
+              }
+              className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-[#93c5fd] focus:ring-4 focus:ring-[#dbeafe]"
+            >
+              <option value="all">All payments</option>
+              <option value="manual">Manual</option>
+              <option value="paid">Paid</option>
+              <option value="pending">Pending</option>
+            </select>
+
+            <select
+              value={bookingCapacityFilter}
+              onChange={(e) =>
+                setBookingCapacityFilter(
+                  e.target.value as BookingCapacityFilter
+                )
+              }
+              className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-[#93c5fd] focus:ring-4 focus:ring-[#dbeafe]"
+            >
+              <option value="all">All capacity</option>
+              <option value="consumes">Consumes capacity</option>
+              <option value="no_capacity">No capacity</option>
+            </select>
+          </div>
+
+          <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
+            <p className="text-sm text-slate-500">
+              Showing {visibleBookings.length} booking{visibleBookings.length === 1 ? "" : "s"}
+            </p>
+
+            {(bookingSearch ||
+              bookingPaymentFilter !== "all" ||
+              bookingCapacityFilter !== "all") && (
+              <button
+                type="button"
+                onClick={() => {
+                  setBookingSearch("");
+                  setBookingPaymentFilter("all");
+                  setBookingCapacityFilter("all");
+                }}
+                className="rounded-2xl border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-50"
+              >
+                Clear filters
+              </button>
+            )}
           </div>
 
           {visibleBookings.length === 0 ? (

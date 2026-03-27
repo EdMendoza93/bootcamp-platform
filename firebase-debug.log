@@ -1,0 +1,48 @@
+[debug] [2026-03-27T19:13:30.105Z] ----------------------------------------------------------------------
+[debug] [2026-03-27T19:13:30.107Z] Command:       /opt/homebrew/Cellar/node/25.3.0/bin/node /opt/homebrew/bin/firebase functions:secrets:set STRIPE_SECRET_KEY
+[debug] [2026-03-27T19:13:30.107Z] CLI Version:   15.11.0
+[debug] [2026-03-27T19:13:30.107Z] Platform:      darwin
+[debug] [2026-03-27T19:13:30.107Z] Node Version:  v25.3.0
+[debug] [2026-03-27T19:13:30.107Z] Time:          Fri Mar 27 2026 19:13:30 GMT+0000 (Greenwich Mean Time)
+[debug] [2026-03-27T19:13:30.107Z] ----------------------------------------------------------------------
+[debug] 
+[debug] [2026-03-27T19:13:30.201Z] > command requires scopes: ["email","openid","https://www.googleapis.com/auth/cloudplatformprojects.readonly","https://www.googleapis.com/auth/firebase","https://www.googleapis.com/auth/cloud-platform"]
+[debug] [2026-03-27T19:13:30.201Z] > authorizing via signed-in user (edgarhernandezmendoza5@gmail.com)
+[debug] [2026-03-27T19:13:30.201Z] Checked if tokens are valid: true, expires at: 1774642080635
+[debug] [2026-03-27T19:13:30.201Z] Checked if tokens are valid: true, expires at: 1774642080635
+[debug] [2026-03-27T19:13:30.202Z] >>> [apiv2][query] GET https://serviceusage.googleapis.com/v1/projects/bootcamp-platform-27d16/services/secretmanager.googleapis.com [none]
+[debug] [2026-03-27T19:13:30.202Z] >>> [apiv2][(partial)header] GET https://serviceusage.googleapis.com/v1/projects/bootcamp-platform-27d16/services/secretmanager.googleapis.com  x-goog-user-project=bootcamp-platform-27d16
+[debug] [2026-03-27T19:13:31.291Z] <<< [apiv2][status] GET https://serviceusage.googleapis.com/v1/projects/bootcamp-platform-27d16/services/secretmanager.googleapis.com 200
+[debug] [2026-03-27T19:13:31.291Z] <<< [apiv2][body] GET https://serviceusage.googleapis.com/v1/projects/bootcamp-platform-27d16/services/secretmanager.googleapis.com [omitted]
+[debug] [2026-03-27T19:13:31.292Z] Checked if tokens are valid: true, expires at: 1774642080635
+[debug] [2026-03-27T19:13:31.292Z] Checked if tokens are valid: true, expires at: 1774642080635
+[debug] [2026-03-27T19:13:31.292Z] >>> [apiv2][query] POST https://serviceusage.googleapis.com/v1/projects/bootcamp-platform-27d16/services/secretmanager.googleapis.com:enable [none]
+[debug] [2026-03-27T19:13:31.292Z] >>> [apiv2][(partial)header] POST https://serviceusage.googleapis.com/v1/projects/bootcamp-platform-27d16/services/secretmanager.googleapis.com:enable  x-goog-user-project=bootcamp-platform-27d16
+[debug] [2026-03-27T19:13:32.127Z] <<< [apiv2][status] POST https://serviceusage.googleapis.com/v1/projects/bootcamp-platform-27d16/services/secretmanager.googleapis.com:enable 200
+[debug] [2026-03-27T19:13:32.127Z] <<< [apiv2][body] POST https://serviceusage.googleapis.com/v1/projects/bootcamp-platform-27d16/services/secretmanager.googleapis.com:enable [omitted]
+[debug] [2026-03-27T19:13:42.140Z] > command requires scopes: ["email","openid","https://www.googleapis.com/auth/cloudplatformprojects.readonly","https://www.googleapis.com/auth/firebase","https://www.googleapis.com/auth/cloud-platform"]
+[debug] [2026-03-27T19:13:42.140Z] > authorizing via signed-in user (edgarhernandezmendoza5@gmail.com)
+[debug] [2026-03-27T19:13:42.140Z] [iam] checking project bootcamp-platform-27d16 for permissions ["firebase.projects.get","secretmanager.secrets.create","secretmanager.secrets.get","secretmanager.secrets.update","secretmanager.versions.add"]
+[debug] [2026-03-27T19:13:42.141Z] Checked if tokens are valid: true, expires at: 1774642080635
+[debug] [2026-03-27T19:13:42.141Z] Checked if tokens are valid: true, expires at: 1774642080635
+[debug] [2026-03-27T19:13:42.141Z] >>> [apiv2][query] POST https://cloudresourcemanager.googleapis.com/v1/projects/bootcamp-platform-27d16:testIamPermissions [none]
+[debug] [2026-03-27T19:13:42.141Z] >>> [apiv2][(partial)header] POST https://cloudresourcemanager.googleapis.com/v1/projects/bootcamp-platform-27d16:testIamPermissions  x-goog-user-project=bootcamp-platform-27d16
+[debug] [2026-03-27T19:13:42.141Z] >>> [apiv2][body] POST https://cloudresourcemanager.googleapis.com/v1/projects/bootcamp-platform-27d16:testIamPermissions {"permissions":["firebase.projects.get","secretmanager.secrets.create","secretmanager.secrets.get","secretmanager.secrets.update","secretmanager.versions.add"]}
+[debug] [2026-03-27T19:13:42.983Z] <<< [apiv2][status] POST https://cloudresourcemanager.googleapis.com/v1/projects/bootcamp-platform-27d16:testIamPermissions 200
+[debug] [2026-03-27T19:13:42.983Z] <<< [apiv2][body] POST https://cloudresourcemanager.googleapis.com/v1/projects/bootcamp-platform-27d16:testIamPermissions {"permissions":["firebase.projects.get","secretmanager.secrets.create","secretmanager.secrets.get","secretmanager.secrets.update","secretmanager.versions.add"]}
+[debug] [2026-03-27T19:13:42.985Z] Checked if tokens are valid: true, expires at: 1774642080635
+[debug] [2026-03-27T19:13:42.985Z] Checked if tokens are valid: true, expires at: 1774642080635
+[debug] [2026-03-27T19:13:42.985Z] >>> [apiv2][query] GET https://cloudresourcemanager.googleapis.com/v1/projects/bootcamp-platform-27d16 [none]
+[debug] [2026-03-27T19:13:43.195Z] <<< [apiv2][status] GET https://cloudresourcemanager.googleapis.com/v1/projects/bootcamp-platform-27d16 200
+[debug] [2026-03-27T19:13:43.195Z] <<< [apiv2][body] GET https://cloudresourcemanager.googleapis.com/v1/projects/bootcamp-platform-27d16 {"projectNumber":"780790284759","projectId":"bootcamp-platform-27d16","lifecycleState":"ACTIVE","name":"bootcamp-platform","labels":{"firebase":"enabled","firebase-core":"disabled"},"createTime":"2026-03-18T00:35:57.226673Z"}
+[debug] [2026-03-27T19:13:43.196Z] Checked if tokens are valid: true, expires at: 1774642080635
+[debug] [2026-03-27T19:13:43.196Z] Checked if tokens are valid: true, expires at: 1774642080635
+[debug] [2026-03-27T19:13:43.196Z] >>> [apiv2][query] GET https://secretmanager.googleapis.com/v1/projects/bootcamp-platform-27d16/secrets/STRIPE_SECRET_KEY [none]
+[debug] [2026-03-27T19:13:43.543Z] <<< [apiv2][status] GET https://secretmanager.googleapis.com/v1/projects/bootcamp-platform-27d16/secrets/STRIPE_SECRET_KEY 404
+[debug] [2026-03-27T19:13:43.543Z] <<< [apiv2][body] GET https://secretmanager.googleapis.com/v1/projects/bootcamp-platform-27d16/secrets/STRIPE_SECRET_KEY {"error":{"code":404,"message":"Secret [projects/780790284759/secrets/STRIPE_SECRET_KEY] not found.","status":"NOT_FOUND"}}
+[debug] [2026-03-27T19:13:43.544Z] Checked if tokens are valid: true, expires at: 1774642080635
+[debug] [2026-03-27T19:13:43.544Z] Checked if tokens are valid: true, expires at: 1774642080635
+[debug] [2026-03-27T19:13:43.544Z] >>> [apiv2][query] POST https://secretmanager.googleapis.com/v1/projects/bootcamp-platform-27d16/secrets secretId=STRIPE_SECRET_KEY
+[debug] [2026-03-27T19:13:43.544Z] >>> [apiv2][body] POST https://secretmanager.googleapis.com/v1/projects/bootcamp-platform-27d16/secrets {"name":"STRIPE_SECRET_KEY","replication":{"automatic":{}},"labels":{"firebase-managed":"functions"}}
+[debug] [2026-03-27T19:13:44.401Z] <<< [apiv2][status] POST https://secretmanager.googleapis.com/v1/projects/bootcamp-platform-27d16/secrets 200
+[debug] [2026-03-27T19:13:44.402Z] <<< [apiv2][body] POST https://secretmanager.googleapis.com/v1/projects/bootcamp-platform-27d16/secrets {"name":"projects/780790284759/secrets/STRIPE_SECRET_KEY","replication":{"automatic":{}},"createTime":"2026-03-27T19:13:43.677915Z","labels":{"firebase-managed":"functions"},"etag":"\"164e064cbb11a1\""}
