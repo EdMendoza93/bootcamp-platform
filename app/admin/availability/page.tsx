@@ -4,10 +4,13 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { db } from "@/lib/firebase";
 import {
   addDays,
+  BookingRecord,
+  BootcampWeekRecord,
   canStartDuration,
   getRemainingSpots,
   getWeekAvailabilityStatus,
   hasWeekOverlap,
+  hydrateWeeksWithBookings,
 } from "@/lib/bookings";
 import {
   addDoc,
@@ -22,16 +25,7 @@ import {
 } from "firebase/firestore";
 import { useToast } from "@/components/ui/ToastProvider";
 
-type BootcampWeek = {
-  id: string;
-  startDate: string;
-  endDate: string;
-  label: string;
-  active: boolean;
-  capacity: number;
-  booked: number;
-  notes?: string;
-};
+type BootcampWeek = BootcampWeekRecord;
 
 type WeekForm = {
   startDate: string;
@@ -91,15 +85,24 @@ export default function AdminAvailabilityPage() {
         collection(db, "bootcampWeeks"),
         orderBy("startDate", "asc")
       );
+      const bookingsQuery = query(collection(db, "bookings"));
 
-      const snapshot = await getDocs(weeksQuery);
+      const [weeksSnapshot, bookingsSnapshot] = await Promise.all([
+        getDocs(weeksQuery),
+        getDocs(bookingsQuery),
+      ]);
 
-      const data = snapshot.docs.map((docItem) => ({
+      const data = weeksSnapshot.docs.map((docItem) => ({
         id: docItem.id,
         ...(docItem.data() as Omit<BootcampWeek, "id">),
       })) as BootcampWeek[];
 
-      setWeeks(data);
+      const bookingData = bookingsSnapshot.docs.map((docItem) => ({
+        id: docItem.id,
+        ...(docItem.data() as Omit<BookingRecord, "id">),
+      })) as BookingRecord[];
+
+      setWeeks(hydrateWeeksWithBookings(data, bookingData));
     } catch (error) {
       console.error("Load weeks error:", error);
       showToast({
@@ -595,7 +598,6 @@ function WeekCard({
   onToggleActive: () => void;
   onDelete: () => void;
 }) {
-  const status = getWeekStatus(week);
   const status = getWeekAvailabilityStatus(week);
   const remaining = getRemainingSpots(week);
   const usagePercent = getUsagePercent(week.booked, week.capacity);

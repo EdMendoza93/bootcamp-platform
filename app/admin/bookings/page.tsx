@@ -2,16 +2,13 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
-  addDoc,
   collection,
-  doc,
   getDocs,
   orderBy,
   query,
-  serverTimestamp,
-  updateDoc,
 } from "firebase/firestore";
-import { db } from "@/lib/firebase";
+import { httpsCallable } from "firebase/functions";
+import { db, functions } from "@/lib/firebase";
 import {
   BookingDurationWeeks,
   BookingRecord,
@@ -262,9 +259,9 @@ export default function AdminBookingsPage() {
     if (!confirmed) return;
 
     try {
-      await updateDoc(doc(db, "bookings", booking.id), {
-        status: "cancelled",
-        updatedAt: serverTimestamp(),
+      const cancelBookingCall = httpsCallable(functions, "cancelAdminBooking");
+      await cancelBookingCall({
+        bookingId: booking.id,
       });
 
       showToast({
@@ -299,7 +296,6 @@ export default function AdminBookingsPage() {
 
       const payload = {
         startWeekId: form.startWeekId,
-        weekIds: selectedWeeks.map((week) => week.id),
         durationWeeks: form.durationWeeks,
         status: form.status,
         source: form.source,
@@ -314,16 +310,17 @@ export default function AdminBookingsPage() {
         customPrice: parsedCustomPrice > 0 ? parsedCustomPrice : null,
         currency: form.currency.trim().toUpperCase() || "EUR",
         notes: form.notes.trim(),
-        updatedAt: serverTimestamp(),
       };
 
       if (editingBookingId) {
-        await updateDoc(doc(db, "bookings", editingBookingId), payload);
-      } else {
-        await addDoc(collection(db, "bookings"), {
+        const updateBookingCall = httpsCallable(functions, "updateAdminBooking");
+        await updateBookingCall({
+          bookingId: editingBookingId,
           ...payload,
-          createdAt: serverTimestamp(),
         });
+      } else {
+        const createBookingCall = httpsCallable(functions, "createAdminBooking");
+        await createBookingCall(payload);
       }
 
       showToast({

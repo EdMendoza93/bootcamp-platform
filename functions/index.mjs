@@ -38,6 +38,158 @@ function normalizeRecipientValue(value) {
   return value.trim().toLowerCase();
 }
 
+function toMiddayDate(date) {
+  return new Date(`${date}T12:00:00`);
+}
+
+function addDays(date, days) {
+  const parsed = toMiddayDate(date);
+  parsed.setDate(parsed.getDate() + days);
+
+  const yyyy = parsed.getFullYear();
+  const mm = String(parsed.getMonth() + 1).padStart(2, "0");
+  const dd = String(parsed.getDate()).padStart(2, "0");
+
+  return `${yyyy}-${mm}-${dd}`;
+}
+
+function normalizeBookingDuration(value) {
+  const duration = Number(value);
+  return duration === 2 || duration === 3 ? duration : 1;
+}
+
+function getRemainingSpots(week) {
+  return Math.max(0, Number(week?.capacity || 0) - Number(week?.booked || 0));
+}
+
+function bookingConsumesCapacity(booking) {
+  return Boolean(booking?.consumesCapacity) && booking?.status !== "cancelled";
+}
+
+function hydrateWeeksWithBookings(weeks, bookings) {
+  return weeks.map((week) => ({
+    ...week,
+    booked: bookings.filter(
+      (booking) =>
+        bookingConsumesCapacity(booking) &&
+        Array.isArray(booking.weekIds) &&
+        booking.weekIds.includes(week.id)
+    ).length,
+  }));
+}
+
+function getConsecutiveBookingWeeks(weeks, startWeekId, duration) {
+  const orderedWeeks = [...weeks].sort((a, b) =>
+    String(a.startDate || "").localeCompare(String(b.startDate || ""))
+  );
+  const startIndex = orderedWeeks.findIndex((week) => week.id === startWeekId);
+
+  if (startIndex === -1) {
+    return [];
+  }
+
+  for (let i = 0; i < duration; i++) {
+    const currentWeek = orderedWeeks[startIndex + i];
+    const nextExpectedStart =
+      i === 0 ? null : addDays(orderedWeeks[startIndex + i - 1].startDate, 7);
+
+    if (!currentWeek) return [];
+    if (!currentWeek.active) return [];
+    if (getRemainingSpots(currentWeek) <= 0) return [];
+    if (nextExpectedStart && currentWeek.startDate !== nextExpectedStart) {
+      return [];
+    }
+  }
+
+  return orderedWeeks.slice(startIndex, startIndex + duration);
+}
+
+async function loadBookingContext(excludedBookingId = "") {
+  const [weeksSnap, bookingsSnap] = await Promise.all([
+    db.collection("bootcampWeeks").orderBy("startDate", "asc").get(),
+    db.collection("bookings").get(),
+  ]);
+
+  const weeks = weeksSnap.docs.map((doc) => ({
+    id: doc.id,
+    ...doc.data(),
+  }));
+
+  const bookings = bookingsSnap.docs
+    .map((doc) => ({
+      id: doc.id,
+      ...doc.data(),
+    }))
+    .filter((booking) => booking.id !== excludedBookingId);
+
+  return {
+    weeks: hydrateWeeksWithBookings(weeks, bookings),
+    bookings,
+  };
+}
+
+function buildBookingPayload(data, selectedWeeks) {
+  const shortStay = Boolean(data?.shortStay);
+  const shortStayNights = Number(data?.shortStayNights || 0);
+  const customPrice = Number(data?.customPrice || 0);
+  const status = data?.status === "pending" ? "pending" : "confirmed";
+  const paymentStatus =
+    data?.paymentStatus === "paid" || data?.paymentStatus === "pending"
+      ? data.paymentStatus
+      : "manual";
+  const paymentMethod =
+    data?.paymentMethod === "cash" ||
+    data?.paymentMethod === "bank_transfer" ||
+    data?.paymentMethod === "stripe"
+      ? data.paymentMethod
+      : "manual";
+
+  return {
+    startWeekId: String(data?.startWeekId || ""),
+    weekIds: selectedWeeks.map((week) => week.id),
+    durationWeeks: normalizeBookingDuration(data?.durationWeeks),
+    status,
+    source: "admin",
+    paymentStatus,
+    paymentMethod,
+    consumesCapacity: Boolean(data?.consumesCapacity),
+    customerName: String(data?.customerName || "").trim(),
+    customerEmail: normalizeRecipientValue(data?.customerEmail),
+    shortStay,
+    shortStayNights: shortStay && shortStayNights > 0 ? shortStayNights : null,
+    customPrice: customPrice > 0 ? customPrice : null,
+    currency: String(data?.currency || "EUR").trim().toUpperCase() || "EUR",
+    notes: String(data?.notes || "").trim(),
+  };
+}
+
+function validateBookingPayload(payload, selectedWeeks) {
+  if (!payload.customerName || !payload.customerEmail) {
+    throw new HttpsError(
+      "invalid-argument",
+      "customerName and customerEmail are required."
+    );
+  }
+
+  if (!payload.startWeekId) {
+    throw new HttpsError("invalid-argument", "startWeekId is required.");
+  }
+
+  if (payload.shortStay && !payload.shortStayNights) {
+    throw new HttpsError(
+      "invalid-argument",
+      "shortStayNights is required for short stays."
+    );
+  }
+
+  if (selectedWeeks.length !== payload.durationWeeks) {
+    throw new HttpsError(
+      "failed-precondition",
+      "Selected weeks are not available for this duration."
+    );
+  }
+}
+
 function getRecipientAliases(userId, userData) {
   const aliases = [
     userId,
@@ -265,6 +417,123 @@ export const sendPushNotification = onCall(
       throw new HttpsError(
         "internal",
         error instanceof Error ? error.message : "Push failed."
+      );
+    }
+  }
+);
+
+export const createAdminBooking = onCall(
+  { region: "us-central1" },
+  async (request) => {
+    try {
+      await assertAdmin(request.auth);
+
+      const durationWeeks = normalizeBookingDuration(request.data?.durationWeeks);
+      const context = await loadBookingContext();
+      const selectedWeeks = getConsecutiveBookingWeeks(
+        context.weeks,
+        String(request.data?.startWeekId || ""),
+        durationWeeks
+      );
+      const payload = buildBookingPayload(
+        { ...request.data, durationWeeks },
+        selectedWeeks
+      );
+
+      validateBookingPayload(payload, selectedWeeks);
+
+      const docRef = await db.collection("bookings").add({
+        ...payload,
+        createdAt: FieldValue.serverTimestamp(),
+        updatedAt: FieldValue.serverTimestamp(),
+        createdBy: request.auth.uid,
+      });
+
+      return {
+        id: docRef.id,
+        weekIds: payload.weekIds,
+      };
+    } catch (error) {
+      console.error("createAdminBooking error:", error);
+      if (error instanceof HttpsError) throw error;
+      throw new HttpsError(
+        "internal",
+        error instanceof Error ? error.message : "Booking creation failed."
+      );
+    }
+  }
+);
+
+export const updateAdminBooking = onCall(
+  { region: "us-central1" },
+  async (request) => {
+    try {
+      await assertAdmin(request.auth);
+
+      const bookingId = String(request.data?.bookingId || "").trim();
+      if (!bookingId) {
+        throw new HttpsError("invalid-argument", "bookingId is required.");
+      }
+
+      const durationWeeks = normalizeBookingDuration(request.data?.durationWeeks);
+      const context = await loadBookingContext(bookingId);
+      const selectedWeeks = getConsecutiveBookingWeeks(
+        context.weeks,
+        String(request.data?.startWeekId || ""),
+        durationWeeks
+      );
+      const payload = buildBookingPayload(
+        { ...request.data, durationWeeks },
+        selectedWeeks
+      );
+
+      validateBookingPayload(payload, selectedWeeks);
+
+      await db.collection("bookings").doc(bookingId).update({
+        ...payload,
+        updatedAt: FieldValue.serverTimestamp(),
+        updatedBy: request.auth.uid,
+      });
+
+      return {
+        id: bookingId,
+        weekIds: payload.weekIds,
+      };
+    } catch (error) {
+      console.error("updateAdminBooking error:", error);
+      if (error instanceof HttpsError) throw error;
+      throw new HttpsError(
+        "internal",
+        error instanceof Error ? error.message : "Booking update failed."
+      );
+    }
+  }
+);
+
+export const cancelAdminBooking = onCall(
+  { region: "us-central1" },
+  async (request) => {
+    try {
+      await assertAdmin(request.auth);
+
+      const bookingId = String(request.data?.bookingId || "").trim();
+      if (!bookingId) {
+        throw new HttpsError("invalid-argument", "bookingId is required.");
+      }
+
+      await db.collection("bookings").doc(bookingId).update({
+        status: "cancelled",
+        updatedAt: FieldValue.serverTimestamp(),
+        updatedBy: request.auth.uid,
+      });
+
+      return { id: bookingId };
+    } catch (error) {
+      console.error("cancelAdminBooking error:", error);
+      if (error instanceof HttpsError) throw error;
+      throw new HttpsError(
+        "internal",
+        error instanceof Error ? error.message : "Booking cancellation failed."
       );
     }
   }
