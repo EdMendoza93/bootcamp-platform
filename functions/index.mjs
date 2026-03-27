@@ -128,7 +128,54 @@ async function loadBookingContext(excludedBookingId = "") {
   };
 }
 
-function buildBookingPayload(data, selectedWeeks) {
+async function resolveBookingUser(userId) {
+  const normalizedUserId = String(userId || "").trim();
+
+  if (!normalizedUserId) {
+    throw new HttpsError("invalid-argument", "userId is required.");
+  }
+
+  const userSnap = await db.collection("users").doc(normalizedUserId).get();
+
+  if (!userSnap.exists) {
+    throw new HttpsError("not-found", "Selected user account was not found.");
+  }
+
+  const userData = userSnap.data() || {};
+
+  if (userData.role === "admin") {
+    throw new HttpsError(
+      "invalid-argument",
+      "Admin accounts cannot be assigned to bookings."
+    );
+  }
+
+  const profilesSnap = await db
+    .collection("profiles")
+    .where("userId", "==", normalizedUserId)
+    .limit(1)
+    .get();
+
+  const profileDoc = profilesSnap.empty ? null : profilesSnap.docs[0];
+  const profileData = profileDoc ? profileDoc.data() || {} : {};
+
+  return {
+    userId: normalizedUserId,
+    profileId: profileDoc?.id || "",
+    customerEmail: String(userData.email || "").trim().toLowerCase(),
+    customerName:
+      String(
+        profileData.fullName ||
+          userData.displayName ||
+          userData.name ||
+          userData.username ||
+          userData.email ||
+          normalizedUserId
+      ).trim(),
+  };
+}
+
+function buildBookingPayload(data, selectedWeeks, bookingUser) {
   const shortStay = Boolean(data?.shortStay);
   const shortStayNights = Number(data?.shortStayNights || 0);
   const customPrice = Number(data?.customPrice || 0);
@@ -152,9 +199,11 @@ function buildBookingPayload(data, selectedWeeks) {
     source: "admin",
     paymentStatus,
     paymentMethod,
-    consumesCapacity: Boolean(data?.consumesCapacity),
-    customerName: String(data?.customerName || "").trim(),
-    customerEmail: normalizeRecipientValue(data?.customerEmail),
+    consumesCapacity: shortStay ? true : Boolean(data?.consumesCapacity),
+    customerName: bookingUser.customerName,
+    customerEmail: bookingUser.customerEmail,
+    userId: bookingUser.userId,
+    profileId: bookingUser.profileId || "",
     shortStay,
     shortStayNights: shortStay && shortStayNights > 0 ? shortStayNights : null,
     customPrice: customPrice > 0 ? customPrice : null,
@@ -164,10 +213,10 @@ function buildBookingPayload(data, selectedWeeks) {
 }
 
 function validateBookingPayload(payload, selectedWeeks) {
-  if (!payload.customerName || !payload.customerEmail) {
+  if (!payload.customerName || !payload.customerEmail || !payload.userId) {
     throw new HttpsError(
       "invalid-argument",
-      "customerName and customerEmail are required."
+      "A valid platform user is required for manual bookings."
     );
   }
 
@@ -435,9 +484,11 @@ export const createAdminBooking = onCall(
         String(request.data?.startWeekId || ""),
         durationWeeks
       );
+      const bookingUser = await resolveBookingUser(request.data?.userId);
       const payload = buildBookingPayload(
         { ...request.data, durationWeeks },
-        selectedWeeks
+        selectedWeeks,
+        bookingUser
       );
 
       validateBookingPayload(payload, selectedWeeks);
@@ -482,9 +533,11 @@ export const updateAdminBooking = onCall(
         String(request.data?.startWeekId || ""),
         durationWeeks
       );
+      const bookingUser = await resolveBookingUser(request.data?.userId);
       const payload = buildBookingPayload(
         { ...request.data, durationWeeks },
-        selectedWeeks
+        selectedWeeks,
+        bookingUser
       );
 
       validateBookingPayload(payload, selectedWeeks);
