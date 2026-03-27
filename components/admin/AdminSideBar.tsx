@@ -10,6 +10,7 @@ const navItems = [
   { label: "Schedule", href: "/admin/schedule" },
   { label: "Availability", href: "/admin/availability" },
   { label: "Bookings", href: "/admin/bookings" },
+  { label: "Payments", href: "/admin/payments" },
   { label: "Templates", href: "/admin/templates" },
   { label: "Progress", href: "/admin/progress" },
   { label: "Training", href: "/admin/training" },
