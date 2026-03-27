@@ -235,7 +235,8 @@ export default function AdminBookingsPage() {
       startWeekId: booking.startWeekId || "",
       durationWeeks: booking.durationWeeks,
       source: booking.source,
-      status: booking.status === "cancelled" ? "confirmed" : booking.status,
+      status:
+        booking.status === "pending" ? "pending" : "confirmed",
       paymentStatus:
         booking.paymentStatus === "failed" || booking.paymentStatus === "refunded"
           ? "pending"
