@@ -231,6 +231,17 @@ export default function ApplicationPage() {
                 the team will review your details and guide you through the next
                 steps.
               </p>
+
+              <div className="mt-5 flex flex-wrap gap-2">
+                <HeaderPill
+                  label="Status"
+                  value={existingApplication ? existingApplication.status : "not submitted"}
+                />
+                <HeaderPill
+                  label="Stage"
+                  value={existingApplication ? "under review flow" : "application form"}
+                />
+              </div>
             </div>
           </div>
         </section>
@@ -254,6 +265,10 @@ export default function ApplicationPage() {
                   <p className="mt-3 text-sm leading-6 text-slate-600">
                     {statusText}
                   </p>
+
+                  <div className="mt-4 rounded-[22px] border border-slate-100 bg-gradient-to-br from-slate-50 to-white p-4 text-sm leading-6 text-slate-600">
+                    This page keeps your application details visible in one place so you can quickly confirm what was submitted and what stage you are in.
+                  </div>
                 </div>
 
                 <a
@@ -508,4 +523,18 @@ function formatStatusLabel(status: ApplicationStatus) {
   if (status === "pending") return "Pending";
   if (status === "approved") return "Approved";
   return "Not approved";
+}
+
+function HeaderPill({
+  label,
+  value,
+}: {
+  label: string;
+  value: string;
+}) {
+  return (
+    <div className="rounded-full border border-slate-200 bg-white/90 px-3 py-1.5 text-xs font-semibold capitalize text-slate-700 shadow-sm">
+      {label}: <span className="text-slate-950">{value}</span>
+    </div>
+  );
 }

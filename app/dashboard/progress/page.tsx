@@ -136,6 +136,13 @@ function formatPhotoDate(photoDate?: string, createdAt?: { seconds?: number }) {
   return "No date";
 }
 
+function formatApprovalLabel(value: string) {
+  if (value === "approved") return "approved";
+  if (value === "pending") return "pending";
+  if (value === "rejected") return "rejected";
+  return "not ready";
+}
+
 async function syncLatestMeasurementsToProfile(profileId: string) {
   const photosSnap = await getDocs(
     query(collection(db, "progressPhotos"), where("profileId", "==", profileId))
@@ -462,23 +469,52 @@ export default function ProgressPage() {
   };
 
   if (loading) {
-    return <p className="p-10 text-gray-500">Loading...</p>;
+    return (
+      <div className="rounded-[28px] border border-white/70 bg-white/90 p-8 shadow-[0_20px_60px_rgba(15,23,42,0.08)] backdrop-blur">
+        <p className="text-sm font-medium text-slate-500">
+          Loading your progress...
+        </p>
+      </div>
+    );
   }
 
   return (
     <>
       <div className="space-y-8">
-        <section className="rounded-[32px] border bg-white p-8 shadow-sm">
-          <h1 className="text-3xl font-bold">Your Progress</h1>
-          <p className="mt-2 text-gray-600">
-            Track your transformation over time.
-          </p>
+        <section className="overflow-hidden rounded-[32px] border border-white/70 bg-white/90 shadow-[0_24px_80px_rgba(15,23,42,0.10)] backdrop-blur">
+          <div className="bg-gradient-to-r from-[#071120] via-[#123b76] to-[#2EA0FF] p-[1px]">
+            <div className="rounded-t-[31px] bg-transparent px-0 py-0" />
+          </div>
+
+          <div className="relative overflow-hidden p-6 md:p-8">
+            <div className="absolute right-0 top-0 h-40 w-40 rounded-full bg-[#2EA0FF]/10 blur-3xl" />
+            <div className="absolute bottom-0 left-0 h-32 w-32 rounded-full bg-emerald-300/10 blur-3xl" />
+
+            <div className="relative">
+              <div className="inline-flex items-center rounded-full border border-[#bfdbfe] bg-[#eff6ff] px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.2em] text-[#1d4ed8]">
+                Progress
+              </div>
+
+              <h1 className="mt-4 text-3xl font-semibold tracking-tight text-slate-950 md:text-4xl">
+                Your Progress
+              </h1>
+              <p className="mt-3 max-w-3xl text-sm text-slate-600 md:text-base">
+                Track your transformation over time and keep your visual timeline organized.
+              </p>
+
+              <div className="mt-5 flex flex-wrap gap-2">
+                <HeaderPill label="Photos" value={String(photos.length)} />
+                <HeaderPill label="Uploads" value={progressPhotosEnabled ? "enabled" : "locked"} />
+                <HeaderPill label="Approval" value={formatApprovalLabel(approvalStatus)} />
+              </div>
+            </div>
+          </div>
         </section>
 
         {beforePhoto && afterPhoto && beforePhoto.id !== afterPhoto.id && (
-          <section className="rounded-[32px] border bg-white p-6 shadow-sm">
-            <h2 className="text-xl font-semibold">Before / After</h2>
-            <p className="mt-2 text-gray-600">
+          <section className="rounded-[32px] border border-white/70 bg-white/90 p-6 shadow-[0_18px_50px_rgba(15,23,42,0.07)] backdrop-blur">
+            <h2 className="text-xl font-semibold text-slate-950">Before / After</h2>
+            <p className="mt-2 text-slate-600">
               Quick visual comparison using your marked photos.
             </p>
 
@@ -521,7 +557,7 @@ export default function ProgressPage() {
         )}
 
         {notApproved ? (
-          <section className="rounded-[32px] border bg-white p-6 shadow-sm">
+          <section className="rounded-[32px] border border-white/70 bg-white/90 p-6 shadow-[0_18px_50px_rgba(15,23,42,0.07)] backdrop-blur">
             <h2 className="text-xl font-semibold">
               Progress photos will unlock soon
             </h2>
@@ -531,14 +567,14 @@ export default function ProgressPage() {
             </p>
           </section>
         ) : notEnabled ? (
-          <section className="rounded-[32px] border bg-white p-6 shadow-sm">
+          <section className="rounded-[32px] border border-white/70 bg-white/90 p-6 shadow-[0_18px_50px_rgba(15,23,42,0.07)] backdrop-blur">
             <h2 className="text-xl font-semibold">Uploads not enabled yet</h2>
             <p className="mt-2 text-gray-600">
               Your coach has not enabled progress photos for your profile yet.
             </p>
           </section>
         ) : (
-          <section className="rounded-[32px] border bg-white p-6 shadow-sm">
+          <section className="rounded-[32px] border border-white/70 bg-white/90 p-6 shadow-[0_18px_50px_rgba(15,23,42,0.07)] backdrop-blur">
             <div className="flex flex-wrap items-center gap-3">
               <h2 className="text-xl font-semibold">
                 {editingPhotoId ? "Edit photo details" : "Upload new photo"}
@@ -555,6 +591,10 @@ export default function ProgressPage() {
                 ? "Update the details of your progress photo."
                 : "Add a new visual update to your progress timeline."}
             </p>
+
+            <div className="mt-4 rounded-[22px] border border-[#bfdbfe] bg-gradient-to-br from-[#eff6ff] to-white p-4 text-sm leading-6 text-slate-700">
+              Use milestones consistently so your timeline and before-after views stay meaningful. This pass improves clarity only, not upload behavior.
+            </div>
 
             {editingPhoto && (
               <div className="mt-4 overflow-hidden rounded-2xl border bg-slate-50 p-3">
@@ -753,9 +793,9 @@ export default function ProgressPage() {
           </section>
         )}
 
-        <section className="rounded-[32px] border bg-white p-6 shadow-sm">
-          <h2 className="text-xl font-semibold">Your Photo Timeline</h2>
-          <p className="mt-2 text-gray-600">
+        <section className="rounded-[32px] border border-white/70 bg-white/90 p-6 shadow-[0_18px_50px_rgba(15,23,42,0.07)] backdrop-blur">
+          <h2 className="text-xl font-semibold text-slate-950">Your Photo Timeline</h2>
+          <p className="mt-2 text-slate-600">
             A visual timeline of your progress updates.
           </p>
 
@@ -896,5 +936,19 @@ function MilestoneBadge({ milestone }: { milestone: Milestone }) {
     >
       {label}
     </span>
+  );
+}
+
+function HeaderPill({
+  label,
+  value,
+}: {
+  label: string;
+  value: string;
+}) {
+  return (
+    <div className="rounded-full border border-slate-200 bg-white/90 px-3 py-1.5 text-xs font-semibold capitalize text-slate-700 shadow-sm">
+      {label}: <span className="text-slate-950">{value}</span>
+    </div>
   );
 }

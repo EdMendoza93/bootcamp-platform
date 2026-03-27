@@ -276,6 +276,12 @@ export default function DashboardProfilePage() {
                 <div className="mt-4 inline-flex items-center rounded-2xl border border-slate-200 bg-white px-4 py-2 text-sm text-slate-700 shadow-sm">
                   {userEmail}
                 </div>
+
+                <div className="mt-5 flex flex-wrap gap-2">
+                  <HeaderPill label="Status" value={formatProfileStatus(form.onboardingStatus)} />
+                  <HeaderPill label="Payment" value={formatPaymentStatus(form.paymentStatus)} />
+                  <HeaderPill label="Completion" value={`${completionState.percent}%`} />
+                </div>
               </div>
 
               <a
@@ -427,6 +433,10 @@ export default function DashboardProfilePage() {
               />
             </FieldGroup>
           </div>
+
+          <div className="mt-6 rounded-[22px] border border-[#bfdbfe] bg-gradient-to-br from-[#eff6ff] to-white p-4 text-sm leading-6 text-slate-700">
+            Keeping this profile complete helps the team tailor your plan, support, and communication without needing to ask for the same details again later.
+          </div>
         </section>
       </div>
 
@@ -533,4 +543,18 @@ function formatProfileStatus(value: string) {
 function formatPaymentStatus(value: string) {
   if (!value) return "Pending";
   return value.charAt(0).toUpperCase() + value.slice(1);
+}
+
+function HeaderPill({
+  label,
+  value,
+}: {
+  label: string;
+  value: string;
+}) {
+  return (
+    <div className="rounded-full border border-slate-200 bg-white/90 px-3 py-1.5 text-xs font-semibold text-slate-700 shadow-sm">
+      {label}: <span className="text-slate-950">{value}</span>
+    </div>
+  );
 }
