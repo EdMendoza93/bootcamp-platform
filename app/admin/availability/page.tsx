@@ -1,7 +1,14 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { db } from "@/lib/firebase";
+import {
+  addDays,
+  canStartDuration,
+  getRemainingSpots,
+  getWeekAvailabilityStatus,
+  hasWeekOverlap,
+} from "@/lib/bookings";
 import {
   addDoc,
   collection,
@@ -48,21 +55,6 @@ function toMiddayDate(date: string) {
   return new Date(`${date}T12:00:00`);
 }
 
-function getDateValue(date: string) {
-  return toMiddayDate(date).getTime();
-}
-
-function addDays(date: string, days: number) {
-  const parsed = toMiddayDate(date);
-  parsed.setDate(parsed.getDate() + days);
-
-  const yyyy = parsed.getFullYear();
-  const mm = String(parsed.getMonth() + 1).padStart(2, "0");
-  const dd = String(parsed.getDate()).padStart(2, "0");
-
-  return `${yyyy}-${mm}-${dd}`;
-}
-
 function formatDateLabel(date: string) {
   if (!date) return "No date";
   const parsed = toMiddayDate(date);
@@ -79,65 +71,6 @@ function getUsagePercent(booked: number, capacity: number) {
   return Math.min(100, Math.round((booked / capacity) * 100));
 }
 
-function getRemainingSpots(item: BootcampWeek) {
-  return Math.max(0, (item.capacity || 0) - (item.booked || 0));
-}
-
-function getWeekStatus(item: BootcampWeek) {
-  if (!item.active) return "inactive";
-
-  if ((item.capacity || 0) <= 0) return "soldout";
-
-  const remaining = getRemainingSpots(item);
-
-  if (remaining <= 0) return "soldout";
-  if (remaining <= Math.max(1, Math.ceil((item.capacity || 0) * 0.2))) {
-    return "low";
-  }
-
-  return "open";
-}
-
-function hasWeekOverlap(
-  weeks: BootcampWeek[],
-  nextWeek: { startDate: string; endDate: string },
-  excludedWeekId?: string | null
-) {
-  const nextStart = getDateValue(nextWeek.startDate);
-  const nextEnd = getDateValue(nextWeek.endDate);
-
-  return weeks.some((week) => {
-    if (excludedWeekId && week.id === excludedWeekId) return false;
-
-    const currentStart = getDateValue(week.startDate);
-    const currentEnd = getDateValue(week.endDate);
-
-    return nextStart < currentEnd && nextEnd > currentStart;
-  });
-}
-
-function canStartDuration(
-  weeks: BootcampWeek[],
-  startIndex: number,
-  duration: 1 | 2 | 3
-) {
-  for (let i = 0; i < duration; i++) {
-    const currentWeek = weeks[startIndex + i];
-    const nextExpectedStart =
-      i === 0 ? null : addDays(weeks[startIndex + i - 1].startDate, 7);
-
-    if (!currentWeek) return false;
-    if (!currentWeek.active) return false;
-    if ((currentWeek.capacity || 0) - (currentWeek.booked || 0) <= 0) return false;
-
-    if (nextExpectedStart && currentWeek.startDate !== nextExpectedStart) {
-      return false;
-    }
-  }
-
-  return true;
-}
-
 export default function AdminAvailabilityPage() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -152,7 +85,7 @@ export default function AdminAvailabilityPage() {
     return addDays(form.startDate, 7);
   }, [form.startDate]);
 
-  const loadWeeks = async () => {
+  const loadWeeks = useCallback(async () => {
     try {
       const weeksQuery = query(
         collection(db, "bootcampWeeks"),
@@ -177,16 +110,16 @@ export default function AdminAvailabilityPage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [showToast]);
 
   useEffect(() => {
     loadWeeks();
-  }, []);
+  }, [loadWeeks]);
 
   const summary = useMemo(() => {
     const activeWeeks = weeks.filter((week) => week.active).length;
     const soldOutWeeks = weeks.filter(
-      (week) => getWeekStatus(week) === "soldout"
+      (week) => getWeekAvailabilityStatus(week) === "soldout"
     ).length;
     const totalCapacity = weeks.reduce(
       (acc, week) => acc + (week.capacity || 0),
@@ -663,6 +596,7 @@ function WeekCard({
   onDelete: () => void;
 }) {
   const status = getWeekStatus(week);
+  const status = getWeekAvailabilityStatus(week);
   const remaining = getRemainingSpots(week);
   const usagePercent = getUsagePercent(week.booked, week.capacity);
 
