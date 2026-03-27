@@ -33,6 +33,77 @@ async function getUserPushTokens(userId) {
     .filter((token) => typeof token === "string" && token.length > 0);
 }
 
+function normalizeRecipientValue(value) {
+  if (typeof value !== "string") return "";
+  return value.trim().toLowerCase();
+}
+
+function getRecipientAliases(userId, userData) {
+  const aliases = [
+    userId,
+    userData?.email,
+    userData?.username,
+    userData?.displayName,
+    userData?.name,
+  ];
+
+  return aliases
+    .map((value) => normalizeRecipientValue(value))
+    .filter((value) => value.length > 0);
+}
+
+async function resolveSelectedUserIds(rawRecipients) {
+  const requested = [
+    ...new Set(
+      rawRecipients
+        .map((value) => normalizeRecipientValue(value))
+        .filter(Boolean)
+    ),
+  ];
+
+  if (requested.length === 0) {
+    return {
+      resolvedUserIds: [],
+      unresolvedRecipients: [],
+    };
+  }
+
+  const usersSnap = await db.collection("users").get();
+  const aliasToUserId = new Map();
+
+  usersSnap.docs.forEach((doc) => {
+    const userData = doc.data() || {};
+
+    if (userData.role === "admin") {
+      return;
+    }
+
+    getRecipientAliases(doc.id, userData).forEach((alias) => {
+      if (!aliasToUserId.has(alias)) {
+        aliasToUserId.set(alias, doc.id);
+      }
+    });
+  });
+
+  const resolvedUserIds = [];
+  const unresolvedRecipients = [];
+
+  requested.forEach((recipient) => {
+    const resolvedUserId = aliasToUserId.get(recipient);
+
+    if (resolvedUserId) {
+      resolvedUserIds.push(resolvedUserId);
+    } else {
+      unresolvedRecipients.push(recipient);
+    }
+  });
+
+  return {
+    resolvedUserIds: [...new Set(resolvedUserIds)],
+    unresolvedRecipients,
+  };
+}
+
 export const sendPushNotification = onCall(
   { region: "us-central1" },
   async (request) => {
@@ -59,9 +130,19 @@ export const sendPushNotification = onCall(
       }
 
       let targetUserIds = [];
+      let unresolvedRecipients = [];
 
       if (audience === "selected") {
-        targetUserIds = selectedUserIds;
+        const selectedRecipients = await resolveSelectedUserIds(selectedUserIds);
+        targetUserIds = selectedRecipients.resolvedUserIds;
+        unresolvedRecipients = selectedRecipients.unresolvedRecipients;
+
+        if (targetUserIds.length === 0) {
+          throw new HttpsError(
+            "invalid-argument",
+            "None of the selected recipients could be resolved to user accounts."
+          );
+        }
       } else {
         const usersSnap = await db.collection("users").get();
         targetUserIds = usersSnap.docs
@@ -77,11 +158,20 @@ export const sendPushNotification = onCall(
         targetUserIds.map((userId) => getUserPushTokens(userId))
       );
 
+      const usersWithoutTokens = [];
+      tokenGroups.forEach((tokens, index) => {
+        if (tokens.length === 0) {
+          usersWithoutTokens.push(targetUserIds[index]);
+        }
+      });
+
       const uniqueTokens = [...new Set(tokenGroups.flat())];
 
       if (uniqueTokens.length === 0) {
         return {
-          targetedUsers: audience === "all" ? targetUserIds.length : selectedUserIds.length,
+          targetedUsers: targetUserIds.length,
+          usersWithoutTokens,
+          unresolvedRecipients,
           successCount: 0,
           failureCount: 0,
           message: "No eligible push tokens found.",
@@ -97,6 +187,8 @@ export const sendPushNotification = onCall(
           body,
         },
         data: {
+          title,
+          body,
           url: safeUrl,
         },
         webpush: {
@@ -156,6 +248,9 @@ export const sendPushNotification = onCall(
         url: safeUrl,
         audience,
         selectedUserIds: audience === "selected" ? selectedUserIds : [],
+        unresolvedRecipients,
+        usersWithoutTokens,
+        targetedUsers: targetUserIds.length,
         targetedTokens: uniqueTokens.length,
         successCount: response.successCount,
         failureCount: response.failureCount,
@@ -164,7 +259,9 @@ export const sendPushNotification = onCall(
       });
 
       return {
-        targetedUsers: audience === "all" ? targetUserIds.length : selectedUserIds.length,
+        targetedUsers: targetUserIds.length,
+        usersWithoutTokens,
+        unresolvedRecipients,
         successCount: response.successCount,
         failureCount: response.failureCount,
       };

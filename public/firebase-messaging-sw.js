@@ -14,6 +14,12 @@ firebase.initializeApp({
 const messaging = firebase.messaging();
 
 messaging.onBackgroundMessage((payload) => {
+  // When the payload contains `notification`, FCM/browser already shows it.
+  // Showing one manually here would create duplicates.
+  if (payload?.notification) {
+    return;
+  }
+
   const title = payload?.data?.title || "Wild Atlantic Bootcamp";
   const body = payload?.data?.body || "You have a new notification.";
   const url = payload?.data?.url || "/dashboard";

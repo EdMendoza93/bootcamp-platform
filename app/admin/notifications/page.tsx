@@ -111,11 +111,16 @@ export default function AdminNotificationsPage() {
         successCount?: number;
         failureCount?: number;
         targetedUsers?: number;
+        usersWithoutTokens?: string[];
+        unresolvedRecipients?: string[];
       };
+
+      const unresolvedCount = data.unresolvedRecipients?.length || 0;
+      const noTokenCount = data.usersWithoutTokens?.length || 0;
 
       showToast({
         title: "Notification sent",
-        description: `Users targeted: ${data.targetedUsers || 0} · Delivered: ${data.successCount || 0} · Failed: ${data.failureCount || 0}`,
+        description: `Users targeted: ${data.targetedUsers || 0} · Delivered: ${data.successCount || 0} · Failed: ${data.failureCount || 0}${unresolvedCount ? ` · Unresolved recipients: ${unresolvedCount}` : ""}${noTokenCount ? ` · No token: ${noTokenCount}` : ""}`,
         type: "success",
       });
 
