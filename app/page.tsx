@@ -25,7 +25,11 @@ export default function HomePage() {
           return;
         }
 
-        const data = userSnap.data() as { role?: string };
+        const data = userSnap.data() as { role?: string; status?: "active" | "inactive" };
+        if (data.status === "inactive") {
+          window.location.replace("/login");
+          return;
+        }
         window.location.replace(getHomeRouteForRole(data.role));
       } catch (error) {
         console.error("Root redirect error:", error);

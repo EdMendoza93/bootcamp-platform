@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { useParams } from "next/navigation";
 import { db, storage } from "@/lib/firebase";
@@ -22,6 +23,14 @@ import {
   uploadBytes,
 } from "firebase/storage";
 import { useToast } from "@/components/ui/ToastProvider";
+import {
+  getDeliveryMethodLabel,
+  getProviderRoleLabel,
+  getSessionStatusTone,
+  OnlineSessionRecord,
+  OnlineSessionStatus,
+  sortSessions,
+} from "@/lib/online-sessions";
 
 type ScheduleType = "training" | "nutrition" | "activity";
 type Milestone = "progress" | "start" | "final";
@@ -65,6 +74,8 @@ type ScheduleItem = {
   details?: string;
   displayTitle: string;
 };
+
+type SessionBoardFilter = "all" | OnlineSessionStatus;
 
 type PhotoModalData = {
   open: boolean;
@@ -234,6 +245,9 @@ export default function AdminProfileDetailPage() {
 
   const [scheduleLoading, setScheduleLoading] = useState(true);
   const [scheduleItems, setScheduleItems] = useState<ScheduleItem[]>([]);
+  const [sessionsLoading, setSessionsLoading] = useState(true);
+  const [onlineSessions, setOnlineSessions] = useState<OnlineSessionRecord[]>([]);
+  const [sessionFilter, setSessionFilter] = useState<SessionBoardFilter>("all");
 
   const [progressLoading, setProgressLoading] = useState(true);
   const [progressSaving, setProgressSaving] = useState(false);
@@ -369,6 +383,24 @@ export default function AdminProfileDetailPage() {
     setProgressPhotos(data);
   };
 
+  const loadOnlineSessions = async (targetProfileId: string) => {
+    const q = query(
+      collection(db, "onlineSessions"),
+      where("profileId", "==", targetProfileId)
+    );
+
+    const snapshot = await getDocs(q);
+
+    const data = sortSessions(
+      snapshot.docs.map((docItem) => ({
+        id: docItem.id,
+        ...(docItem.data() as Omit<OnlineSessionRecord, "id">),
+      })) as OnlineSessionRecord[]
+    );
+
+    setOnlineSessions(data);
+  };
+
   useEffect(() => {
     const loadProfile = async () => {
       try {
@@ -442,6 +474,7 @@ export default function AdminProfileDetailPage() {
 
         await Promise.all([
           loadScheduleItems(profileRouteId),
+          loadOnlineSessions(profileRouteId),
           loadProgressPhotos(profileRouteId),
         ]);
       } catch (error) {
@@ -454,6 +487,7 @@ export default function AdminProfileDetailPage() {
       } finally {
         setLoading(false);
         setScheduleLoading(false);
+        setSessionsLoading(false);
         setProgressLoading(false);
       }
     };
@@ -636,6 +670,12 @@ export default function AdminProfileDetailPage() {
       return acc;
     }, {} as Record<string, ScheduleItem[]>);
   }, [scheduleItems]);
+
+  const visibleSessions = useMemo(() => {
+    return onlineSessions.filter(
+      (item) => sessionFilter === "all" || item.status === sessionFilter
+    );
+  }, [onlineSessions, sessionFilter]);
 
   const editingPhoto = useMemo(
     () => progressPhotos.find((photo) => photo.id === editingPhotoId) || null,
@@ -895,12 +935,12 @@ export default function AdminProfileDetailPage() {
     <>
       <div className="mx-auto max-w-6xl space-y-6">
         <div className="flex flex-wrap items-center justify-between gap-3">
-          <a
+          <Link
             href="/admin/profiles"
             className="inline-flex rounded-2xl border bg-white px-4 py-2.5 text-sm font-medium shadow-sm transition hover:-translate-y-0.5 hover:shadow-md"
           >
             Back to Profiles
-          </a>
+          </Link>
 
           <div className="flex flex-wrap gap-3">
             <a
@@ -1013,6 +1053,10 @@ export default function AdminProfileDetailPage() {
             <CompactSummaryPill
               label="Schedule"
               value={String(scheduleItems.length)}
+            />
+            <CompactSummaryPill
+              label="Sessions"
+              value={String(onlineSessions.length)}
             />
             <CompactSummaryPill
               label="Photos"
@@ -1268,6 +1312,85 @@ export default function AdminProfileDetailPage() {
         </section>
 
         <section className="rounded-[28px] border border-white/70 bg-white/90 p-5 shadow-[0_18px_50px_rgba(15,23,42,0.07)] backdrop-blur">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+            <div>
+              <h2 className="text-base font-semibold text-slate-950">
+                Online Sessions
+              </h2>
+              <p className="mt-1 text-sm text-slate-500">
+                Private Zoom or WhatsApp sessions attached to this client.
+              </p>
+            </div>
+
+            <select
+              value={sessionFilter}
+              onChange={(e) =>
+                setSessionFilter(e.target.value as SessionBoardFilter)
+              }
+              className="rounded-2xl border border-slate-200 bg-white px-4 py-2.5 text-sm text-slate-700 outline-none"
+            >
+              <option value="all">All status</option>
+              <option value="scheduled">Scheduled</option>
+              <option value="completed">Completed</option>
+              <option value="cancelled">Cancelled</option>
+            </select>
+          </div>
+
+          <div className="mt-5">
+            {sessionsLoading ? (
+              <p className="text-sm text-slate-500">Loading sessions...</p>
+            ) : visibleSessions.length === 0 ? (
+              <div className="rounded-2xl border border-dashed p-8 text-center text-sm text-slate-500">
+                No online sessions found for this client.
+              </div>
+            ) : (
+              <div className="grid gap-3 xl:grid-cols-2">
+                {visibleSessions.map((item) => (
+                  <div
+                    key={item.id}
+                    className="rounded-2xl border bg-slate-50 p-4"
+                  >
+                    <div className="flex flex-wrap items-center gap-2">
+                      <SessionStatusBadge status={item.status} />
+                      <span className="rounded-full border border-[#dbeafe] bg-[#eff6ff] px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.16em] text-[#1d4ed8]">
+                        {getProviderRoleLabel(item.providerRole)}
+                      </span>
+                      <span className="rounded-full border border-slate-200 bg-white px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">
+                        {getDeliveryMethodLabel(item.deliveryMethod)}
+                      </span>
+                    </div>
+
+                    <p className="mt-3 font-medium text-slate-950">
+                      {item.title?.trim() || "Private session"}
+                    </p>
+                    <p className="mt-1 text-sm text-slate-600">
+                      {item.scheduledDate} at {item.startTime} · {item.durationMinutes} min
+                    </p>
+
+                    {item.notes?.trim() ? (
+                      <p className="mt-2 line-clamp-3 text-sm text-slate-600">
+                        {item.notes}
+                      </p>
+                    ) : null}
+
+                    {item.meetingLink ? (
+                      <a
+                        href={item.meetingLink}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="mt-4 inline-flex text-sm font-medium text-[#1d4ed8] hover:text-[#1e40af]"
+                      >
+                        Open meeting link
+                      </a>
+                    ) : null}
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </section>
+
+        <section className="rounded-[28px] border border-white/70 bg-white/90 p-5 shadow-[0_18px_50px_rgba(15,23,42,0.07)] backdrop-blur">
           <h2 className="text-base font-semibold text-slate-950">
             Health & Notes
           </h2>
@@ -1334,7 +1457,7 @@ export default function AdminProfileDetailPage() {
           </div>
 
           <p className="mt-1 text-sm text-slate-500">
-            Upload, edit, and manage this client's progress updates.
+            Upload, edit, and manage this client&apos;s progress updates.
           </p>
 
           {editingPhoto && (
@@ -1661,6 +1784,25 @@ function TypeBadge({ type }: { type: ScheduleType }) {
   return (
     <span className="inline-flex rounded-full border px-3 py-1 text-xs font-medium uppercase tracking-wide text-slate-800">
       {type}
+    </span>
+  );
+}
+
+function SessionStatusBadge({ status }: { status: OnlineSessionStatus }) {
+  const tone = getSessionStatusTone(status);
+
+  const classes =
+    tone === "success"
+      ? "border-emerald-200 bg-emerald-50 text-emerald-700"
+      : tone === "danger"
+      ? "border-rose-200 bg-rose-50 text-rose-700"
+      : "border-[#dbeafe] bg-[#eff6ff] text-[#1d4ed8]";
+
+  return (
+    <span
+      className={`rounded-full border px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.16em] ${classes}`}
+    >
+      {status}
     </span>
   );
 }

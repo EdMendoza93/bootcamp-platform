@@ -23,6 +23,11 @@ export default function ProtectedRoute({
       return;
     }
 
+    if (appUser && appUser.status === "inactive") {
+      router.replace("/login");
+      return;
+    }
+
     if (appUser && normalizeRole(appUser.role) !== "user") {
       router.replace(getHomeRouteForRole(appUser.role));
     }
@@ -30,6 +35,10 @@ export default function ProtectedRoute({
 
   if (loading) {
     return <p className="p-10">Loading...</p>;
+  }
+
+  if (appUser && appUser.status === "inactive") {
+    return null;
   }
 
   if (firebaseUser && appUser && normalizeRole(appUser.role) !== "user") {

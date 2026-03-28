@@ -7,7 +7,7 @@ import {
   useMemo,
   useState,
 } from "react";
-import { onAuthStateChanged, User } from "firebase/auth";
+import { onAuthStateChanged, signOut, User } from "firebase/auth";
 import { doc, getDoc } from "firebase/firestore";
 import { auth, db } from "@/lib/firebase";
 import { AppRole, normalizeRole } from "@/lib/roles";
@@ -17,6 +17,7 @@ type AppUser = {
   email: string | null;
   name: string | null;
   role: AppRole;
+  status: "active" | "inactive";
 };
 
 type AuthContextType = {
@@ -57,12 +58,23 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         const userSnap = await getDoc(userRef);
 
         if (userSnap.exists()) {
-          const data = userSnap.data() as Partial<AppUser> & { role?: string };
+          const data = userSnap.data() as Partial<AppUser> & { role?: string; status?: "active" | "inactive" };
+          const nextStatus = data.status === "inactive" ? "inactive" : "active";
+
+          if (nextStatus === "inactive") {
+            await signOut(auth);
+            setAppUser(null);
+            setFirebaseUser(null);
+            setProfileLoading(false);
+            return;
+          }
+
           setAppUser({
             uid: currentUser.uid,
             email: data.email ?? currentUser.email,
             name: data.name ?? currentUser.displayName ?? "",
             role: normalizeRole(data.role),
+            status: nextStatus,
           });
         } else {
           setAppUser({
@@ -70,6 +82,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             email: currentUser.email,
             name: currentUser.displayName || "",
             role: "user",
+            status: "active",
           });
         }
       } catch (error) {
@@ -79,6 +92,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           email: currentUser.email,
           name: currentUser.displayName || "",
           role: normalizeRole("user"),
+          status: "active",
         });
       } finally {
         setProfileLoading(false);

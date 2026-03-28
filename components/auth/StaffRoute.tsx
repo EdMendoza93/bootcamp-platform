@@ -23,6 +23,11 @@ export default function StaffRoute({
       return;
     }
 
+    if (appUser && appUser.status === "inactive") {
+      router.replace("/login");
+      return;
+    }
+
     if (appUser && !canAccessStaff(appUser.role)) {
       router.replace(getHomeRouteForRole(appUser.role));
     }
@@ -33,6 +38,7 @@ export default function StaffRoute({
   }
 
   if (!firebaseUser) return null;
+  if (appUser && appUser.status === "inactive") return null;
   if (!appUser || !canAccessStaff(appUser.role)) return null;
 
   return <>{children}</>;

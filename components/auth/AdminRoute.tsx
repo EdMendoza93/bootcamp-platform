@@ -23,6 +23,11 @@ export default function AdminRoute({
       return;
     }
 
+    if (appUser && appUser.status === "inactive") {
+      router.replace("/login");
+      return;
+    }
+
     if (appUser && appUser.role !== "admin") {
       router.replace(getHomeRouteForRole(appUser.role));
     }
@@ -33,6 +38,10 @@ export default function AdminRoute({
   }
 
   if (!firebaseUser) {
+    return null;
+  }
+
+  if (appUser && appUser.status === "inactive") {
     return null;
   }
 

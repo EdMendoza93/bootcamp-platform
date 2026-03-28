@@ -7,6 +7,8 @@ const navItems = [
   { label: "Dashboard", href: "/dashboard" },
   { label: "Application", href: "/dashboard/application" },
   { label: "Profile", href: "/dashboard/profile" },
+  { label: "Sessions", href: "/dashboard/sessions" },
+  { label: "Messages", href: "/dashboard/messages" },
   { label: "Progress", href: "/dashboard/progress" },
 ];
 

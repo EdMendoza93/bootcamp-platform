@@ -8,6 +8,7 @@ import {
   getRedirectResult,
   onAuthStateChanged,
   setPersistence,
+  signOut,
   signInWithEmailAndPassword,
   signInWithPopup,
   browserLocalPersistence,
@@ -64,6 +65,7 @@ async function ensureUserDoc(
       email: String(email || "").trim().toLowerCase(),
       name: nextName,
       role: nextRole,
+      status: "active",
       createdAt: serverTimestamp(),
       updatedAt: serverTimestamp(),
     });
@@ -98,7 +100,12 @@ async function routeUserByRole(uid: string) {
     return;
   }
 
-  const data = userSnap.data() as { role?: string };
+  const data = userSnap.data() as { role?: string; status?: "active" | "inactive" };
+  if (data.status === "inactive") {
+    await signOut(auth);
+    window.location.replace("/login");
+    return;
+  }
   window.location.replace(getHomeRouteForRole(data.role));
 }
 

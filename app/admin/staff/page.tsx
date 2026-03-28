@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { addDoc, collection, getDocs, orderBy, query, serverTimestamp } from "firebase/firestore";
+import { addDoc, collection, deleteDoc, doc, getDocs, orderBy, query, serverTimestamp, updateDoc } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { useToast } from "@/components/ui/ToastProvider";
 import { AppRole, getRoleLabel } from "@/lib/roles";
@@ -20,6 +20,7 @@ type StaffUser = {
   email?: string;
   name?: string;
   role?: string;
+  status?: "active" | "inactive";
 };
 
 export default function AdminStaffPage() {
@@ -85,6 +86,8 @@ export default function AdminStaffPage() {
   const summary = useMemo(
     () => ({
       total: staffUsers.length,
+      active: staffUsers.filter((item) => item.status !== "inactive").length,
+      inactive: staffUsers.filter((item) => item.status === "inactive").length,
       admins: staffUsers.filter((item) => item.role === "admin").length,
       coaches: staffUsers.filter((item) => item.role === "coach").length,
       nutritionists: staffUsers.filter((item) => item.role === "nutritionist").length,
@@ -92,6 +95,57 @@ export default function AdminStaffPage() {
     }),
     [invites, staffUsers]
   );
+
+  const toggleStaffStatus = async (staffUser: StaffUser) => {
+    const nextStatus = staffUser.status === "inactive" ? "active" : "inactive";
+
+    try {
+      await updateDoc(doc(db, "users", staffUser.id), {
+        status: nextStatus,
+        updatedAt: serverTimestamp(),
+      });
+
+      await loadData();
+
+      showToast({
+        title: nextStatus === "active" ? "Staff activated" : "Staff deactivated",
+        description:
+          nextStatus === "active"
+            ? "They can access the platform again."
+            : "They can no longer access the platform.",
+        type: "success",
+      });
+    } catch (error) {
+      console.error("Toggle staff status error:", error);
+      showToast({
+        title: "Update failed",
+        description: "Could not update staff access.",
+        type: "error",
+      });
+    }
+  };
+
+  const revokeInvite = async (inviteId: string) => {
+    const confirmed = window.confirm("Revoke this invite?");
+    if (!confirmed) return;
+
+    try {
+      await deleteDoc(doc(db, "staffInvites", inviteId));
+      await loadData();
+      showToast({
+        title: "Invite revoked",
+        description: "The staff invite was removed.",
+        type: "success",
+      });
+    } catch (error) {
+      console.error("Revoke invite error:", error);
+      showToast({
+        title: "Could not revoke invite",
+        description: "Please try again.",
+        type: "error",
+      });
+    }
+  };
 
   const createInvite = async () => {
     const fullName = form.fullName.trim();
@@ -178,10 +232,10 @@ export default function AdminStaffPage() {
 
       <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
         <SummaryCard label="Staff" value={String(summary.total)} tone="light" />
+        <SummaryCard label="Active" value={String(summary.active)} tone="success" />
+        <SummaryCard label="Inactive" value={String(summary.inactive)} tone="warning" />
         <SummaryCard label="Admins" value={String(summary.admins)} tone="dark" />
-        <SummaryCard label="Coaches" value={String(summary.coaches)} tone="blue" />
-        <SummaryCard label="Nutritionists" value={String(summary.nutritionists)} tone="success" />
-        <SummaryCard label="Pending Invites" value={String(summary.pendingInvites)} tone="warning" />
+        <SummaryCard label="Pending Invites" value={String(summary.pendingInvites)} tone="blue" />
       </section>
 
       <section className="grid gap-6 xl:grid-cols-[0.95fr_1.05fr]">
@@ -264,8 +318,28 @@ export default function AdminStaffPage() {
                       {item.name || item.email || item.id}
                     </p>
                     <p className="mt-1 text-sm text-slate-500">{item.email || item.id}</p>
-                    <div className="mt-3 inline-flex rounded-full border border-slate-200 bg-white px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-700">
-                      {getRoleLabel(item.role)}
+                    <div className="mt-3 flex flex-wrap items-center gap-2">
+                      <div className="inline-flex rounded-full border border-slate-200 bg-white px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-700">
+                        {getRoleLabel(item.role)}
+                      </div>
+                      <div
+                        className={`inline-flex rounded-full px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.16em] ${
+                          item.status === "inactive"
+                            ? "bg-amber-100 text-amber-700"
+                            : "bg-emerald-100 text-emerald-700"
+                        }`}
+                      >
+                        {item.status === "inactive" ? "inactive" : "active"}
+                      </div>
+                    </div>
+                    <div className="mt-4 flex flex-wrap gap-2">
+                      <button
+                        type="button"
+                        onClick={() => void toggleStaffStatus(item)}
+                        className="rounded-2xl border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-50"
+                      >
+                        {item.status === "inactive" ? "Activate" : "Deactivate"}
+                      </button>
                     </div>
                   </div>
                 ))
@@ -302,6 +376,17 @@ export default function AdminStaffPage() {
                     <p className="mt-2 text-xs uppercase tracking-[0.16em] text-slate-500">
                       {getRoleLabel(item.role)}
                     </p>
+                    {item.status !== "accepted" ? (
+                      <div className="mt-4 flex flex-wrap gap-2">
+                        <button
+                          type="button"
+                          onClick={() => void revokeInvite(item.id)}
+                          className="rounded-2xl border border-rose-200 bg-rose-50 px-4 py-2 text-sm font-medium text-rose-700 transition hover:bg-rose-100"
+                        >
+                          Revoke invite
+                        </button>
+                      </div>
+                    ) : null}
                   </div>
                 ))
               )}
