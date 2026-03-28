@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import { useEffect, useMemo, useState } from "react";
 import { auth, db, storage } from "@/lib/firebase";
 import { onAuthStateChanged } from "firebase/auth";
@@ -523,9 +524,11 @@ export default function ProgressPage() {
                 <div className="mb-3 inline-flex rounded-full border bg-slate-50 px-3 py-1 text-xs font-medium text-slate-700">
                   Before
                 </div>
-                <img
+                <Image
                   src={beforePhoto.imageUrl}
                   alt={beforePhoto.title || "Before photo"}
+                  width={1200}
+                  height={900}
                   className="h-72 w-full rounded-xl object-cover"
                 />
                 <p className="mt-3 font-medium">
@@ -540,9 +543,11 @@ export default function ProgressPage() {
                 <div className="mb-3 inline-flex rounded-full border bg-slate-50 px-3 py-1 text-xs font-medium text-slate-700">
                   After
                 </div>
-                <img
+                <Image
                   src={afterPhoto.imageUrl}
                   alt={afterPhoto.title || "After photo"}
+                  width={1200}
+                  height={900}
                   className="h-72 w-full rounded-xl object-cover"
                 />
                 <p className="mt-3 font-medium">
@@ -598,9 +603,11 @@ export default function ProgressPage() {
 
             {editingPhoto && (
               <div className="mt-4 overflow-hidden rounded-2xl border bg-slate-50 p-3">
-                <img
+                <Image
                   src={editingPhoto.imageUrl}
                   alt={editingPhoto.title || "Editing photo"}
+                  width={1200}
+                  height={900}
                   className="h-48 w-full rounded-xl object-cover"
                 />
               </div>
@@ -637,9 +644,12 @@ export default function ProgressPage() {
 
                   {previewUrl && (
                     <div className="mt-4 overflow-hidden rounded-2xl border bg-slate-50 p-3">
-                      <img
+                      <Image
                         src={previewUrl}
                         alt="Selected preview"
+                        unoptimized
+                        width={1200}
+                        height={900}
                         className="h-48 w-full rounded-xl object-cover"
                       />
                     </div>
@@ -812,10 +822,12 @@ export default function ProgressPage() {
                     onClick={() => openPhotoModal(photo)}
                     className="w-full text-left"
                   >
-                    <img
+                    <Image
                       src={photo.imageUrl}
-                      className="h-56 w-full rounded-xl object-cover"
                       alt={photo.title || "Progress photo"}
+                      width={1200}
+                      height={1200}
+                      className="h-56 w-full rounded-xl object-cover"
                     />
                   </button>
 
@@ -903,9 +915,11 @@ export default function ProgressPage() {
             </div>
 
             <div className="mt-6 flex justify-center rounded-2xl bg-gray-50 p-4">
-              <img
+              <Image
                 src={photoModalData.imageUrl}
                 alt={photoModalData.title}
+                width={1600}
+                height={2000}
                 className="max-h-[72vh] w-auto max-w-full rounded-2xl object-contain"
               />
             </div>

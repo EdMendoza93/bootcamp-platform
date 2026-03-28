@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import { useEffect, useMemo, useState } from "react";
 import { db, storage } from "@/lib/firebase";
 import {
@@ -452,9 +453,11 @@ export default function AdminProgressPage() {
 
             {editingPhoto && (
               <div className="mt-4 overflow-hidden rounded-2xl border bg-slate-50 p-3">
-                <img
+                <Image
                   src={editingPhoto.imageUrl}
                   alt={editingPhoto.title || "Editing photo"}
+                  width={1200}
+                  height={900}
                   className="h-48 w-full rounded-xl object-cover"
                 />
               </div>
@@ -627,9 +630,11 @@ export default function AdminProgressPage() {
                   className="w-full text-left"
                 >
                   <div className="flex aspect-[4/5] items-center justify-center overflow-hidden rounded-xl bg-gray-100">
-                    <img
+                    <Image
                       src={photo.imageUrl}
                       alt={photo.title || "Progress photo"}
+                      width={1200}
+                      height={1500}
                       className="max-h-full max-w-full object-contain"
                     />
                   </div>
@@ -744,9 +749,11 @@ export default function AdminProgressPage() {
             </div>
 
             <div className="mt-6 flex justify-center rounded-2xl bg-gray-50 p-4">
-              <img
+              <Image
                 src={photoModalData.imageUrl}
                 alt={photoModalData.title}
+                width={1600}
+                height={2000}
                 className="max-h-[72vh] w-auto max-w-full rounded-2xl object-contain"
               />
             </div>

@@ -1,7 +1,8 @@
 "use client";
 
+import Image from "next/image";
 import Link from "next/link";
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useParams } from "next/navigation";
 import { db, storage } from "@/lib/firebase";
 import {
@@ -312,7 +313,7 @@ export default function AdminProfileDetailPage() {
 
   const { showToast } = useToast();
 
-  const resolveTemplateTitle = async (
+  const resolveTemplateTitle = useCallback(async (
     type: ScheduleType,
     templateId?: string
   ) => {
@@ -333,9 +334,9 @@ export default function AdminProfileDetailPage() {
     } catch {
       return "";
     }
-  };
+  }, []);
 
-  const loadScheduleItems = async (targetProfileId: string) => {
+  const loadScheduleItems = useCallback(async (targetProfileId: string) => {
     const q = query(
       collection(db, "scheduleItems"),
       where("profileId", "==", targetProfileId)
@@ -375,9 +376,9 @@ export default function AdminProfileDetailPage() {
     });
 
     setScheduleItems(resolved);
-  };
+  }, [resolveTemplateTitle]);
 
-  const loadProgressPhotos = async (targetProfileId: string) => {
+  const loadProgressPhotos = useCallback(async (targetProfileId: string) => {
     const q = query(
       collection(db, "progressPhotos"),
       where("profileId", "==", targetProfileId)
@@ -393,9 +394,9 @@ export default function AdminProfileDetailPage() {
       .sort((a, b) => getPhotoSortValue(b) - getPhotoSortValue(a)) as ProgressPhoto[];
 
     setProgressPhotos(data);
-  };
+  }, []);
 
-  const loadOnlineSessions = async (targetProfileId: string) => {
+  const loadOnlineSessions = useCallback(async (targetProfileId: string) => {
     const q = query(
       collection(db, "onlineSessions"),
       where("profileId", "==", targetProfileId)
@@ -411,9 +412,9 @@ export default function AdminProfileDetailPage() {
     );
 
     setOnlineSessions(data);
-  };
+  }, []);
 
-  const loadBookings = async (targetProfileId: string) => {
+  const loadBookings = useCallback(async (targetProfileId: string) => {
     const q = query(
       collection(db, "bookings"),
       where("profileId", "==", targetProfileId)
@@ -427,9 +428,9 @@ export default function AdminProfileDetailPage() {
     })) as BookingRecord[];
 
     setBookings(data);
-  };
+  }, []);
 
-  const loadMessageThreads = async (targetProfileId: string) => {
+  const loadMessageThreads = useCallback(async (targetProfileId: string) => {
     const q = query(
       collection(db, "messageThreads"),
       where("clientProfileId", "==", targetProfileId)
@@ -445,7 +446,7 @@ export default function AdminProfileDetailPage() {
     );
 
     setMessageThreads(data);
-  };
+  }, []);
 
   useEffect(() => {
     const loadProfile = async () => {
@@ -543,7 +544,15 @@ export default function AdminProfileDetailPage() {
     };
 
     loadProfile();
-  }, [profileRouteId, showToast]);
+  }, [
+    loadBookings,
+    loadMessageThreads,
+    loadOnlineSessions,
+    loadProgressPhotos,
+    loadScheduleItems,
+    profileRouteId,
+    showToast,
+  ]);
 
   const saveProfile = async () => {
     if (!profileId) return;
@@ -1648,9 +1657,11 @@ export default function AdminProfileDetailPage() {
 
           {editingPhoto && (
             <div className="mt-4 overflow-hidden rounded-2xl border bg-slate-50 p-3">
-              <img
+              <Image
                 src={editingPhoto.imageUrl}
                 alt={editingPhoto.title || "Editing photo"}
+                width={1200}
+                height={900}
                 className="h-48 w-full rounded-xl object-cover"
               />
             </div>
@@ -1817,9 +1828,11 @@ export default function AdminProfileDetailPage() {
                         className="w-full text-left"
                       >
                         <div className="flex aspect-[4/5] items-center justify-center overflow-hidden rounded-xl bg-slate-100">
-                          <img
+                          <Image
                             src={photo.imageUrl}
                             alt={photo.title || "Progress photo"}
+                            width={1200}
+                            height={1500}
                             className="max-h-full max-w-full object-contain"
                           />
                         </div>
@@ -1936,9 +1949,11 @@ export default function AdminProfileDetailPage() {
             </div>
 
             <div className="mt-6 flex justify-center rounded-2xl bg-slate-50 p-4">
-              <img
+              <Image
                 src={photoModalData.imageUrl}
                 alt={photoModalData.title}
+                width={1600}
+                height={2000}
                 className="max-h-[72vh] w-auto max-w-full rounded-2xl object-contain"
               />
             </div>

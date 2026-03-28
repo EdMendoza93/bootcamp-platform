@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import Image from "next/image";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { auth, db } from "@/lib/firebase";
 import { onAuthStateChanged, User } from "firebase/auth";
 import {
@@ -173,7 +174,7 @@ export default function DashboardPage() {
     photoDate: "",
   });
 
-  const resolveTemplateTitle = async (
+  const resolveTemplateTitle = useCallback(async (
     type: ScheduleType,
     templateId?: string
   ) => {
@@ -194,9 +195,9 @@ export default function DashboardPage() {
     } catch {
       return "";
     }
-  };
+  }, []);
 
-  const loadDashboard = async () => {
+  const loadDashboard = useCallback(async () => {
     const currentUser = auth.currentUser || (await waitForUser(5000));
 
     if (!currentUser) {
@@ -359,7 +360,7 @@ export default function DashboardPage() {
       setOnlineSessions([]);
       setMessageThreads([]);
     }
-  };
+  }, [resolveTemplateTitle]);
 
   useEffect(() => {
     let cancelled = false;
@@ -382,7 +383,7 @@ export default function DashboardPage() {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [loadDashboard]);
 
   const refreshDashboard = async () => {
     setRefreshing(true);
@@ -1022,9 +1023,11 @@ export default function DashboardPage() {
                   className="rounded-[24px] border border-white/80 bg-white/95 p-3 text-left shadow-[0_14px_40px_rgba(15,23,42,0.07)] transition-all duration-200 hover:-translate-y-1 hover:shadow-[0_20px_45px_rgba(15,23,42,0.10)]"
                 >
                   <div className="flex aspect-[4/5] items-center justify-center overflow-hidden rounded-[18px] bg-slate-100">
-                    <img
+                    <Image
                       src={photo.imageUrl}
                       alt={photo.title || "Progress photo"}
+                      width={1200}
+                      height={1500}
                       className="max-h-full max-w-full object-contain"
                     />
                   </div>
@@ -1134,9 +1137,11 @@ export default function DashboardPage() {
             </div>
 
             <div className="mt-6 flex justify-center rounded-[22px] border border-slate-100 bg-gradient-to-br from-slate-50 to-white p-4">
-              <img
+              <Image
                 src={photoModalData.imageUrl}
                 alt={photoModalData.title}
+                width={1600}
+                height={2000}
                 className="max-h-[72vh] w-auto max-w-full rounded-[20px] object-contain"
               />
             </div>
