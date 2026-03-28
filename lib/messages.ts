@@ -19,6 +19,7 @@ export type MessageThreadRecord = {
   lastMessageAt?: { seconds?: number; nanoseconds?: number };
   lastMessagePreview?: string;
   lastSenderRole?: AppRole;
+  readByUserIds?: string[];
 };
 
 export type ThreadMessageRecord = {

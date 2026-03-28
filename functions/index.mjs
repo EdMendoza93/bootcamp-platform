@@ -1,4 +1,5 @@
 import { onCall, HttpsError } from "firebase-functions/v2/https";
+import { onDocumentCreated } from "firebase-functions/v2/firestore";
 import { initializeApp } from "firebase-admin/app";
 import { getFirestore, FieldValue } from "firebase-admin/firestore";
 import { getMessaging } from "firebase-admin/messaging";
@@ -68,6 +69,162 @@ async function getUserPushTokens(userId) {
   return snap.docs
     .map((doc) => doc.get("token"))
     .filter((token) => typeof token === "string" && token.length > 0);
+}
+
+async function getActiveUserIdsByRoles(roles) {
+  const uniqueRoles = [...new Set(roles.filter((role) => typeof role === "string" && role))];
+
+  if (uniqueRoles.length === 0) {
+    return [];
+  }
+
+  const snapshots = await Promise.all(
+    uniqueRoles.map((role) =>
+      db
+        .collection("users")
+        .where("role", "==", role)
+        .get()
+    )
+  );
+
+  const userIds = [];
+
+  snapshots.forEach((snap) => {
+    snap.docs.forEach((doc) => {
+      const data = doc.data() || {};
+      if (data.status !== "inactive") {
+        userIds.push(doc.id);
+      }
+    });
+  });
+
+  return [...new Set(userIds)];
+}
+
+async function sendPushToUserIds({
+  userIds,
+  title,
+  body,
+  url = "/",
+  createdBy = "",
+  metadata = {},
+}) {
+  const targetUserIds = [...new Set(userIds.filter((value) => typeof value === "string" && value.trim()))];
+
+  if (targetUserIds.length === 0) {
+    return {
+      targetedUsers: 0,
+      usersWithoutTokens: [],
+      successCount: 0,
+      failureCount: 0,
+    };
+  }
+
+  const tokenGroups = await Promise.all(
+    targetUserIds.map((userId) => getUserPushTokens(userId))
+  );
+
+  const usersWithoutTokens = [];
+  tokenGroups.forEach((tokens, index) => {
+    if (tokens.length === 0) {
+      usersWithoutTokens.push(targetUserIds[index]);
+    }
+  });
+
+  const uniqueTokens = [...new Set(tokenGroups.flat())];
+
+  if (uniqueTokens.length === 0) {
+    return {
+      targetedUsers: targetUserIds.length,
+      usersWithoutTokens,
+      successCount: 0,
+      failureCount: 0,
+    };
+  }
+
+  const safeUrl = String(url || "/").startsWith("/") ? String(url || "/") : "/";
+
+  const response = await getMessaging().sendEachForMulticast({
+    tokens: uniqueTokens,
+    data: {
+      title: String(title || "").trim(),
+      body: String(body || "").trim(),
+      url: safeUrl,
+    },
+    webpush: {
+      headers: {
+        Urgency: "high",
+      },
+      fcmOptions: {
+        link: safeUrl,
+      },
+    },
+  });
+
+  const invalidTokenErrors = new Set([
+    "messaging/invalid-registration-token",
+    "messaging/registration-token-not-registered",
+  ]);
+
+  const invalidTokens = [];
+
+  response.responses.forEach((result, index) => {
+    if (
+      !result.success &&
+      result.error &&
+      invalidTokenErrors.has(result.error.code)
+    ) {
+      invalidTokens.push(uniqueTokens[index]);
+    }
+  });
+
+  if (invalidTokens.length > 0) {
+    await Promise.all(
+      targetUserIds.map(async (userId) => {
+        const snap = await db
+          .collection("users")
+          .doc(userId)
+          .collection("pushTokens")
+          .get();
+
+        const removals = snap.docs.filter((doc) =>
+          invalidTokens.includes(doc.get("token"))
+        );
+
+        await Promise.all(removals.map((doc) => doc.ref.delete()));
+      })
+    );
+  }
+
+  await db.collection("pushLogs").add({
+    title,
+    body,
+    url: safeUrl,
+    audience: "selected",
+    selectedUserIds: targetUserIds,
+    usersWithoutTokens,
+    targetedUsers: targetUserIds.length,
+    targetedTokens: uniqueTokens.length,
+    successCount: response.successCount,
+    failureCount: response.failureCount,
+    createdBy,
+    metadata,
+    createdAt: FieldValue.serverTimestamp(),
+  });
+
+  return {
+    targetedUsers: targetUserIds.length,
+    usersWithoutTokens,
+    successCount: response.successCount,
+    failureCount: response.failureCount,
+  };
+}
+
+function getThreadRecipientRoles(threadCategory) {
+  if (threadCategory === "coach") return ["coach", "admin"];
+  if (threadCategory === "nutrition") return ["nutritionist", "admin"];
+  if (threadCategory === "sessions") return ["coach", "nutritionist", "admin"];
+  return ["admin"];
 }
 
 function normalizeRecipientValue(value) {
@@ -504,6 +661,79 @@ export const sendPushNotification = onCall(
         "internal",
         error instanceof Error ? error.message : "Push failed."
       );
+    }
+  }
+);
+
+export const notifyInboxMessageCreated = onDocumentCreated(
+  {
+    region: "us-central1",
+    document: "messageThreads/{threadId}/messages/{messageId}",
+  },
+  async (event) => {
+    try {
+      const messageSnap = event.data;
+      if (!messageSnap?.exists) {
+        return;
+      }
+
+      const { threadId } = event.params;
+      const message = messageSnap.data() || {};
+      const threadSnap = await db.collection("messageThreads").doc(threadId).get();
+
+      if (!threadSnap.exists) {
+        return;
+      }
+
+      const thread = threadSnap.data() || {};
+      const senderUid = String(message.senderUid || "").trim();
+      const senderRole = String(message.senderRole || "").trim();
+      const senderName = String(message.senderName || "").trim();
+      const subject = String(thread.subject || "").trim() || "New message";
+      const preview = String(message.body || "").trim();
+
+      let targetUserIds = [];
+
+      if (senderRole === "user") {
+        targetUserIds = await getActiveUserIdsByRoles(
+          getThreadRecipientRoles(String(thread.category || "general"))
+        );
+      } else {
+        const clientUserId = String(thread.clientUserId || "").trim();
+        targetUserIds = clientUserId ? [clientUserId] : [];
+      }
+
+      const filteredTargets = targetUserIds.filter((userId) => userId && userId !== senderUid);
+
+      if (filteredTargets.length === 0) {
+        return;
+      }
+
+      const title =
+        senderRole === "user"
+          ? `Client message: ${subject}`
+          : `New message from ${senderName || "staff"}`;
+
+      const body = preview
+        ? preview.slice(0, 160)
+        : "You have a new message in your inbox.";
+
+      await sendPushToUserIds({
+        userIds: filteredTargets,
+        title,
+        body,
+        url: "/",
+        createdBy: senderUid,
+        metadata: {
+          source: "messages",
+          threadId,
+          messageId: messageSnap.id,
+          senderRole,
+          category: String(thread.category || "general"),
+        },
+      });
+    } catch (error) {
+      console.error("notifyInboxMessageCreated error:", error);
     }
   }
 );

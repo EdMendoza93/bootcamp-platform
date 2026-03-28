@@ -5,6 +5,23 @@ import { auth, db } from "@/lib/firebase";
 import { onAuthStateChanged } from "firebase/auth";
 import { collection, doc, getDoc, getDocs } from "firebase/firestore";
 import { useToast } from "@/components/ui/ToastProvider";
+import {
+  formatThreadTimestamp,
+  getMessageCategoryClasses,
+  getMessageCategoryLabel,
+  MessageThreadRecord,
+  sortThreads,
+} from "@/lib/messages";
+import {
+  getProviderRoleLabel,
+  getSessionPaymentStatusClasses,
+  getSessionPaymentStatusLabel,
+  getSessionStatusTone,
+  isUpcomingSession,
+  normalizeSessionPayment,
+  OnlineSessionRecord,
+  sortSessions,
+} from "@/lib/online-sessions";
 
 type Application = {
   id: string;
@@ -76,11 +93,14 @@ function formatPhotoDate(
 export default function AdminPage() {
   const [loading, setLoading] = useState(true);
   const [allowed, setAllowed] = useState(false);
+  const [currentUserId, setCurrentUserId] = useState("");
 
   const [applications, setApplications] = useState<Application[]>([]);
   const [profiles, setProfiles] = useState<Profile[]>([]);
   const [scheduleItems, setScheduleItems] = useState<ScheduleItem[]>([]);
   const [progressPhotos, setProgressPhotos] = useState<ProgressPhoto[]>([]);
+  const [onlineSessions, setOnlineSessions] = useState<OnlineSessionRecord[]>([]);
+  const [messageThreads, setMessageThreads] = useState<MessageThreadRecord[]>([]);
 
   const { showToast } = useToast();
 
@@ -108,13 +128,16 @@ export default function AdminPage() {
         }
 
         setAllowed(true);
+        setCurrentUserId(currentUser.uid);
 
-        const [appsSnap, profilesSnap, scheduleSnap, progressSnap] =
+        const [appsSnap, profilesSnap, scheduleSnap, progressSnap, sessionsSnap, threadsSnap] =
           await Promise.all([
             getDocs(collection(db, "applications")),
             getDocs(collection(db, "profiles")),
             getDocs(collection(db, "scheduleItems")),
             getDocs(collection(db, "progressPhotos")),
+            getDocs(collection(db, "onlineSessions")),
+            getDocs(collection(db, "messageThreads")),
           ]);
 
         const appData = appsSnap.docs.map((docItem) => ({
@@ -139,6 +162,20 @@ export default function AdminPage() {
           }))
           .sort((a, b) => getPhotoSortValue(b) - getPhotoSortValue(a)) as ProgressPhoto[];
 
+        const sessionData = sortSessions(
+          sessionsSnap.docs.map((docItem) => ({
+            id: docItem.id,
+            ...(docItem.data() as Omit<OnlineSessionRecord, "id">),
+          })) as OnlineSessionRecord[]
+        );
+
+        const threadData = sortThreads(
+          threadsSnap.docs.map((docItem) => ({
+            id: docItem.id,
+            ...(docItem.data() as Omit<MessageThreadRecord, "id">),
+          })) as MessageThreadRecord[]
+        );
+
         scheduleData.sort((a, b) => {
           if (a.date !== b.date) return a.date.localeCompare(b.date);
           return (a.startTime || "").localeCompare(b.startTime || "");
@@ -148,6 +185,8 @@ export default function AdminPage() {
         setProfiles(profileData);
         setScheduleItems(scheduleData);
         setProgressPhotos(progressData);
+        setOnlineSessions(sessionData);
+        setMessageThreads(threadData);
       } catch (error) {
         console.error("Admin overview error:", error);
         showToast({
@@ -202,6 +241,37 @@ export default function AdminPage() {
 
   const recentSchedule = useMemo(() => scheduleItems.slice(0, 6), [scheduleItems]);
   const recentUploads = useMemo(() => progressPhotos.slice(0, 6), [progressPhotos]);
+  const recentSessions = useMemo(
+    () =>
+      onlineSessions
+        .filter((item) => item.status === "scheduled")
+        .slice(0, 4),
+    [onlineSessions]
+  );
+  const recentThreads = useMemo(() => messageThreads.slice(0, 4), [messageThreads]);
+
+  const sessionSummary = useMemo(
+    () => ({
+      total: onlineSessions.length,
+      upcoming: onlineSessions.filter((item) => isUpcomingSession(item)).length,
+      paymentPending: onlineSessions.filter(
+        (item) => normalizeSessionPayment(item).paymentStatus === "pending"
+      ).length,
+    }),
+    [onlineSessions]
+  );
+
+  const threadSummary = useMemo(
+    () => ({
+      open: messageThreads.filter((item) => item.status === "open").length,
+      unread: currentUserId
+        ? messageThreads.filter(
+            (item) => !item.readByUserIds?.includes(currentUserId)
+          ).length
+        : 0,
+    }),
+    [currentUserId, messageThreads]
+  );
 
   const profileNameMap = useMemo(() => {
     const map: Record<string, string> = {};
@@ -298,6 +368,8 @@ export default function AdminPage() {
                 <HeroPill label="Applications" value={String(applications.length)} />
                 <HeroPill label="Clients" value={String(profiles.length)} />
                 <HeroPill label="Schedule" value={String(scheduleItems.length)} />
+                <HeroPill label="Sessions" value={String(onlineSessions.length)} />
+                <HeroPill label="Inbox" value={String(messageThreads.length)} />
               </div>
             </div>
 
@@ -414,6 +486,172 @@ export default function AdminPage() {
           title="Progress"
           description="Review recent photo uploads and keep transformations organized."
         />
+        <QuickLinkCard
+          href="/admin/online-sessions"
+          title="Online Sessions"
+          description="Manage post-bootcamp follow-up calls without mixing them into the on-site schedule."
+        />
+        <QuickLinkCard
+          href="/admin/messages"
+          title="Messages"
+          description="Stay on top of coach, nutrition, and private session threads."
+        />
+      </section>
+
+      <section className="grid gap-6 xl:grid-cols-2">
+        <div className="rounded-[28px] border border-white/70 bg-white/90 p-6 shadow-[0_18px_50px_rgba(15,23,42,0.07)] backdrop-blur">
+          <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
+            <div>
+              <p className="text-sm font-semibold uppercase tracking-[0.18em] text-[#1d4ed8]">
+                Follow-up
+              </p>
+              <h2 className="mt-2 text-2xl font-semibold tracking-tight text-slate-950">
+                Sessions Watch
+              </h2>
+              <p className="mt-2 text-sm text-slate-500">
+                Private calls stay separate from the bootcamp itinerary and can carry payment state later.
+              </p>
+            </div>
+            <a
+              href="/admin/online-sessions"
+              className="rounded-2xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-medium text-slate-700 shadow-sm transition hover:-translate-y-0.5 hover:border-slate-300 hover:shadow-md"
+            >
+              Open Sessions
+            </a>
+          </div>
+
+          <div className="mt-6 grid gap-3 sm:grid-cols-3">
+            <MiniStat label="Total" value={String(sessionSummary.total)} />
+            <MiniStat label="Upcoming" value={String(sessionSummary.upcoming)} />
+            <MiniStat
+              label="Payment Pending"
+              value={String(sessionSummary.paymentPending)}
+            />
+          </div>
+
+          {recentSessions.length === 0 ? (
+            <div className="mt-6 rounded-[22px] border border-dashed border-slate-200 p-8 text-center text-sm text-slate-500">
+              No scheduled follow-up sessions yet.
+            </div>
+          ) : (
+            <div className="mt-6 space-y-3">
+              {recentSessions.map((item) => {
+                const profile = profileNameMap[item.profileId] || "Unknown client";
+                const payment = normalizeSessionPayment(item);
+
+                return (
+                  <div
+                    key={item.id}
+                    className="rounded-[22px] border border-slate-100 bg-gradient-to-br from-slate-50 to-white p-4"
+                  >
+                    <div className="flex flex-wrap items-center gap-2">
+                      <SessionStatusPill status={item.status} />
+                      <span className="rounded-full border border-[#dbeafe] bg-[#eff6ff] px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.16em] text-[#1d4ed8]">
+                        {getProviderRoleLabel(item.providerRole)}
+                      </span>
+                      <span
+                        className={`rounded-full border px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.16em] ${getSessionPaymentStatusClasses(payment.paymentStatus)}`}
+                      >
+                        {getSessionPaymentStatusLabel(payment.paymentStatus)}
+                      </span>
+                    </div>
+
+                    <p className="mt-3 text-sm font-semibold text-slate-900">
+                      {item.title?.trim() || "Private session"}
+                    </p>
+                    <p className="mt-1 text-sm text-slate-600">
+                      {profile} · {item.scheduledDate} at {item.startTime}
+                    </p>
+                    <p className="mt-2 text-xs uppercase tracking-[0.14em] text-slate-500">
+                      {payment.paymentRequired
+                        ? payment.price
+                          ? `${payment.currency} ${payment.price}`
+                          : "Payment required"
+                        : "No payment attached"}
+                    </p>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+
+        <div className="rounded-[28px] border border-white/70 bg-white/90 p-6 shadow-[0_18px_50px_rgba(15,23,42,0.07)] backdrop-blur">
+          <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
+            <div>
+              <p className="text-sm font-semibold uppercase tracking-[0.18em] text-[#1d4ed8]">
+                Inbox
+              </p>
+              <h2 className="mt-2 text-2xl font-semibold tracking-tight text-slate-950">
+                Message Watch
+              </h2>
+              <p className="mt-2 text-sm text-slate-500">
+                Keep an eye on client questions across coach, nutrition, and private session threads.
+              </p>
+            </div>
+            <a
+              href="/admin/messages"
+              className="rounded-2xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-medium text-slate-700 shadow-sm transition hover:-translate-y-0.5 hover:border-slate-300 hover:shadow-md"
+            >
+              Open Inbox
+            </a>
+          </div>
+
+          <div className="mt-6 grid gap-3 sm:grid-cols-2">
+            <MiniStat label="Open Threads" value={String(threadSummary.open)} />
+            <MiniStat label="Unread" value={String(threadSummary.unread)} />
+          </div>
+
+          {recentThreads.length === 0 ? (
+            <div className="mt-6 rounded-[22px] border border-dashed border-slate-200 p-8 text-center text-sm text-slate-500">
+              No client conversations yet.
+            </div>
+          ) : (
+            <div className="mt-6 space-y-3">
+              {recentThreads.map((thread) => {
+                const isUnread = currentUserId
+                  ? !thread.readByUserIds?.includes(currentUserId)
+                  : false;
+
+                return (
+                  <a
+                    key={thread.id}
+                    href="/admin/messages"
+                    className="block rounded-[22px] border border-slate-100 bg-gradient-to-br from-slate-50 to-white p-4 transition hover:-translate-y-0.5 hover:shadow-md"
+                  >
+                    <div className="flex flex-wrap items-center gap-2">
+                      <span
+                        className={`rounded-full border px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.16em] ${getMessageCategoryClasses(thread.category)}`}
+                      >
+                        {getMessageCategoryLabel(thread.category)}
+                      </span>
+                      <span className="rounded-full border border-slate-200 bg-white px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">
+                        {thread.status}
+                      </span>
+                      {isUnread ? (
+                        <span className="rounded-full border border-amber-200 bg-amber-50 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.16em] text-amber-700">
+                          Unread
+                        </span>
+                      ) : null}
+                    </div>
+                    <p className="mt-3 text-sm font-semibold text-slate-900">
+                      {thread.subject}
+                    </p>
+                    <p className="mt-1 text-sm text-slate-600">
+                      {thread.clientName || "Client thread"}
+                    </p>
+                    <p className="mt-2 line-clamp-2 text-sm text-slate-500">
+                      {thread.lastMessagePreview || "No message preview yet."}
+                    </p>
+                    <p className="mt-3 text-xs uppercase tracking-[0.14em] text-slate-400">
+                      {formatThreadTimestamp(thread.lastMessageAt || thread.createdAt)}
+                    </p>
+                  </a>
+                );
+              })}
+            </div>
+          )}
+        </div>
       </section>
 
       <div className="grid gap-6 xl:grid-cols-2">
@@ -653,5 +891,28 @@ function HeroPill({
     <div className="rounded-full border border-slate-200 bg-white/90 px-3 py-1.5 text-xs font-semibold text-slate-700 shadow-sm">
       {label}: <span className="text-slate-950">{value}</span>
     </div>
+  );
+}
+
+function SessionStatusPill({
+  status,
+}: {
+  status: OnlineSessionRecord["status"];
+}) {
+  const tone = getSessionStatusTone(status);
+
+  const classes =
+    tone === "success"
+      ? "border-emerald-200 bg-emerald-50 text-emerald-700"
+      : tone === "danger"
+      ? "border-rose-200 bg-rose-50 text-rose-700"
+      : "border-[#dbeafe] bg-[#eff6ff] text-[#1d4ed8]";
+
+  return (
+    <span
+      className={`rounded-full border px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.16em] ${classes}`}
+    >
+      {status}
+    </span>
   );
 }

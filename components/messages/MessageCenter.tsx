@@ -190,8 +190,31 @@ export default function MessageCenter({
       total: threads.length,
       open: threads.filter((thread) => thread.status === "open").length,
       closed: threads.filter((thread) => thread.status === "closed").length,
+      unread: threads.filter(
+        (thread) =>
+          firebaseUser?.uid &&
+          !thread.readByUserIds?.includes(firebaseUser.uid) &&
+          thread.lastSenderRole !== role
+      ).length,
     }),
-    [threads]
+    [firebaseUser?.uid, role, threads]
+  );
+
+  const markThreadAsRead = useCallback(
+    async (threadId: string) => {
+      if (!firebaseUser?.uid) return;
+
+      const thread = threads.find((item) => item.id === threadId);
+      if (!thread) return;
+
+      const alreadyRead = thread.readByUserIds?.includes(firebaseUser.uid);
+      if (alreadyRead) return;
+
+      await updateDoc(doc(db, "messageThreads", threadId), {
+        readByUserIds: [...new Set([...(thread.readByUserIds || []), firebaseUser.uid])],
+      });
+    },
+    [firebaseUser?.uid, threads]
   );
 
   const createThread = async () => {
@@ -229,6 +252,7 @@ export default function MessageCenter({
         lastMessageAt: serverTimestamp(),
         lastMessagePreview: openingMessage.slice(0, 160),
         lastSenderRole: appUser.role,
+        readByUserIds: [firebaseUser.uid],
       };
 
       const threadRef = await addDoc(collection(db, "messageThreads"), threadPayload);
@@ -291,6 +315,7 @@ export default function MessageCenter({
         lastMessagePreview: body.slice(0, 160),
         lastSenderRole: appUser.role,
         status: "open",
+        readByUserIds: [firebaseUser.uid],
       });
 
       setReplyBody("");
@@ -370,6 +395,7 @@ export default function MessageCenter({
               <HeaderPill label="Threads" value={String(summary.total)} />
               <HeaderPill label="Open" value={String(summary.open)} />
               <HeaderPill label="Closed" value={String(summary.closed)} />
+              <HeaderPill label="Unread" value={String(summary.unread)} />
             </div>
           </div>
         </div>
@@ -527,6 +553,8 @@ export default function MessageCenter({
                       onClick={async () => {
                         setSelectedThreadId(thread.id);
                         await loadMessages(thread.id);
+                        await markThreadAsRead(thread.id);
+                        await loadData();
                       }}
                       className={[
                         "w-full rounded-[22px] border p-4 text-left transition",
@@ -546,6 +574,13 @@ export default function MessageCenter({
                         >
                           {thread.status}
                         </span>
+                        {firebaseUser?.uid &&
+                        !thread.readByUserIds?.includes(firebaseUser.uid) &&
+                        thread.lastSenderRole !== role ? (
+                          <span className="rounded-full border border-[#dbeafe] bg-[#eff6ff] px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.16em] text-[#1d4ed8]">
+                            unread
+                          </span>
+                        ) : null}
                       </div>
                       <p className="mt-3 text-sm font-semibold text-slate-950">
                         {thread.subject}

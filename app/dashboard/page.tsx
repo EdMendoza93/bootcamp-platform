@@ -13,6 +13,23 @@ import {
 } from "firebase/firestore";
 import PushNotificationsCard from "@/components/dashboard/PushNotificationsCard";
 import { getHomeRouteForRole, normalizeRole } from "@/lib/roles";
+import {
+  formatThreadTimestamp,
+  getMessageCategoryClasses,
+  getMessageCategoryLabel,
+  MessageThreadRecord,
+  sortThreads,
+} from "@/lib/messages";
+import {
+  getProviderRoleLabel,
+  getSessionPaymentStatusClasses,
+  getSessionPaymentStatusLabel,
+  getSessionStatusTone,
+  isUpcomingSession,
+  normalizeSessionPayment,
+  OnlineSessionRecord,
+  sortSessions,
+} from "@/lib/online-sessions";
 
 type ApplicationStatus = "none" | "pending" | "approved" | "rejected";
 type OnboardingStatus = "none" | "incomplete" | "active";
@@ -135,6 +152,8 @@ export default function DashboardPage() {
   const [scheduleItems, setScheduleItems] = useState<ScheduleItem[]>([]);
   const [progressPhotos, setProgressPhotos] = useState<ProgressPhoto[]>([]);
   const [progressPhotosEnabled, setProgressPhotosEnabled] = useState(true);
+  const [onlineSessions, setOnlineSessions] = useState<OnlineSessionRecord[]>([]);
+  const [messageThreads, setMessageThreads] = useState<MessageThreadRecord[]>([]);
 
   const [scheduleModalData, setScheduleModalData] = useState<ScheduleModalData>({
     open: false,
@@ -289,6 +308,18 @@ export default function DashboardPage() {
         )
       );
 
+      const [sessionsSnap, threadsSnap] = await Promise.all([
+        getDocs(
+          query(collection(db, "onlineSessions"), where("profileId", "==", profileDoc.id))
+        ),
+        getDocs(
+          query(
+            collection(db, "messageThreads"),
+            where("clientUserId", "==", currentUser.uid)
+          )
+        ),
+      ]);
+
       const progressData = progressQuery.docs
         .map((docItem) => ({
           id: docItem.id,
@@ -297,6 +328,22 @@ export default function DashboardPage() {
         .sort((a, b) => getPhotoSortValue(b) - getPhotoSortValue(a)) as ProgressPhoto[];
 
       setProgressPhotos(progressData);
+      setOnlineSessions(
+        sortSessions(
+          sessionsSnap.docs.map((docItem) => ({
+            id: docItem.id,
+            ...(docItem.data() as Omit<OnlineSessionRecord, "id">),
+          })) as OnlineSessionRecord[]
+        )
+      );
+      setMessageThreads(
+        sortThreads(
+          threadsSnap.docs.map((docItem) => ({
+            id: docItem.id,
+            ...(docItem.data() as Omit<MessageThreadRecord, "id">),
+          })) as MessageThreadRecord[]
+        )
+      );
     } else {
       setHasProfile(false);
       setOnboardingStatus("none");
@@ -309,6 +356,8 @@ export default function DashboardPage() {
       setScheduleItems([]);
       setProgressPhotos([]);
       setProgressPhotosEnabled(false);
+      setOnlineSessions([]);
+      setMessageThreads([]);
     }
   };
 
@@ -472,6 +521,23 @@ export default function DashboardPage() {
   const recentProgressPhotos = useMemo(() => {
     return progressPhotos.slice(0, 6);
   }, [progressPhotos]);
+  const supportSummary = useMemo(
+    () => ({
+      upcomingSessions: onlineSessions.filter((item) => isUpcomingSession(item)).length,
+      pendingSessionPayments: onlineSessions.filter(
+        (item) => normalizeSessionPayment(item).paymentStatus === "pending"
+      ).length,
+      unreadThreads: messageThreads.filter(
+        (item) => !user?.uid || !item.readByUserIds?.includes(user.uid)
+      ).length,
+    }),
+    [messageThreads, onlineSessions, user?.uid]
+  );
+  const nextSession = useMemo(
+    () => onlineSessions.find((item) => isUpcomingSession(item)) || null,
+    [onlineSessions]
+  );
+  const latestThread = useMemo(() => messageThreads[0] || null, [messageThreads]);
 
   const canSeeProgramContent =
     applicationStatus === "approved" && hasProfile;
@@ -588,6 +654,148 @@ export default function DashboardPage() {
         </section>
 
         <PushNotificationsCard />
+
+        {hasProfile && (
+          <section className="grid gap-6 xl:grid-cols-2">
+            <div className="rounded-[28px] border border-white/70 bg-white/90 p-6 shadow-[0_18px_50px_rgba(15,23,42,0.07)] backdrop-blur">
+              <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
+                <div>
+                  <p className="text-sm font-semibold uppercase tracking-[0.18em] text-[#1d4ed8]">
+                    Private follow-up
+                  </p>
+                  <h2 className="mt-2 text-2xl font-semibold tracking-tight text-slate-950">
+                    Sessions & Support
+                  </h2>
+                  <p className="mt-2 text-sm text-slate-500">
+                    Private sessions live outside your on-site itinerary so post-bootcamp support stays separate and easy to manage.
+                  </p>
+                </div>
+                <div className="flex flex-wrap gap-3">
+                  <a
+                    href="/dashboard/sessions"
+                    className="rounded-2xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-medium text-slate-700 shadow-sm transition hover:-translate-y-0.5 hover:border-slate-300 hover:shadow-md"
+                  >
+                    Open Sessions
+                  </a>
+                  <a
+                    href="/dashboard/messages"
+                    className="rounded-2xl bg-slate-950 px-4 py-2.5 text-sm font-medium text-white shadow-sm transition hover:-translate-y-0.5 hover:bg-slate-800 hover:shadow-md"
+                  >
+                    Open Messages
+                  </a>
+                </div>
+              </div>
+
+              <div className="mt-6 grid gap-4 sm:grid-cols-3">
+                <InfoCard
+                  label="Upcoming Sessions"
+                  value={String(supportSummary.upcomingSessions)}
+                />
+                <InfoCard
+                  label="Session Payments"
+                  value={
+                    supportSummary.pendingSessionPayments > 0
+                      ? `${supportSummary.pendingSessionPayments} pending`
+                      : "All clear"
+                  }
+                />
+                <InfoCard
+                  label="Unread Messages"
+                  value={String(supportSummary.unreadThreads)}
+                />
+              </div>
+
+              <div className="mt-4 rounded-[22px] border border-[#bfdbfe] bg-gradient-to-br from-[#eff6ff] to-white p-4 text-sm leading-6 text-slate-700">
+                Your itinerary below is only for the in-bootcamp experience. Private sessions and support messages stay here as a separate follow-up space.
+              </div>
+            </div>
+
+            <div className="grid gap-4">
+              <div className="rounded-[28px] border border-white/70 bg-white/90 p-6 shadow-[0_18px_50px_rgba(15,23,42,0.07)] backdrop-blur">
+                <div className="flex items-start justify-between gap-4">
+                  <div>
+                    <p className="text-sm font-semibold uppercase tracking-[0.18em] text-[#1d4ed8]">
+                      Next session
+                    </p>
+                    <h2 className="mt-2 text-xl font-semibold tracking-tight text-slate-950">
+                      {nextSession?.title?.trim() || "No upcoming session"}
+                    </h2>
+                  </div>
+                  {nextSession ? <SessionStatusPill status={nextSession.status} /> : null}
+                </div>
+
+                {nextSession ? (
+                  <div className="mt-4">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <span className="rounded-full border border-[#dbeafe] bg-[#eff6ff] px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.16em] text-[#1d4ed8]">
+                        {getProviderRoleLabel(nextSession.providerRole)}
+                      </span>
+                      <span
+                        className={`rounded-full border px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.16em] ${getSessionPaymentStatusClasses(normalizeSessionPayment(nextSession).paymentStatus)}`}
+                      >
+                        {getSessionPaymentStatusLabel(
+                          normalizeSessionPayment(nextSession).paymentStatus
+                        )}
+                      </span>
+                    </div>
+                    <p className="mt-3 text-sm text-slate-600">
+                      {nextSession.scheduledDate} at {nextSession.startTime} ·{" "}
+                      {nextSession.durationMinutes} min
+                    </p>
+                    <p className="mt-2 text-sm text-slate-600">
+                      {normalizeSessionPayment(nextSession).paymentRequired
+                        ? normalizeSessionPayment(nextSession).price
+                          ? `${normalizeSessionPayment(nextSession).currency} ${normalizeSessionPayment(nextSession).price}`
+                          : "Payment required before this session is confirmed"
+                        : "No extra payment attached"}
+                    </p>
+                  </div>
+                ) : (
+                  <p className="mt-4 text-sm text-slate-600">
+                    When the team schedules a private follow-up, it will appear here.
+                  </p>
+                )}
+              </div>
+
+              <div className="rounded-[28px] border border-white/70 bg-white/90 p-6 shadow-[0_18px_50px_rgba(15,23,42,0.07)] backdrop-blur">
+                <div className="flex items-start justify-between gap-4">
+                  <div>
+                    <p className="text-sm font-semibold uppercase tracking-[0.18em] text-[#1d4ed8]">
+                      Latest thread
+                    </p>
+                    <h2 className="mt-2 text-xl font-semibold tracking-tight text-slate-950">
+                      {latestThread?.subject || "No conversations yet"}
+                    </h2>
+                  </div>
+                  {latestThread ? (
+                    <span
+                      className={`rounded-full border px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.16em] ${getMessageCategoryClasses(latestThread.category)}`}
+                    >
+                      {getMessageCategoryLabel(latestThread.category)}
+                    </span>
+                  ) : null}
+                </div>
+
+                {latestThread ? (
+                  <div className="mt-4">
+                    <p className="line-clamp-3 text-sm leading-6 text-slate-600">
+                      {latestThread.lastMessagePreview || "No message preview yet."}
+                    </p>
+                    <p className="mt-3 text-xs uppercase tracking-[0.14em] text-slate-400">
+                      {formatThreadTimestamp(
+                        latestThread.lastMessageAt || latestThread.createdAt
+                      )}
+                    </p>
+                  </div>
+                ) : (
+                  <p className="mt-4 text-sm text-slate-600">
+                    You will see support conversations here once you or the team start a thread.
+                  </p>
+                )}
+              </div>
+            </div>
+          </section>
+        )}
 
         {applicationStatus === "none" && (
           <section className="rounded-[28px] border border-white/70 bg-white/90 p-6 shadow-[0_18px_50px_rgba(15,23,42,0.07)] backdrop-blur">
@@ -998,6 +1206,29 @@ function DashboardPill({
     <div className="rounded-full border border-slate-200 bg-white/90 px-3 py-1.5 text-xs font-semibold capitalize text-slate-700 shadow-sm">
       {label}: <span className="text-slate-950">{value}</span>
     </div>
+  );
+}
+
+function SessionStatusPill({
+  status,
+}: {
+  status: OnlineSessionRecord["status"];
+}) {
+  const tone = getSessionStatusTone(status);
+
+  const classes =
+    tone === "success"
+      ? "border-emerald-200 bg-emerald-50 text-emerald-700"
+      : tone === "danger"
+      ? "border-rose-200 bg-rose-50 text-rose-700"
+      : "border-[#dbeafe] bg-[#eff6ff] text-[#1d4ed8]";
+
+  return (
+    <span
+      className={`rounded-full border px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.16em] ${classes}`}
+    >
+      {status}
+    </span>
   );
 }
 

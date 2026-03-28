@@ -18,7 +18,10 @@ import {
   getAllowedProviderRoles,
   getDeliveryMethodLabel,
   getProviderRoleLabel,
+  getSessionPaymentStatusClasses,
+  getSessionPaymentStatusLabel,
   getSessionStatusTone,
+  normalizeSessionPayment,
   OnlineSessionDeliveryMethod,
   OnlineSessionProviderRole,
   OnlineSessionRecord,
@@ -559,6 +562,13 @@ export default function StaffSessionsPage() {
                       <div className="min-w-0 flex-1">
                         <div className="flex flex-wrap items-center gap-2">
                           <StatusPill status={item.status} />
+                          <span
+                            className={`rounded-full border px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.16em] ${getSessionPaymentStatusClasses(normalizeSessionPayment(item).paymentStatus)}`}
+                          >
+                            {getSessionPaymentStatusLabel(
+                              normalizeSessionPayment(item).paymentStatus
+                            )}
+                          </span>
                           <span className="rounded-full border border-[#dbeafe] bg-[#eff6ff] px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.16em] text-[#1d4ed8]">
                             {getProviderRoleLabel(item.providerRole)}
                           </span>
@@ -573,6 +583,13 @@ export default function StaffSessionsPage() {
                           {profile?.fullName || "Unknown client"} · {item.scheduledDate} at{" "}
                           {item.startTime} · {item.durationMinutes} min
                         </p>
+                        {normalizeSessionPayment(item).paymentRequired ? (
+                          <p className="mt-2 text-sm text-slate-600">
+                            {normalizeSessionPayment(item).price
+                              ? `${normalizeSessionPayment(item).currency} ${normalizeSessionPayment(item).price}`
+                              : "Payment required"}
+                          </p>
+                        ) : null}
                         {item.notes ? (
                           <p className="mt-3 text-sm leading-6 text-slate-700">
                             {item.notes}

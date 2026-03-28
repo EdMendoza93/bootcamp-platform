@@ -7,8 +7,11 @@ import { useToast } from "@/components/ui/ToastProvider";
 import {
   getDeliveryMethodLabel,
   getProviderRoleLabel,
+  getSessionPaymentStatusClasses,
+  getSessionPaymentStatusLabel,
   getSessionStatusTone,
   isUpcomingSession,
+  normalizeSessionPayment,
   OnlineSessionRecord,
   OnlineSessionStatus,
   sortSessions,
@@ -103,6 +106,9 @@ export default function DashboardSessionsPage() {
       total: sessions.length,
       upcoming: sessions.filter((item) => isUpcomingSession(item)).length,
       completed: sessions.filter((item) => item.status === "completed").length,
+      paymentPending: sessions.filter(
+        (item) => normalizeSessionPayment(item).paymentStatus === "pending"
+      ).length,
     }),
     [sessions]
   );
@@ -142,6 +148,10 @@ export default function DashboardSessionsPage() {
               <HeaderPill label="Total" value={String(summary.total)} />
               <HeaderPill label="Upcoming" value={String(summary.upcoming)} />
               <HeaderPill label="Completed" value={String(summary.completed)} />
+              <HeaderPill
+                label="Payment pending"
+                value={String(summary.paymentPending)}
+              />
             </div>
           </div>
         </div>
@@ -188,6 +198,13 @@ export default function DashboardSessionsPage() {
                   <div className="min-w-0 flex-1">
                     <div className="flex flex-wrap items-center gap-2">
                       <StatusPill status={item.status} />
+                      <span
+                        className={`rounded-full border px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.16em] ${getSessionPaymentStatusClasses(normalizeSessionPayment(item).paymentStatus)}`}
+                      >
+                        {getSessionPaymentStatusLabel(
+                          normalizeSessionPayment(item).paymentStatus
+                        )}
+                      </span>
                       <span className="rounded-full border border-[#dbeafe] bg-[#eff6ff] px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.16em] text-[#1d4ed8]">
                         {getProviderRoleLabel(item.providerRole)}
                       </span>
@@ -200,6 +217,13 @@ export default function DashboardSessionsPage() {
                     </h3>
                     <p className="mt-1 text-sm text-slate-600">
                       {item.scheduledDate} at {item.startTime} · {item.durationMinutes} min
+                    </p>
+                    <p className="mt-2 text-sm text-slate-600">
+                      {normalizeSessionPayment(item).paymentRequired
+                        ? normalizeSessionPayment(item).price
+                          ? `${normalizeSessionPayment(item).currency} ${normalizeSessionPayment(item).price}`
+                          : "Payment will be confirmed by the team"
+                        : "No extra payment attached"}
                     </p>
                     {item.notes ? (
                       <p className="mt-3 text-sm leading-6 text-slate-700">

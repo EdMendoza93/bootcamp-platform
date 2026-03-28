@@ -16,8 +16,12 @@ import {
   getAllowedProviderRoles,
   getDeliveryMethodLabel,
   getProviderRoleLabel,
+  getSessionPaymentStatusClasses,
+  getSessionPaymentStatusLabel,
   getSessionStatusTone,
+  normalizeSessionPayment,
   OnlineSessionDeliveryMethod,
+  OnlineSessionPaymentStatus,
   OnlineSessionProviderRole,
   OnlineSessionRecord,
   OnlineSessionStatus,
@@ -53,6 +57,10 @@ export default function AdminOnlineSessionsPage() {
     title: "",
     notes: "",
     status: "scheduled" as OnlineSessionStatus,
+    paymentRequired: false,
+    paymentStatus: "not_required" as OnlineSessionPaymentStatus,
+    price: "",
+    currency: "EUR",
   });
 
   const { showToast } = useToast();
@@ -130,6 +138,9 @@ export default function AdminOnlineSessionsPage() {
       scheduled: sessions.filter((item) => item.status === "scheduled").length,
       completed: sessions.filter((item) => item.status === "completed").length,
       cancelled: sessions.filter((item) => item.status === "cancelled").length,
+      pendingPayment: sessions.filter(
+        (item) => normalizeSessionPayment(item).paymentStatus === "pending"
+      ).length,
     }),
     [sessions]
   );
@@ -147,6 +158,10 @@ export default function AdminOnlineSessionsPage() {
       title: "",
       notes: "",
       status: "scheduled",
+      paymentRequired: false,
+      paymentStatus: "not_required",
+      price: "",
+      currency: "EUR",
     });
   };
 
@@ -165,6 +180,13 @@ export default function AdminOnlineSessionsPage() {
     setSaving(true);
 
     try {
+      const paymentRequired = Boolean(form.paymentRequired);
+      const paymentStatus = paymentRequired
+        ? form.paymentStatus === "paid" || form.paymentStatus === "waived"
+          ? form.paymentStatus
+          : "pending"
+        : "not_required";
+      const price = paymentRequired ? Number(form.price || 0) : 0;
       const payload = {
         profileId: form.profileId,
         providerRole: form.providerRole,
@@ -176,6 +198,10 @@ export default function AdminOnlineSessionsPage() {
         title: form.title.trim(),
         notes: form.notes.trim(),
         status: form.status,
+        paymentRequired,
+        paymentStatus,
+        price: paymentRequired && price > 0 ? price : null,
+        currency: String(form.currency || "EUR").trim().toUpperCase() || "EUR",
       };
 
       if (editingId) {
@@ -221,6 +247,13 @@ export default function AdminOnlineSessionsPage() {
       title: item.title || "",
       notes: item.notes || "",
       status: item.status,
+      paymentRequired: Boolean(item.paymentRequired),
+      paymentStatus: normalizeSessionPayment(item).paymentStatus,
+      price:
+        typeof item.price === "number" && Number.isFinite(item.price)
+          ? String(item.price)
+          : "",
+      currency: normalizeSessionPayment(item).currency,
     });
     window.scrollTo({ top: 0, behavior: "smooth" });
   };
@@ -284,6 +317,7 @@ export default function AdminOnlineSessionsPage() {
               <HeaderPill label="Scheduled" value={String(summary.scheduled)} />
               <HeaderPill label="Completed" value={String(summary.completed)} />
               <HeaderPill label="Cancelled" value={String(summary.cancelled)} />
+              <HeaderPill label="Payment pending" value={String(summary.pendingPayment)} />
             </div>
           </div>
         </div>
@@ -453,6 +487,76 @@ export default function AdminOnlineSessionsPage() {
               />
             </Field>
 
+            <div className="rounded-[22px] border border-slate-200 bg-slate-50/70 p-4">
+              <p className="text-sm font-semibold uppercase tracking-[0.16em] text-slate-500">
+                Payment prep
+              </p>
+
+              <label className="mt-4 flex items-center gap-3 text-sm font-medium text-slate-700">
+                <input
+                  type="checkbox"
+                  checked={form.paymentRequired}
+                  onChange={(e) =>
+                    setForm((prev) => ({
+                      ...prev,
+                      paymentRequired: e.target.checked,
+                      paymentStatus: e.target.checked ? "pending" : "not_required",
+                    }))
+                  }
+                />
+                This session requires payment
+              </label>
+
+              <div className="mt-4 grid gap-4 sm:grid-cols-2">
+                <Field label="Payment status">
+                  <select
+                    value={form.paymentStatus}
+                    onChange={(e) =>
+                      setForm((prev) => ({
+                        ...prev,
+                        paymentStatus: e.target.value as OnlineSessionPaymentStatus,
+                      }))
+                    }
+                    disabled={!form.paymentRequired}
+                    className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition disabled:bg-slate-100"
+                  >
+                    <option value="pending">Pending</option>
+                    <option value="paid">Paid</option>
+                    <option value="waived">Waived</option>
+                    <option value="not_required">No payment</option>
+                  </select>
+                </Field>
+
+                <Field label="Currency">
+                  <input
+                    value={form.currency}
+                    onChange={(e) =>
+                      setForm((prev) => ({ ...prev, currency: e.target.value }))
+                    }
+                    disabled={!form.paymentRequired}
+                    className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm uppercase text-slate-900 outline-none transition disabled:bg-slate-100"
+                  />
+                </Field>
+              </div>
+
+              <div className="mt-4">
+                <Field label="Suggested price">
+                  <input
+                    type="number"
+                    min="0"
+                    step="0.01"
+                    value={form.price}
+                    onChange={(e) =>
+                      setForm((prev) => ({ ...prev, price: e.target.value }))
+                    }
+                    disabled={!form.paymentRequired}
+                    placeholder="0.00"
+                    className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition disabled:bg-slate-100"
+                  />
+                </Field>
+              </div>
+            </div>
+
             <div className="flex flex-wrap gap-3">
               <button
                 type="button"
@@ -526,6 +630,13 @@ export default function AdminOnlineSessionsPage() {
                       <div className="min-w-0 flex-1">
                         <div className="flex flex-wrap items-center gap-2">
                           <StatusPill status={item.status} />
+                          <span
+                            className={`rounded-full border px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.16em] ${getSessionPaymentStatusClasses(normalizeSessionPayment(item).paymentStatus)}`}
+                          >
+                            {getSessionPaymentStatusLabel(
+                              normalizeSessionPayment(item).paymentStatus
+                            )}
+                          </span>
                           <span className="rounded-full border border-[#dbeafe] bg-[#eff6ff] px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.16em] text-[#1d4ed8]">
                             {getProviderRoleLabel(item.providerRole)}
                           </span>
@@ -540,6 +651,13 @@ export default function AdminOnlineSessionsPage() {
                           {profile?.fullName || "Unknown client"} · {item.scheduledDate} at{" "}
                           {item.startTime} · {item.durationMinutes} min
                         </p>
+                        {normalizeSessionPayment(item).paymentRequired ? (
+                          <p className="mt-2 text-sm text-slate-600">
+                            {normalizeSessionPayment(item).price
+                              ? `${normalizeSessionPayment(item).currency} ${normalizeSessionPayment(item).price}`
+                              : "Price not set"}
+                          </p>
+                        ) : null}
                         {item.notes ? (
                           <p className="mt-3 text-sm leading-6 text-slate-700">
                             {item.notes}

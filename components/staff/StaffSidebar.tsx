@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { useUnreadMessageCount } from "@/components/messages/useUnreadMessageCount";
 
 const navItems = [
   { label: "Overview", href: "/staff" },
@@ -17,6 +18,7 @@ export default function StaffSidebar({
   onNavigate?: () => void;
 }) {
   const pathname = usePathname();
+  const unreadCount = useUnreadMessageCount();
 
   return (
     <aside className="h-full border-b border-white/70 bg-[linear-gradient(180deg,rgba(255,255,255,0.88),rgba(248,251,255,0.86))] backdrop-blur-xl md:min-h-screen md:w-[300px] md:border-b-0 md:border-r">
@@ -57,14 +59,21 @@ export default function StaffSidebar({
                 ].join(" ")}
               >
                 <span>{item.label}</span>
-                <span
-                  className={[
-                    "h-2.5 w-2.5 rounded-full transition-all duration-200",
-                    isActive
-                      ? "bg-[#2EA0FF] shadow-[0_0_0_4px_rgba(46,160,255,0.16)]"
-                      : "bg-slate-200 group-hover:bg-slate-300",
-                  ].join(" ")}
-                />
+                <div className="flex items-center gap-2">
+                  {item.href === "/staff/messages" && unreadCount > 0 ? (
+                    <span className="rounded-full bg-slate-950 px-2.5 py-1 text-[11px] font-semibold text-white">
+                      {unreadCount}
+                    </span>
+                  ) : null}
+                  <span
+                    className={[
+                      "h-2.5 w-2.5 rounded-full transition-all duration-200",
+                      isActive
+                        ? "bg-[#2EA0FF] shadow-[0_0_0_4px_rgba(46,160,255,0.16)]"
+                        : "bg-slate-200 group-hover:bg-slate-300",
+                    ].join(" ")}
+                  />
+                </div>
               </Link>
             );
           })}
