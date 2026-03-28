@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { addDoc, collection, deleteDoc, doc, getDoc, getDocs, query, serverTimestamp, updateDoc, where } from "firebase/firestore";
 import { auth, db } from "@/lib/firebase";
@@ -395,6 +396,12 @@ export default function StaffSchedulePage() {
                 <p className="mt-1 text-sm text-slate-500">
                   Status: {selectedProfile.clientStatus || "active"}
                 </p>
+                <Link
+                  href={`/staff/clients/${selectedProfile.id}`}
+                  className="mt-3 inline-flex text-sm font-medium text-[#1d4ed8] hover:text-[#1e40af]"
+                >
+                  Open client workspace
+                </Link>
               </div>
             )}
 

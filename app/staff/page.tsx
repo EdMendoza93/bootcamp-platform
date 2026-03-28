@@ -306,9 +306,12 @@ export default function StaffOverviewPage() {
                       <p className="mt-3 text-sm font-semibold text-slate-900">
                         {item.title?.trim() || "Schedule item"}
                       </p>
-                      <p className="mt-1 text-sm text-slate-600">
+                      <Link
+                        href={`/staff/clients/${item.profileId}`}
+                        className="mt-1 inline-flex text-sm text-slate-600 hover:text-slate-950"
+                      >
                         {profileMap.get(item.profileId)?.fullName || "Unknown client"}
-                      </p>
+                      </Link>
                     </div>
                     <div className="text-right text-xs uppercase tracking-[0.14em] text-slate-500">
                       <p>{item.date}</p>
@@ -369,8 +372,13 @@ export default function StaffOverviewPage() {
                       {item.title?.trim() || "Private session"}
                     </p>
                     <p className="mt-1 text-sm text-slate-600">
-                      {profileMap.get(item.profileId)?.fullName || "Unknown client"} ·{" "}
-                      {item.scheduledDate} at {item.startTime}
+                      <Link
+                        href={`/staff/clients/${item.profileId}`}
+                        className="hover:text-slate-950"
+                      >
+                        {profileMap.get(item.profileId)?.fullName || "Unknown client"}
+                      </Link>{" "}
+                      · {item.scheduledDate} at {item.startTime}
                     </p>
                     <p className="mt-2 text-xs uppercase tracking-[0.14em] text-slate-500">
                       {payment.paymentRequired

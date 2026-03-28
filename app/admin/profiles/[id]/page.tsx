@@ -23,6 +23,14 @@ import {
   uploadBytes,
 } from "firebase/storage";
 import { useToast } from "@/components/ui/ToastProvider";
+import { BookingRecord } from "@/lib/bookings";
+import {
+  formatThreadTimestamp,
+  getMessageCategoryClasses,
+  getMessageCategoryLabel,
+  MessageThreadRecord,
+  sortThreads,
+} from "@/lib/messages";
 import {
   getDeliveryMethodLabel,
   getProviderRoleLabel,
@@ -245,9 +253,13 @@ export default function AdminProfileDetailPage() {
 
   const [scheduleLoading, setScheduleLoading] = useState(true);
   const [scheduleItems, setScheduleItems] = useState<ScheduleItem[]>([]);
+  const [bookingsLoading, setBookingsLoading] = useState(true);
+  const [bookings, setBookings] = useState<BookingRecord[]>([]);
   const [sessionsLoading, setSessionsLoading] = useState(true);
   const [onlineSessions, setOnlineSessions] = useState<OnlineSessionRecord[]>([]);
   const [sessionFilter, setSessionFilter] = useState<SessionBoardFilter>("all");
+  const [threadsLoading, setThreadsLoading] = useState(true);
+  const [messageThreads, setMessageThreads] = useState<MessageThreadRecord[]>([]);
 
   const [progressLoading, setProgressLoading] = useState(true);
   const [progressSaving, setProgressSaving] = useState(false);
@@ -401,6 +413,40 @@ export default function AdminProfileDetailPage() {
     setOnlineSessions(data);
   };
 
+  const loadBookings = async (targetProfileId: string) => {
+    const q = query(
+      collection(db, "bookings"),
+      where("profileId", "==", targetProfileId)
+    );
+
+    const snapshot = await getDocs(q);
+
+    const data = snapshot.docs.map((docItem) => ({
+      id: docItem.id,
+      ...(docItem.data() as Omit<BookingRecord, "id">),
+    })) as BookingRecord[];
+
+    setBookings(data);
+  };
+
+  const loadMessageThreads = async (targetProfileId: string) => {
+    const q = query(
+      collection(db, "messageThreads"),
+      where("clientProfileId", "==", targetProfileId)
+    );
+
+    const snapshot = await getDocs(q);
+
+    const data = sortThreads(
+      snapshot.docs.map((docItem) => ({
+        id: docItem.id,
+        ...(docItem.data() as Omit<MessageThreadRecord, "id">),
+      })) as MessageThreadRecord[]
+    );
+
+    setMessageThreads(data);
+  };
+
   useEffect(() => {
     const loadProfile = async () => {
       try {
@@ -473,8 +519,10 @@ export default function AdminProfileDetailPage() {
         });
 
         await Promise.all([
+          loadBookings(profileRouteId),
           loadScheduleItems(profileRouteId),
           loadOnlineSessions(profileRouteId),
+          loadMessageThreads(profileRouteId),
           loadProgressPhotos(profileRouteId),
         ]);
       } catch (error) {
@@ -486,8 +534,10 @@ export default function AdminProfileDetailPage() {
         });
       } finally {
         setLoading(false);
+        setBookingsLoading(false);
         setScheduleLoading(false);
         setSessionsLoading(false);
+        setThreadsLoading(false);
         setProgressLoading(false);
       }
     };
@@ -1055,8 +1105,16 @@ export default function AdminProfileDetailPage() {
               value={String(scheduleItems.length)}
             />
             <CompactSummaryPill
+              label="Bookings"
+              value={String(bookings.length)}
+            />
+            <CompactSummaryPill
               label="Sessions"
               value={String(onlineSessions.length)}
+            />
+            <CompactSummaryPill
+              label="Threads"
+              value={String(messageThreads.length)}
             />
             <CompactSummaryPill
               label="Photos"
@@ -1312,6 +1370,77 @@ export default function AdminProfileDetailPage() {
         </section>
 
         <section className="rounded-[28px] border border-white/70 bg-white/90 p-5 shadow-[0_18px_50px_rgba(15,23,42,0.07)] backdrop-blur">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <h2 className="text-base font-semibold text-slate-950">
+                Bootcamp Bookings
+              </h2>
+              <p className="mt-1 text-sm text-slate-500">
+                Reservation context connected to this client.
+              </p>
+            </div>
+
+            <a
+              href="/admin/bookings"
+              className="rounded-2xl border bg-white px-4 py-2.5 text-sm font-medium shadow-sm transition hover:-translate-y-0.5 hover:shadow-md"
+            >
+              Open Bookings
+            </a>
+          </div>
+
+          <div className="mt-5">
+            {bookingsLoading ? (
+              <p className="text-sm text-slate-500">Loading bookings...</p>
+            ) : bookings.length === 0 ? (
+              <div className="rounded-2xl border border-dashed p-8 text-center text-sm text-slate-500">
+                No bookings found for this client.
+              </div>
+            ) : (
+              <div className="grid gap-3 xl:grid-cols-2">
+                {bookings.map((booking) => (
+                  <div key={booking.id} className="rounded-2xl border bg-slate-50 p-4">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <span className="rounded-full border border-slate-200 bg-white px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-700">
+                        {booking.status}
+                      </span>
+                      <span className="rounded-full border border-[#dbeafe] bg-[#eff6ff] px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.16em] text-[#1d4ed8]">
+                        {booking.durationWeeks} week{booking.durationWeeks === 1 ? "" : "s"}
+                      </span>
+                      <span className="rounded-full border border-slate-200 bg-white px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">
+                        {booking.paymentStatus}
+                      </span>
+                    </div>
+
+                    <p className="mt-3 text-sm text-slate-700">
+                      Start week: {booking.startWeekId || "—"} · Capacity:{" "}
+                      {booking.consumesCapacity ? "consumes" : "does not consume"}
+                    </p>
+
+                    {booking.shortStay ? (
+                      <p className="mt-2 text-sm text-slate-600">
+                        Short stay · {booking.shortStayNights || 0} nights
+                      </p>
+                    ) : null}
+
+                    {booking.customPrice ? (
+                      <p className="mt-2 text-sm text-slate-600">
+                        {booking.currency || "EUR"} {booking.customPrice}
+                      </p>
+                    ) : null}
+
+                    {booking.notes?.trim() ? (
+                      <p className="mt-2 line-clamp-3 text-sm text-slate-600">
+                        {booking.notes}
+                      </p>
+                    ) : null}
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </section>
+
+        <section className="rounded-[28px] border border-white/70 bg-white/90 p-5 shadow-[0_18px_50px_rgba(15,23,42,0.07)] backdrop-blur">
           <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
             <div>
               <h2 className="text-base font-semibold text-slate-950">
@@ -1383,6 +1512,63 @@ export default function AdminProfileDetailPage() {
                         Open meeting link
                       </a>
                     ) : null}
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </section>
+
+        <section className="rounded-[28px] border border-white/70 bg-white/90 p-5 shadow-[0_18px_50px_rgba(15,23,42,0.07)] backdrop-blur">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <h2 className="text-base font-semibold text-slate-950">
+                Client Conversations
+              </h2>
+              <p className="mt-1 text-sm text-slate-500">
+                Threads between this client and staff.
+              </p>
+            </div>
+
+            <a
+              href="/admin/messages"
+              className="rounded-2xl border bg-white px-4 py-2.5 text-sm font-medium shadow-sm transition hover:-translate-y-0.5 hover:shadow-md"
+            >
+              Open Messages
+            </a>
+          </div>
+
+          <div className="mt-5">
+            {threadsLoading ? (
+              <p className="text-sm text-slate-500">Loading conversations...</p>
+            ) : messageThreads.length === 0 ? (
+              <div className="rounded-2xl border border-dashed p-8 text-center text-sm text-slate-500">
+                No threads found for this client.
+              </div>
+            ) : (
+              <div className="grid gap-3 xl:grid-cols-2">
+                {messageThreads.map((thread) => (
+                  <div key={thread.id} className="rounded-2xl border bg-slate-50 p-4">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <span
+                        className={`rounded-full border px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.16em] ${getMessageCategoryClasses(thread.category)}`}
+                      >
+                        {getMessageCategoryLabel(thread.category)}
+                      </span>
+                      <span className="rounded-full border border-slate-200 bg-white px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">
+                        {thread.status}
+                      </span>
+                    </div>
+
+                    <p className="mt-3 font-medium text-slate-950">
+                      {thread.subject}
+                    </p>
+                    <p className="mt-2 line-clamp-3 text-sm text-slate-600">
+                      {thread.lastMessagePreview || "No preview yet."}
+                    </p>
+                    <p className="mt-3 text-xs uppercase tracking-[0.14em] text-slate-400">
+                      {formatThreadTimestamp(thread.lastMessageAt || thread.createdAt)}
+                    </p>
                   </div>
                 ))}
               </div>

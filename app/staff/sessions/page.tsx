@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   addDoc,
@@ -580,8 +581,13 @@ export default function StaffSessionsPage() {
                           {item.title?.trim() || "Private session"}
                         </h3>
                         <p className="mt-1 text-sm text-slate-600">
-                          {profile?.fullName || "Unknown client"} · {item.scheduledDate} at{" "}
-                          {item.startTime} · {item.durationMinutes} min
+                          <Link
+                            href={`/staff/clients/${item.profileId}`}
+                            className="hover:text-slate-950"
+                          >
+                            {profile?.fullName || "Unknown client"}
+                          </Link>{" "}
+                          · {item.scheduledDate} at {item.startTime} · {item.durationMinutes} min
                         </p>
                         {normalizeSessionPayment(item).paymentRequired ? (
                           <p className="mt-2 text-sm text-slate-600">

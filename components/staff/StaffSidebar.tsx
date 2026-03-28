@@ -6,6 +6,7 @@ import { useUnreadMessageCount } from "@/components/messages/useUnreadMessageCou
 
 const navItems = [
   { label: "Overview", href: "/staff" },
+  { label: "Clients", href: "/staff/clients" },
   { label: "Schedule", href: "/staff/schedule" },
   { label: "Sessions", href: "/staff/sessions" },
   { label: "Messages", href: "/staff/messages" },
