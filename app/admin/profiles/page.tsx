@@ -4,6 +4,8 @@ import { useEffect, useMemo, useState } from "react";
 import { auth, db } from "@/lib/firebase";
 import { onAuthStateChanged } from "firebase/auth";
 import { collection, getDocs } from "firebase/firestore";
+import { buildCsv, downloadCsv } from "@/lib/export";
+import { BookingRecord } from "@/lib/bookings";
 
 type Profile = {
   id: string;
@@ -14,10 +16,48 @@ type Profile = {
   paymentStatus?: string;
   assignedProgram?: string;
   clientStatus?: "active" | "inactive";
+  age?: string;
+  goal?: string;
+  height?: string;
+  weight?: string;
+  allergies?: string;
+  injuries?: string;
+  notes?: string;
+  internalNotes?: string;
+};
+
+type UserRow = {
+  id: string;
+  email?: string;
+  role?: string;
+  name?: string;
+  displayName?: string;
+};
+
+type ApplicationRow = {
+  id: string;
+  userId?: string;
+  phone?: string;
+  goal?: string;
+  status?: string;
+  createdAt?: {
+    seconds?: number;
+    nanoseconds?: number;
+  };
+};
+
+type BookingExportRecord = BookingRecord & {
+  createdAt?: {
+    seconds?: number;
+    nanoseconds?: number;
+  };
 };
 
 type PaymentFilter = "all" | "paid" | "pending" | "cash" | "manual";
 type OnboardingFilter = "all" | "active" | "incomplete";
+type ClientExportScope = "filtered" | "all" | "active" | "inactive";
+type BookingExportStatus = "all" | "confirmed" | "pending" | "cancelled";
+type BookingExportPayment = "all" | "paid" | "pending" | "manual";
 
 function getInitials(name: string) {
   const parts = String(name || "")
@@ -34,6 +74,9 @@ function getInitials(name: string) {
 export default function AdminProfilesPage() {
   const [loading, setLoading] = useState(true);
   const [profiles, setProfiles] = useState<Profile[]>([]);
+  const [users, setUsers] = useState<UserRow[]>([]);
+  const [applications, setApplications] = useState<ApplicationRow[]>([]);
+  const [bookings, setBookings] = useState<BookingExportRecord[]>([]);
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<"all" | "active" | "inactive">(
     "all"
@@ -41,6 +84,13 @@ export default function AdminProfilesPage() {
   const [paymentFilter, setPaymentFilter] = useState<PaymentFilter>("all");
   const [onboardingFilter, setOnboardingFilter] =
     useState<OnboardingFilter>("all");
+  const [clientExportScope, setClientExportScope] =
+    useState<ClientExportScope>("filtered");
+  const [bookingExportStatus, setBookingExportStatus] =
+    useState<BookingExportStatus>("all");
+  const [bookingExportPayment, setBookingExportPayment] =
+    useState<BookingExportPayment>("all");
+  const [bookingExportYear, setBookingExportYear] = useState("all");
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
@@ -50,16 +100,40 @@ export default function AdminProfilesPage() {
       }
 
       try {
-        const snapshot = await getDocs(collection(db, "profiles"));
+        const [profilesSnap, usersSnap, applicationsSnap, bookingsSnap] =
+          await Promise.all([
+            getDocs(collection(db, "profiles")),
+            getDocs(collection(db, "users")),
+            getDocs(collection(db, "applications")),
+            getDocs(collection(db, "bookings")),
+          ]);
 
-        const data: Profile[] = snapshot.docs
+        const data: Profile[] = profilesSnap.docs
           .map((docItem) => ({
             id: docItem.id,
             ...(docItem.data() as Omit<Profile, "id">),
           }))
           .sort((a, b) => (a.fullName || "").localeCompare(b.fullName || ""));
 
+        const userData = usersSnap.docs.map((docItem) => ({
+          id: docItem.id,
+          ...(docItem.data() as Omit<UserRow, "id">),
+        })) as UserRow[];
+
+        const applicationData = applicationsSnap.docs.map((docItem) => ({
+          id: docItem.id,
+          ...(docItem.data() as Omit<ApplicationRow, "id">),
+        })) as ApplicationRow[];
+
+        const bookingData = bookingsSnap.docs.map((docItem) => ({
+          id: docItem.id,
+          ...(docItem.data() as Omit<BookingExportRecord, "id">),
+        })) as BookingExportRecord[];
+
         setProfiles(data);
+        setUsers(userData);
+        setApplications(applicationData);
+        setBookings(bookingData);
       } catch (error) {
         console.error("Fetch profiles error:", error);
       } finally {
@@ -126,6 +200,206 @@ export default function AdminProfilesPage() {
     };
   }, [profiles]);
 
+  const availableBookingYears = useMemo(() => {
+    return [...new Set(
+      bookings
+        .map((booking) =>
+          booking.createdAt?.seconds
+            ? String(new Date(booking.createdAt.seconds * 1000).getFullYear())
+            : ""
+        )
+        .filter(Boolean)
+    )].sort((a, b) => Number(b) - Number(a));
+  }, [bookings]);
+
+  const exportClientDatabase = () => {
+    const userById = new Map(users.map((user) => [user.id, user]));
+    const applicationByUserId = new Map(
+      applications
+        .filter((application) => application.userId)
+        .map((application) => [application.userId as string, application])
+    );
+    const bookingsByProfileId = new Map<string, BookingRecord[]>();
+
+    bookings.forEach((booking) => {
+      const key = booking.profileId || "";
+      if (!key) return;
+      const current = bookingsByProfileId.get(key) || [];
+      current.push(booking);
+      bookingsByProfileId.set(key, current);
+    });
+
+    const sourceProfiles =
+      clientExportScope === "filtered"
+        ? filteredProfiles
+        : clientExportScope === "active"
+        ? profiles.filter((profile) => (profile.clientStatus || "active") === "active")
+        : clientExportScope === "inactive"
+        ? profiles.filter((profile) => (profile.clientStatus || "active") === "inactive")
+        : profiles;
+
+    const rows = sourceProfiles.map((profile) => {
+      const user = profile.userId ? userById.get(profile.userId) : null;
+      const application = profile.userId
+        ? applicationByUserId.get(profile.userId)
+        : null;
+      const profileBookings = bookingsByProfileId.get(profile.id) || [];
+
+      return {
+        profileId: profile.id,
+        userId: profile.userId || "",
+        fullName: profile.fullName || "",
+        email: user?.email || "",
+        phone: application?.phone || "",
+        approvalStatus: profile.approvalStatus || "",
+        onboardingStatus: profile.onboardingStatus || "",
+        paymentStatus: profile.paymentStatus || "",
+        clientStatus: profile.clientStatus || "active",
+        assignedProgram: profile.assignedProgram || "",
+        age: profile.age || "",
+        goal: profile.goal || application?.goal || "",
+        height: profile.height || "",
+        weight: profile.weight || "",
+        allergies: profile.allergies || "",
+        injuries: profile.injuries || "",
+        notes: profile.notes || "",
+        internalNotes: profile.internalNotes || "",
+        totalBookings: profileBookings.length,
+        confirmedBookings: profileBookings.filter(
+          (booking) => booking.status === "confirmed"
+        ).length,
+        pendingBookings: profileBookings.filter(
+          (booking) => booking.status === "pending"
+        ).length,
+        totalCustomPrice: profileBookings.reduce(
+          (sum, booking) => sum + (typeof booking.customPrice === "number" ? booking.customPrice : 0),
+          0
+        ),
+      };
+    });
+
+    const headers = [
+      "profileId",
+      "userId",
+      "fullName",
+      "email",
+      "phone",
+      "approvalStatus",
+      "onboardingStatus",
+      "paymentStatus",
+      "clientStatus",
+      "assignedProgram",
+      "age",
+      "goal",
+      "height",
+      "weight",
+      "allergies",
+      "injuries",
+      "notes",
+      "internalNotes",
+      "totalBookings",
+      "confirmedBookings",
+      "pendingBookings",
+      "totalCustomPrice",
+    ];
+
+    downloadCsv(
+      `bootcamp-client-database-${clientExportScope}-${new Date().toISOString().slice(0, 10)}.csv`,
+      buildCsv(headers, rows)
+    );
+  };
+
+  const exportBookingsReport = () => {
+    const userById = new Map(users.map((user) => [user.id, user]));
+    const profileById = new Map(profiles.map((profile) => [profile.id, profile]));
+    const applicationByUserId = new Map(
+      applications
+        .filter((application) => application.userId)
+        .map((application) => [application.userId as string, application])
+    );
+
+    const filteredBookings = bookings.filter((booking) => {
+      const matchesStatus =
+        bookingExportStatus === "all" ? true : booking.status === bookingExportStatus;
+      const matchesPayment =
+        bookingExportPayment === "all"
+          ? true
+          : booking.paymentStatus === bookingExportPayment;
+      const bookingYear = booking.createdAt?.seconds
+        ? String(new Date(booking.createdAt.seconds * 1000).getFullYear())
+        : "";
+      const matchesYear =
+        bookingExportYear === "all" ? true : bookingYear === bookingExportYear;
+
+      return matchesStatus && matchesPayment && matchesYear;
+    });
+
+    const rows = filteredBookings.map((booking) => {
+      const profile = booking.profileId ? profileById.get(booking.profileId) : null;
+      const user = booking.userId ? userById.get(booking.userId) : null;
+      const application = booking.userId
+        ? applicationByUserId.get(booking.userId)
+        : null;
+
+      return {
+        bookingId: booking.id,
+        profileId: booking.profileId || "",
+        userId: booking.userId || "",
+        customerName: booking.customerName || profile?.fullName || "",
+        customerEmail: booking.customerEmail || user?.email || "",
+        phone: application?.phone || "",
+        bookingStatus: booking.status,
+        durationWeeks: booking.durationWeeks,
+        startWeekId: booking.startWeekId || "",
+        weekIds: Array.isArray(booking.weekIds) ? booking.weekIds.join(" | ") : "",
+        paymentStatus: booking.paymentStatus,
+        paymentMethod: booking.paymentMethod,
+        consumesCapacity: booking.consumesCapacity ? "yes" : "no",
+        shortStay: booking.shortStay ? "yes" : "no",
+        shortStayNights: booking.shortStayNights || "",
+        customPrice: typeof booking.customPrice === "number" ? booking.customPrice : "",
+        currency: booking.currency || "EUR",
+        createdAt: booking.createdAt?.seconds
+          ? new Date(booking.createdAt.seconds * 1000).toISOString()
+          : "",
+        assignedProgram: profile?.assignedProgram || "",
+        clientStatus: profile?.clientStatus || "",
+        profilePaymentStatus: profile?.paymentStatus || "",
+        notes: booking.notes || "",
+      };
+    });
+
+    const headers = [
+      "bookingId",
+      "profileId",
+      "userId",
+      "customerName",
+      "customerEmail",
+      "phone",
+      "bookingStatus",
+      "durationWeeks",
+      "startWeekId",
+      "weekIds",
+      "paymentStatus",
+      "paymentMethod",
+      "consumesCapacity",
+      "shortStay",
+      "shortStayNights",
+      "customPrice",
+      "currency",
+      "createdAt",
+      "assignedProgram",
+      "clientStatus",
+      "profilePaymentStatus",
+      "notes",
+    ];
+
+    downloadCsv(
+      `bootcamp-bookings-report-${bookingExportStatus}-${bookingExportPayment}-${bookingExportYear}-${new Date().toISOString().slice(0, 10)}.csv`,
+      buildCsv(headers, rows)
+    );
+  };
+
   if (loading) {
     return (
       <div className="rounded-[28px] border border-white/70 bg-white/90 p-8 shadow-[0_20px_60px_rgba(15,23,42,0.08)] backdrop-blur">
@@ -164,6 +438,96 @@ export default function AdminProfilesPage() {
               label="Onboarding incomplete"
               value={String(summary.incompleteOnboarding)}
             />
+          </div>
+
+          <div className="mt-6 grid gap-4 xl:grid-cols-2">
+            <div className="rounded-[22px] border border-slate-200 bg-white/90 p-4">
+              <p className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">
+                Client Database Export
+              </p>
+              <p className="mt-2 text-sm text-slate-600">
+                Export all client records, or only active/inactive clients. `Filtered`
+                uses the current search and page filters.
+              </p>
+              <div className="mt-4 flex flex-col gap-3 sm:flex-row">
+                <select
+                  value={clientExportScope}
+                  onChange={(e) =>
+                    setClientExportScope(e.target.value as ClientExportScope)
+                  }
+                  className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 shadow-sm outline-none transition focus:border-[#93c5fd] focus:ring-4 focus:ring-[#dbeafe]"
+                >
+                  <option value="filtered">Current filtered view</option>
+                  <option value="all">All clients</option>
+                  <option value="active">Active only</option>
+                  <option value="inactive">Inactive only</option>
+                </select>
+                <button
+                  type="button"
+                  onClick={exportClientDatabase}
+                  className="rounded-2xl bg-slate-950 px-4 py-3 text-sm font-medium text-white shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:bg-slate-800 hover:shadow-md"
+                >
+                  Export Client CSV
+                </button>
+              </div>
+            </div>
+
+            <div className="rounded-[22px] border border-slate-200 bg-white/90 p-4">
+              <p className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">
+                Bookings & Payments Export
+              </p>
+              <p className="mt-2 text-sm text-slate-600">
+                Filter by booking status, payment status, and year. Year uses booking
+                creation timestamp because profiles do not currently store a reliable created date.
+              </p>
+              <div className="mt-4 grid gap-3 sm:grid-cols-3">
+                <select
+                  value={bookingExportStatus}
+                  onChange={(e) =>
+                    setBookingExportStatus(e.target.value as BookingExportStatus)
+                  }
+                  className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 shadow-sm outline-none transition focus:border-[#93c5fd] focus:ring-4 focus:ring-[#dbeafe]"
+                >
+                  <option value="all">All booking status</option>
+                  <option value="confirmed">Confirmed</option>
+                  <option value="pending">Pending</option>
+                  <option value="cancelled">Cancelled</option>
+                </select>
+                <select
+                  value={bookingExportPayment}
+                  onChange={(e) =>
+                    setBookingExportPayment(e.target.value as BookingExportPayment)
+                  }
+                  className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 shadow-sm outline-none transition focus:border-[#93c5fd] focus:ring-4 focus:ring-[#dbeafe]"
+                >
+                  <option value="all">All payment status</option>
+                  <option value="paid">Paid</option>
+                  <option value="pending">Pending</option>
+                  <option value="manual">Manual</option>
+                </select>
+                <select
+                  value={bookingExportYear}
+                  onChange={(e) => setBookingExportYear(e.target.value)}
+                  className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 shadow-sm outline-none transition focus:border-[#93c5fd] focus:ring-4 focus:ring-[#dbeafe]"
+                >
+                  <option value="all">All years</option>
+                  {availableBookingYears.map((year) => (
+                    <option key={year} value={year}>
+                      {year}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div className="mt-3">
+                <button
+                  type="button"
+                  onClick={exportBookingsReport}
+                  className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-medium text-slate-700 shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:border-slate-300 hover:shadow-md"
+                >
+                  Export Bookings & Payments CSV
+                </button>
+              </div>
+            </div>
           </div>
         </div>
       </section>

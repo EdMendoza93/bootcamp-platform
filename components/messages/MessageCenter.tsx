@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   addDoc,
   collection,
+  deleteDoc,
   doc,
   getDocs,
   serverTimestamp,
@@ -46,6 +47,7 @@ export default function MessageCenter({
   const { firebaseUser, appUser, authLoading, profileLoading } = useAuth();
   const [loading, setLoading] = useState(true);
   const [sending, setSending] = useState(false);
+  const [deleting, setDeleting] = useState(false);
   const [profiles, setProfiles] = useState<ProfileOption[]>([]);
   const [threads, setThreads] = useState<MessageThreadRecord[]>([]);
   const [selectedThreadId, setSelectedThreadId] = useState("");
@@ -362,6 +364,54 @@ export default function MessageCenter({
     }
   };
 
+  const deleteThread = async () => {
+    if (!selectedThread) return;
+
+    const confirmed = window.confirm(
+      "Delete this thread permanently? This will remove the full conversation history."
+    );
+
+    if (!confirmed) return;
+
+    setDeleting(true);
+
+    try {
+      const messagesSnap = await getDocs(
+        collection(db, "messageThreads", selectedThread.id, "messages")
+      );
+
+      await Promise.all(messagesSnap.docs.map((docItem) => deleteDoc(docItem.ref)));
+      await deleteDoc(doc(db, "messageThreads", selectedThread.id));
+
+      const deletedThreadId = selectedThread.id;
+
+      setSelectedThreadId("");
+      setMessages([]);
+      setReplyBody("");
+
+      await loadData();
+
+      showToast({
+        title: "Thread deleted",
+        description: "The conversation was removed from the inbox.",
+        type: "success",
+      });
+
+      if (selectedThreadId === deletedThreadId) {
+        setSelectedThreadId("");
+      }
+    } catch (error) {
+      console.error("Delete thread error:", error);
+      showToast({
+        title: "Could not delete thread",
+        description: "Please try again.",
+        type: "error",
+      });
+    } finally {
+      setDeleting(false);
+    }
+  };
+
   if (loading || loadingAuth) {
     return (
       <div className="rounded-[28px] border border-white/70 bg-white/90 p-8 shadow-[0_20px_60px_rgba(15,23,42,0.08)] backdrop-blur">
@@ -638,6 +688,14 @@ export default function MessageCenter({
                         className="rounded-2xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-medium text-slate-700 transition hover:bg-slate-50"
                       >
                         {selectedThread.status === "open" ? "Close thread" : "Reopen thread"}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={deleteThread}
+                        disabled={deleting}
+                        className="rounded-2xl border border-rose-200 bg-rose-50 px-4 py-2.5 text-sm font-medium text-rose-700 transition hover:bg-rose-100 disabled:opacity-60"
+                      >
+                        {deleting ? "Deleting..." : "Delete thread"}
                       </button>
                     </div>
                   </div>

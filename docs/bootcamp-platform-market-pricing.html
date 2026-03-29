@@ -1,0 +1,297 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Bootcamp Platform - Market Pricing Reference</title>
+    <style>
+      :root {
+        --bg: #f6efe7;
+        --paper: #fffaf4;
+        --ink: #18212f;
+        --muted: #6b7280;
+        --line: #ece4d8;
+        --gold: #f2cf8d;
+        --gold-soft: #fff2d7;
+        --rose-soft: #fce7e1;
+        --shadow: 0 18px 48px rgba(90, 69, 44, 0.09);
+      }
+
+      body {
+        margin: 0;
+        font-family: "Aptos", "Helvetica Neue", Arial, sans-serif;
+        color: var(--ink);
+        background:
+          radial-gradient(circle at top left, #fff6ec 0%, transparent 32%),
+          radial-gradient(circle at top right, #fde7dc 0%, transparent 28%),
+          linear-gradient(180deg, #f6efe7 0%, #f3ece4 100%);
+      }
+
+      .page {
+        max-width: 920px;
+        margin: 0 auto;
+        padding: 56px 60px 80px;
+        background: rgba(255, 250, 244, 0.88);
+      }
+
+      .hero {
+        border-radius: 34px;
+        padding: 38px 40px;
+        color: white;
+        background:
+          radial-gradient(circle at top right, rgba(252, 231, 225, 0.18) 0%, transparent 26%),
+          linear-gradient(135deg, #1c2431 0%, #2f3d4f 52%, #a66b2d 100%);
+        box-shadow: 0 28px 80px rgba(24, 33, 47, 0.18);
+      }
+
+      .eyebrow {
+        margin: 0 0 10px;
+        font-size: 12px;
+        text-transform: uppercase;
+        letter-spacing: 0.24em;
+        color: rgba(255,255,255,0.7);
+      }
+
+      h1 {
+        margin: 0;
+        font-size: 40px;
+        letter-spacing: -0.03em;
+      }
+
+      .hero p {
+        margin: 16px 0 0;
+        max-width: 740px;
+        font-size: 15px;
+        line-height: 1.7;
+        color: rgba(255,255,255,0.84);
+      }
+
+      h2 {
+        margin: 42px 0 14px;
+        font-size: 26px;
+        letter-spacing: -0.02em;
+      }
+
+      p, li {
+        font-size: 14px;
+        line-height: 1.7;
+      }
+
+      .lead {
+        margin-top: 0;
+        color: var(--muted);
+      }
+
+      .grid {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 18px;
+      }
+
+      .card {
+        border: 1px solid var(--line);
+        border-radius: 28px;
+        padding: 24px;
+        background:
+          radial-gradient(circle at top right, rgba(252, 231, 225, 0.38) 0%, transparent 28%),
+          linear-gradient(180deg, #ffffff 0%, #fffcf8 100%);
+        box-shadow: var(--shadow);
+      }
+
+      .card h3 {
+        margin: 0 0 10px;
+        font-size: 18px;
+      }
+
+      .big {
+        font-size: 34px;
+        font-weight: 800;
+        letter-spacing: -0.03em;
+      }
+
+      .compare-box {
+        margin-top: 18px;
+        border: 1px solid var(--line);
+        border-radius: 28px;
+        overflow: hidden;
+        box-shadow: var(--shadow);
+        background: #fff;
+      }
+
+      .row {
+        display: grid;
+        grid-template-columns: 1.2fr 1fr 1fr;
+      }
+
+      .row > div {
+        padding: 18px 20px;
+        border-bottom: 1px solid var(--line);
+      }
+
+      .row > div:not(:last-child) {
+        border-right: 1px solid var(--line);
+      }
+
+      .head {
+        font-weight: 700;
+        background: linear-gradient(180deg, #fff9f2 0%, #fffdf9 100%);
+      }
+
+      .highlight {
+        background: linear-gradient(135deg, var(--gold-soft) 0%, #fff8ef 52%, var(--rose-soft) 100%);
+      }
+
+      .source-list {
+        display: grid;
+        gap: 14px;
+        margin-top: 18px;
+      }
+
+      .source {
+        border: 1px solid var(--line);
+        border-radius: 22px;
+        padding: 18px 20px;
+        background: #fff;
+        box-shadow: 0 12px 32px rgba(90, 69, 44, 0.06);
+      }
+
+      .source a {
+        color: #7c4a15;
+        text-decoration: none;
+        word-break: break-word;
+      }
+
+      .note {
+        margin-top: 24px;
+        padding: 20px 22px;
+        border-radius: 22px;
+        background: linear-gradient(135deg, #fff7ef 0%, #fffdfa 100%);
+        border: 1px solid var(--line);
+        color: #6b5a49;
+        box-shadow: 0 14px 36px rgba(90, 69, 44, 0.06);
+      }
+    </style>
+  </head>
+  <body>
+    <div class="page">
+      <section class="hero">
+        <p class="eyebrow">Market Reference</p>
+        <h1>Comparable Pricing In The Market</h1>
+        <p>
+          This document is a simple market reference showing that custom web apps,
+          private dashboards, and ongoing maintenance are commonly priced much higher
+          by agencies and established providers. These references are not exact copies
+          of this project, but they show the general pricing environment around custom
+          software, websites, and maintenance.
+        </p>
+      </section>
+
+      <h2>Quick Reading</h2>
+      <p class="lead">
+        The current build price for Bootcamp Platform is low compared with many custom
+        software and agency references in the market, especially considering it includes
+        a website, private web app, multiple user roles, bookings, schedules, messaging,
+        notifications, exports, and future payment support.
+      </p>
+
+      <div class="grid">
+        <div class="card">
+          <h3>This Project</h3>
+          <div class="big">EUR 3,500</div>
+          <p>Current one-time build price discussed for the website and private platform.</p>
+        </div>
+        <div class="card">
+          <h3>Typical Market Range</h3>
+          <div class="big">$10k - $40k+</div>
+          <p>Common range for custom web applications with business workflows and admin tools.</p>
+        </div>
+      </div>
+
+      <h2>Simple Comparison</h2>
+      <div class="compare-box">
+        <div class="row head">
+          <div>Reference</div>
+          <div>Typical Price</div>
+          <div>What It Suggests</div>
+        </div>
+        <div class="row">
+          <div>Custom web app ranges</div>
+          <div>$10k - $40k+</div>
+          <div>Custom business systems are usually priced far above a normal website</div>
+        </div>
+        <div class="row">
+          <div>Freelance full-stack hourly rates</div>
+          <div>$61-80/hr average</div>
+          <div>Even solo custom development adds up quickly over many hours</div>
+        </div>
+        <div class="row">
+          <div>Web application maintenance</div>
+          <div>$300 - $2,500/month</div>
+          <div>Ongoing support and maintenance are commonly billed monthly</div>
+        </div>
+        <div class="row">
+          <div>This project</div>
+          <div class="highlight">EUR 3,500 build</div>
+          <div class="highlight">Positioned well below many agency and custom software references</div>
+        </div>
+      </div>
+
+      <h2>Current References</h2>
+      <div class="source-list">
+        <div class="source">
+          <strong>Scenic IT Solutions - Custom web app development cost (2026)</strong>
+          <p>
+            This source shows a mid-sized custom application range of <strong>$10,000 - $40,000</strong>,
+            and places more complex software above that.
+          </p>
+          <a href="https://www.scenicitsolutions.com/blogs/cost-of-custom-web-app-development-2026.html">https://www.scenicitsolutions.com/blogs/cost-of-custom-web-app-development-2026.html</a>
+        </div>
+
+        <div class="source">
+          <strong>Arc - Full-stack developer hourly rate</strong>
+          <p>
+            Arc shows full-stack freelance developers commonly averaging around <strong>$61-80/hour</strong>.
+            That is useful context for understanding how custom platform work is normally valued.
+          </p>
+          <a href="https://arc.dev/freelance-developer-rates/full-stack">https://arc.dev/freelance-developer-rates/full-stack</a>
+        </div>
+
+        <div class="source">
+          <strong>WebFX - Website maintenance pricing (2026)</strong>
+          <p>
+            WebFX shows that maintenance is usually a real ongoing cost. Their page references
+            web application maintenance around <strong>$300 - $2,500/month</strong>, and custom business
+            website maintenance around <strong>$350 - $4,500/month</strong>, depending on complexity.
+          </p>
+          <a href="https://www.webfx.com/web-development/pricing/website-maintenance/">https://www.webfx.com/web-development/pricing/website-maintenance/</a>
+        </div>
+
+        <div class="source">
+          <strong>WebFX - Website build cost (2026)</strong>
+          <p>
+            WebFX also shows business websites commonly ranging from <strong>$1,000 - $100,000</strong>
+            depending on size, design, and functionality. This helps explain why a custom site plus
+            private app is not in the same category as a basic brochure website.
+          </p>
+          <a href="https://www.webfx.com/web-design/pricing/website-costs/">https://www.webfx.com/web-design/pricing/website-costs/</a>
+        </div>
+
+        <div class="source">
+          <strong>ZTABS - SaaS development cost breakdown (2026)</strong>
+          <p>
+            ZTABS shows how larger software products can scale much higher, with MVP development often
+            starting well above small website budgets. It also highlights that hosting, support, and
+            post-launch work are real ongoing costs.
+          </p>
+          <a href="https://ztabs.co/blog/saas-development-cost-breakdown">https://ztabs.co/blog/saas-development-cost-breakdown</a>
+        </div>
+      </div>
+
+      <div class="note">
+        This reference sheet is meant to give context, not to claim that every agency would quote the
+        exact same amount. The point is simple: this type of project sits in the custom software category,
+        not in the simple website category.
+      </div>
+    </div>
+  </body>
+</html>
