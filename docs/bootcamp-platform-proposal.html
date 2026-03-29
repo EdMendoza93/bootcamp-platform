@@ -1,0 +1,1043 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Bootcamp Platform Proposal</title>
+    <style>
+      :root {
+        --cream-1: #f8f2ea;
+        --cream-2: #fffaf4;
+        --rose-1: #f7d9d0;
+        --rose-2: #fce7e1;
+        --gold-1: #f5cf86;
+        --gold-2: #fff0cf;
+        --ink: #18212f;
+        --muted: #6b7280;
+        --line: #ece4d8;
+        --card-shadow: 0 18px 48px rgba(90, 69, 44, 0.09);
+      }
+
+      body {
+        font-family: "Aptos", "Helvetica Neue", Arial, sans-serif;
+        color: var(--ink);
+        margin: 0;
+        background:
+          radial-gradient(circle at top left, #fff6ec 0%, transparent 32%),
+          radial-gradient(circle at top right, #fde7dc 0%, transparent 28%),
+          linear-gradient(180deg, #f6efe7 0%, #f3ece4 100%);
+      }
+
+      .page {
+        max-width: 920px;
+        margin: 0 auto;
+        background: rgba(255, 250, 244, 0.86);
+        backdrop-filter: blur(8px);
+        padding: 56px 60px 80px;
+      }
+
+      .hero {
+        background:
+          radial-gradient(circle at top right, rgba(191, 226, 255, 0.28) 0%, transparent 24%),
+          radial-gradient(circle at bottom left, rgba(117, 196, 255, 0.18) 0%, transparent 30%),
+          linear-gradient(135deg, #2d78d0 0%, #55aef7 54%, #8dd5ff 100%);
+        color: white;
+        border-radius: 36px;
+        padding: 40px 42px;
+        box-shadow: 0 28px 80px rgba(57, 121, 198, 0.24);
+        position: relative;
+        overflow: hidden;
+      }
+
+      .hero::after {
+        content: "";
+        position: absolute;
+        inset: auto -80px -90px auto;
+        width: 260px;
+        height: 260px;
+        border-radius: 999px;
+        background: rgba(255, 255, 255, 0.14);
+      }
+
+      .hero-top {
+        display: flex;
+        align-items: center;
+        gap: 18px;
+        margin-bottom: 30px;
+        position: relative;
+        z-index: 1;
+      }
+
+      .logo {
+        width: 72px;
+        height: 72px;
+        border-radius: 24px;
+        background: #ffffff;
+        padding: 11px;
+        box-sizing: border-box;
+        border: 1px solid rgba(255,255,255,0.34);
+        box-shadow: 0 12px 28px rgba(26, 97, 173, 0.18);
+      }
+
+      .eyebrow {
+        font-size: 12px;
+        letter-spacing: 0.24em;
+        text-transform: uppercase;
+        color: rgba(255,255,255,0.68);
+        margin: 0 0 10px;
+      }
+
+      h1 {
+        font-size: 42px;
+        line-height: 1.02;
+        margin: 0;
+        letter-spacing: -0.03em;
+      }
+
+      .hero p {
+        font-size: 15px;
+        line-height: 1.7;
+        color: rgba(255,255,255,0.8);
+        max-width: 700px;
+        margin: 16px 0 0;
+        position: relative;
+        z-index: 1;
+      }
+
+      .stats {
+        display: flex;
+        gap: 14px;
+        margin-top: 26px;
+        flex-wrap: wrap;
+        position: relative;
+        z-index: 1;
+      }
+
+      .stat {
+        background: rgba(255,255,255,0.1);
+        border: 1px solid rgba(255,255,255,0.14);
+        border-radius: 22px;
+        padding: 16px 18px;
+        min-width: 150px;
+        box-shadow: inset 0 1px 0 rgba(255,255,255,0.05);
+      }
+
+      .stat-label {
+        font-size: 11px;
+        text-transform: uppercase;
+        letter-spacing: 0.18em;
+        color: rgba(255,255,255,0.62);
+        margin-bottom: 8px;
+      }
+
+      .stat-value {
+        font-size: 23px;
+        font-weight: 800;
+      }
+
+      h2 {
+        font-size: 26px;
+        margin: 44px 0 14px;
+        color: #4aa3f0;
+        letter-spacing: -0.02em;
+      }
+
+      p, li {
+        font-size: 14px;
+        line-height: 1.7;
+      }
+
+      .lead {
+        color: var(--muted);
+        margin-top: 0;
+        max-width: 760px;
+      }
+
+      .grid {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 18px;
+        margin-top: 18px;
+      }
+
+      .card {
+        border: 1px solid var(--line);
+        background:
+          radial-gradient(circle at top right, rgba(252, 231, 225, 0.38) 0%, transparent 28%),
+          linear-gradient(180deg, #ffffff 0%, #fffcf8 100%);
+        border-radius: 28px;
+        padding: 24px;
+        box-shadow: var(--card-shadow);
+      }
+
+      .card h3 {
+        margin: 0 0 10px;
+        font-size: 18px;
+        color: var(--ink);
+        letter-spacing: -0.02em;
+      }
+
+      .price-box {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 18px;
+        margin-top: 18px;
+      }
+
+      .price {
+        border-radius: 30px;
+        padding: 26px;
+        background: linear-gradient(180deg, #ffffff 0%, #fffcf8 100%);
+        border: 1px solid var(--line);
+        box-shadow: var(--card-shadow);
+      }
+
+      .price.highlight {
+        background:
+          radial-gradient(circle at top right, rgba(252, 231, 225, 0.48) 0%, transparent 26%),
+          linear-gradient(135deg, var(--gold-2) 0%, #fff8ef 52%, var(--rose-2) 100%);
+        border-color: #efcf96;
+        transform: translateY(-10px);
+        position: relative;
+      }
+
+      .recommended-badge {
+        position: absolute;
+        top: 18px;
+        right: 18px;
+        padding: 8px 12px;
+        border-radius: 999px;
+        background: #111827;
+        color: #fff;
+        font-size: 11px;
+        letter-spacing: 0.14em;
+        text-transform: uppercase;
+      }
+
+      .price-label {
+        font-size: 12px;
+        text-transform: uppercase;
+        letter-spacing: 0.18em;
+        color: #8a7765;
+      }
+
+      .price-value {
+        font-size: 38px;
+        font-weight: 800;
+        margin: 10px 0 8px;
+        color: var(--ink);
+        letter-spacing: -0.03em;
+      }
+
+      .pill-row {
+        margin-top: 18px;
+      }
+
+      .pill {
+        display: inline-block;
+        margin: 0 8px 8px 0;
+        padding: 9px 13px;
+        border-radius: 999px;
+        background: linear-gradient(180deg, #fff7ef 0%, #fffdf9 100%);
+        border: 1px solid var(--line);
+        font-size: 12px;
+        color: #6f5b4a;
+        box-shadow: 0 8px 20px rgba(90, 69, 44, 0.06);
+      }
+
+      .visual-strip {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 14px;
+        margin-top: 18px;
+      }
+
+      .visual {
+        border-radius: 28px;
+        border: 1px solid var(--line);
+        background: #ffffff;
+        overflow: hidden;
+        box-shadow: var(--card-shadow);
+      }
+
+      .visual img {
+        display: block;
+        width: 100%;
+        height: auto;
+        background: #f8fafc;
+      }
+
+      .visual-copy {
+        padding: 18px 20px 20px;
+        background: linear-gradient(180deg, #ffffff 0%, #fffaf5 100%);
+      }
+
+      .visual strong {
+        display: block;
+        margin-bottom: 6px;
+        font-size: 16px;
+        color: var(--ink);
+      }
+
+      .visual p {
+        margin: 0;
+        color: #73614f;
+        font-size: 13px;
+        line-height: 1.6;
+      }
+
+      ul {
+        padding-left: 20px;
+      }
+
+      .footnote {
+        margin-top: 28px;
+        padding: 20px 22px;
+        border-radius: 22px;
+        background: linear-gradient(135deg, #fff7ef 0%, #fffdfa 100%);
+        border: 1px solid var(--line);
+        color: #6b5a49;
+        box-shadow: 0 14px 36px rgba(90, 69, 44, 0.06);
+      }
+
+      .promise-box {
+        margin-top: 30px;
+        padding: 30px 32px;
+        border-radius: 30px;
+        background:
+          radial-gradient(circle at top right, rgba(252, 231, 225, 0.5) 0%, transparent 28%),
+          linear-gradient(135deg, #fff2e5 0%, #fffaf4 48%, #fff0de 100%);
+        border: 1px solid #efd7b1;
+        box-shadow: 0 22px 56px rgba(166, 107, 45, 0.12);
+      }
+
+      .promise-label {
+        display: inline-block;
+        padding: 8px 12px;
+        border-radius: 999px;
+        background: #111827;
+        color: #fff;
+        font-size: 11px;
+        letter-spacing: 0.16em;
+        text-transform: uppercase;
+      }
+
+      .promise-box h3 {
+        margin: 18px 0 12px;
+        font-size: 31px;
+        line-height: 1.08;
+        letter-spacing: -0.03em;
+        color: #4aa3f0;
+      }
+
+      .promise-box p {
+        margin: 0;
+        font-size: 17px;
+        line-height: 1.85;
+        color: #5b4a39;
+      }
+
+      .compare-box {
+        margin-top: 18px;
+        border: 1px solid var(--line);
+        border-radius: 28px;
+        overflow: hidden;
+        box-shadow: var(--card-shadow);
+        background: #fff;
+      }
+
+      .compare-row {
+        display: grid;
+        grid-template-columns: 1.2fr 1fr 1fr;
+      }
+
+      .compare-row > div {
+        padding: 18px 20px;
+        border-bottom: 1px solid var(--line);
+      }
+
+      .compare-row > div:not(:last-child) {
+        border-right: 1px solid var(--line);
+      }
+
+      .compare-head {
+        background: linear-gradient(180deg, #fff9f2 0%, #fffdf9 100%);
+        font-weight: 700;
+        color: var(--ink);
+      }
+
+      .compare-head .is-premium {
+        background: linear-gradient(135deg, var(--gold-2) 0%, #fff8ef 52%, var(--rose-2) 100%);
+      }
+
+      .source-list {
+        display: grid;
+        gap: 14px;
+        margin-top: 18px;
+      }
+
+      .source {
+        border: 1px solid var(--line);
+        border-radius: 22px;
+        padding: 18px 20px;
+        background: #fff;
+        box-shadow: 0 12px 32px rgba(90, 69, 44, 0.06);
+      }
+
+      .source a {
+        color: #7c4a15;
+        text-decoration: none;
+        word-break: break-word;
+      }
+
+      .feature-grid {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 18px;
+        margin-top: 18px;
+      }
+
+      .feature-card {
+        border: 1px solid var(--line);
+        border-radius: 28px;
+        padding: 24px;
+        background:
+          radial-gradient(circle at top right, rgba(252, 231, 225, 0.24) 0%, transparent 26%),
+          linear-gradient(180deg, #ffffff 0%, #fffcf8 100%);
+        box-shadow: var(--card-shadow);
+      }
+
+      .feature-meta {
+        display: flex;
+        gap: 10px;
+        align-items: center;
+        flex-wrap: wrap;
+        margin-bottom: 12px;
+      }
+
+      .feature-badge {
+        display: inline-block;
+        padding: 7px 11px;
+        border-radius: 999px;
+        background: #eff6ff;
+        border: 1px solid #bfdbfe;
+        color: #2563eb;
+        font-size: 11px;
+        letter-spacing: 0.12em;
+        text-transform: uppercase;
+      }
+
+      .feature-badge.premium {
+        background: linear-gradient(135deg, var(--gold-2) 0%, #fff8ef 52%, var(--rose-2) 100%);
+        border-color: #efcf96;
+        color: #8a5a15;
+      }
+
+      .feature-card h3 {
+        margin: 0 0 10px;
+        font-size: 20px;
+        color: var(--ink);
+        letter-spacing: -0.02em;
+      }
+
+      .feature-card p {
+        margin: 0 0 10px;
+        color: #5f5346;
+      }
+
+      .feature-card p strong {
+        color: #3e2f23;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="page">
+      <section class="hero">
+        <div class="hero-top">
+          <img class="logo" src="../app/icon.png" alt="Bootcamp Platform" />
+          <div>
+            <p class="eyebrow">Private Proposal</p>
+            <h1>Bootcamp Platform</h1>
+          </div>
+        </div>
+        <p>
+          This proposal will cover the website, the private web app, and the
+          monthly support package for the bootcamp. The idea will be to give the
+          business a stronger image, make day-to-day work easier, and create a
+          more premium experience for both the team and the clients.
+        </p>
+
+        <div class="stats">
+          <div class="stat">
+            <div class="stat-label">One-Time Build</div>
+            <div class="stat-value">EUR 3,500</div>
+          </div>
+          <div class="stat">
+            <div class="stat-label">Monthly Base</div>
+            <div class="stat-value">EUR 150</div>
+          </div>
+          <div class="stat">
+            <div class="stat-label">Full Monthly Option</div>
+            <div class="stat-value">EUR 270</div>
+          </div>
+        </div>
+      </section>
+
+      <h2>What Is Included</h2>
+      <p class="lead">
+        This project will be more than a simple website. It will be a full digital
+        system for presenting the business properly online and managing the
+        bootcamp in a more professional, organized, and scalable way.
+      </p>
+
+      <div class="grid">
+        <div class="card">
+          <h3>Website</h3>
+          <ul>
+            <li>I will create a custom website designed specifically for the bootcamp</li>
+            <li>It will give the business a more premium and trustworthy image</li>
+            <li>It will present services, offers, pricing, and key information in a clear way</li>
+            <li>It will give the business a stronger online presence for leads, referrals, congresses, and new enquiries</li>
+            <li>I will prepare the best SEO setup possible within the website build so the site is ready to perform well on search engines</li>
+            <li>The design will be mobile-friendly, so it will look good on phone, tablet, and desktop</li>
+            <li>The website structure will be ready for future bookings and payment flows</li>
+          </ul>
+        </div>
+        <div class="card">
+          <h3>Private Web App</h3>
+          <ul>
+            <li>The platform will include a private system for the daily running of the bootcamp</li>
+            <li>There will be an admin area to manage clients, bookings, availability, sessions, and reports</li>
+            <li>Clients will have their own private accounts where they can view their information and tools</li>
+            <li>Coach and nutritionist will have separate access so the team can work inside the same system</li>
+            <li>The app will include schedules, messages, push notifications, follow-up sessions, exports, and general operations tools</li>
+            <li>Overall, it will make the business feel much more organized and less dependent on scattered tools and manual work</li>
+          </ul>
+        </div>
+      </div>
+
+      <h2>Main Tools Inside The Platform</h2>
+      <div class="pill-row">
+        <span class="pill">Client accounts</span>
+        <span class="pill">Bookings</span>
+        <span class="pill">Availability</span>
+        <span class="pill">Schedules</span>
+        <span class="pill">Private sessions</span>
+        <span class="pill">Payments</span>
+        <span class="pill">Messages</span>
+        <span class="pill">Push notifications</span>
+        <span class="pill">Reports and exports</span>
+        <span class="pill">Staff management</span>
+      </div>
+
+      <h2>Feature Breakdown</h2>
+      <p class="lead">
+        Below is a simple explanation of what each main feature will do and how it
+        will help the business in practice. Features marked as <strong>Premium</strong>
+        will belong to the EUR 270 package.
+      </p>
+
+      <div class="feature-grid">
+        <div class="feature-card">
+          <div class="feature-meta">
+            <span class="feature-badge">Core</span>
+          </div>
+          <h3>Website</h3>
+          <p>
+            The website will be the public face of the business. It will explain the
+            bootcamp clearly, look professional, and help new people trust the brand.
+          </p>
+          <p>
+            <strong>Example:</strong> someone finds the business online, understands the offer,
+            sees the value clearly, and feels confident contacting or booking.
+          </p>
+        </div>
+
+        <div class="feature-card">
+          <div class="feature-meta">
+            <span class="feature-badge">Core</span>
+          </div>
+          <h3>Client Accounts</h3>
+          <p>
+            Each client will be able to have their own private account inside the app,
+            where they can see the information that belongs to them.
+          </p>
+          <p>
+            <strong>Example:</strong> a client logs in and checks their schedule, profile,
+            private sessions, progress, and messages in one place.
+          </p>
+        </div>
+
+        <div class="feature-card">
+          <div class="feature-meta">
+            <span class="feature-badge">Core</span>
+          </div>
+          <h3>Availability</h3>
+          <p>
+            You will be able to choose which weeks are available, how many places exist,
+            and whether those weeks are open or closed.
+          </p>
+          <p>
+            <strong>Example:</strong> if a week is full or not active, it will stop being
+            offered as available for booking.
+          </p>
+        </div>
+
+        <div class="feature-card">
+          <div class="feature-meta">
+            <span class="feature-badge">Core</span>
+          </div>
+          <h3>Bookings</h3>
+          <p>
+            The booking system will let the business manage 1-week, 2-week, and 3-week
+            stays in an organized way, connected to real availability.
+          </p>
+          <p>
+            <strong>Example:</strong> if someone books 2 consecutive weeks, those places
+            will be counted automatically in the relevant weeks.
+          </p>
+        </div>
+
+        <div class="feature-card">
+          <div class="feature-meta">
+            <span class="feature-badge">Core</span>
+          </div>
+          <h3>Schedule</h3>
+          <p>
+            The platform will include a schedule system so clients can see their
+            on-site plan while they are in the bootcamp.
+          </p>
+          <p>
+            <strong>Example:</strong> the client can open their dashboard and see meals,
+            training, and activities without staff having to send everything manually.
+          </p>
+        </div>
+
+        <div class="feature-card">
+          <div class="feature-meta">
+            <span class="feature-badge premium">Premium</span>
+          </div>
+          <h3>Coach and Nutritionist Access</h3>
+          <p>
+            The premium package will include separate access for coach and
+            nutritionist, so the team can work inside the platform with more
+            structure while admin keeps full control.
+          </p>
+          <p>
+            <strong>Example:</strong> the coach can update the training side of the schedule,
+            and the nutritionist can update the food side, all inside one system.
+          </p>
+        </div>
+
+        <div class="feature-card">
+          <div class="feature-meta">
+            <span class="feature-badge">Core</span>
+          </div>
+          <h3>Private Sessions</h3>
+          <p>
+            The platform will also allow follow-up private sessions outside the normal
+            bootcamp stay, such as online coaching or nutrition check-ins.
+          </p>
+          <p>
+            <strong>Example:</strong> a client can have a Zoom or WhatsApp follow-up session
+            after the bootcamp, without mixing that into the normal on-site schedule.
+          </p>
+        </div>
+
+        <div class="feature-card">
+          <div class="feature-meta">
+            <span class="feature-badge premium">Premium</span>
+          </div>
+          <h3>Messaging</h3>
+          <p>
+            The premium package will include private messaging inside the platform,
+            so clients and staff can communicate in a more organized way.
+          </p>
+          <p>
+            <strong>Example:</strong> a client can ask about a private session or a schedule
+            detail directly inside the app instead of depending on scattered messages.
+          </p>
+        </div>
+
+        <div class="feature-card">
+          <div class="feature-meta">
+            <span class="feature-badge premium">Premium</span>
+          </div>
+          <h3>Push Notifications</h3>
+          <p>
+            The premium package will also include push notifications, which means the
+            system can send alerts directly to the user when something important happens.
+          </p>
+          <p>
+            <strong>Example:</strong> a client could receive a notification saying they have
+            a new message, a booking update, or a change in their schedule.
+          </p>
+        </div>
+
+        <div class="feature-card">
+          <div class="feature-meta">
+            <span class="feature-badge">Core</span>
+          </div>
+          <h3>Reports and Exports</h3>
+          <p>
+            Admin will be able to export important business information, making it easier
+            to review client data and booking/payment numbers.
+          </p>
+          <p>
+            <strong>Example:</strong> you will be able to download a client database or a
+            bookings/payments report to work with the numbers more easily.
+          </p>
+        </div>
+
+        <div class="feature-card">
+          <div class="feature-meta">
+            <span class="feature-badge">Core</span>
+          </div>
+          <h3>Payments</h3>
+          <p>
+            The project is also being prepared for payment flows, so the business can
+            eventually manage deposits or payments inside the ecosystem.
+          </p>
+          <p>
+            <strong>Example:</strong> in the future, a client could move from seeing the offer
+            to completing a payment without leaving the business system.
+          </p>
+        </div>
+      </div>
+
+      <h2>Visual Overview</h2>
+      <p class="lead">
+        This is a visual preview of the type of platform and client experience the project will aim to deliver.
+      </p>
+      <div class="visual-strip">
+        <div class="visual">
+          <img src="assets/admin-overview-mockup.svg" alt="Admin overview mockup" />
+          <div class="visual-copy">
+            <strong>Admin Overview</strong>
+            <p>One main control area where the business can manage clients, bookings, staff, sessions, and reporting.</p>
+          </div>
+        </div>
+        <div class="visual">
+          <img src="assets/client-dashboard-mockup.svg" alt="Client dashboard mockup" />
+          <div class="visual-copy">
+            <strong>Client Dashboard</strong>
+            <p>A private and polished client space for schedules, progress, communication, and follow-up support.</p>
+          </div>
+        </div>
+        <div class="visual">
+          <img src="assets/bookings-messaging-mockup.svg" alt="Bookings and messaging mockup" />
+          <div class="visual-copy">
+            <strong>Bookings and Messaging</strong>
+            <p>Clear and practical tools for handling reservations and keeping client communication in one place.</p>
+          </div>
+        </div>
+      </div>
+
+      <h2>Pricing</h2>
+      <div class="price-box">
+        <div class="price">
+          <div class="price-label">One-Time Build</div>
+          <div class="price-value">EUR 3,500</div>
+          <p>
+            This will cover the build and delivery of the website and the private
+            web app. If needed, it can be split into monthly payments instead of
+            one single payment.
+          </p>
+        </div>
+        <div class="price highlight">
+          <div class="recommended-badge">Recommended</div>
+          <div class="price-label">Full Monthly Option</div>
+          <div class="price-value">EUR 270</div>
+          <p>
+            This will be the stronger option if you want maintenance, technical
+            management, and regular small improvements included in one monthly package.
+          </p>
+        </div>
+      </div>
+
+      <div class="promise-box">
+        <span class="promise-label">Key Point</span>
+        <h3>We do not stop until you are happy with how it looks.</h3>
+        <p>
+          Before final delivery, both options include normal revision rounds so the
+          project can be adjusted properly. This includes things like colours,
+          fonts, style direction, pictures on the website, and the general visual
+          presentation. The goal will not only be to deliver something that works,
+          but to deliver something you feel proud to present as your business.
+        </p>
+      </div>
+
+      <h2>Monthly Base - EUR 150</h2>
+      <div class="grid">
+        <div class="card">
+          <h3>Included</h3>
+          <ul>
+            <li>Keeping the website and app working correctly</li>
+            <li>Managing updates and deployments</li>
+            <li>Managing the platform and database on the technical side</li>
+            <li>Fixing small bugs when they come up</li>
+            <li>Basic support when needed</li>
+            <li>Domain management</li>
+            <li>1 small website update per month</li>
+          </ul>
+        </div>
+        <div class="card">
+          <h3>Important</h3>
+          <ul>
+            <li>Domain costs</li>
+            <li>New features are not included in this package</li>
+            <li>Big changes are not included in this package</li>
+            <li>Paid third-party tools are not included unless agreed separately</li>
+          </ul>
+        </div>
+      </div>
+
+      <h2>Full Monthly Option - EUR 270</h2>
+      <p class="lead">
+        This will be the stronger option if you want the platform to stay more
+        active, more polished, and easier to improve over time without needing
+        to quote every small request separately.
+      </p>
+      <div class="grid">
+        <div class="card">
+          <h3>Includes Everything In The EUR 150 Package</h3>
+          <ul>
+            <li>Everything included in the EUR 150 monthly package</li>
+            <li>Up to 2 small website updates per month</li>
+            <li>Minor web app changes</li>
+            <li>Messaging system inside the platform</li>
+            <li>Push notifications for users</li>
+            <li>Small visual, text, or content updates when needed</li>
+            <li>More flexibility for regular small requests during the month</li>
+            <li>The web app can be hosted under your own domain, for example: app.bootcampwildatlanticway.ie</li>
+          </ul>
+        </div>
+        <div class="card">
+          <h3>Still Not Included</h3>
+          <ul>
+            <li>New features</li>
+            <li>New sections or new modules</li>
+            <li>Big changes to workflow or system logic</li>
+            <li>Large redesigns</li>
+            <li>Large custom requests</li>
+          </ul>
+        </div>
+      </div>
+
+      <div class="compare-box">
+        <div class="compare-row compare-head">
+          <div>Monthly options</div>
+          <div>EUR 150</div>
+          <div class="is-premium">EUR 270</div>
+        </div>
+        <div class="compare-row">
+          <div>Maintenance and technical management</div>
+          <div>Included</div>
+          <div>Included</div>
+        </div>
+        <div class="compare-row">
+          <div>Small bug fixes</div>
+          <div>Included</div>
+          <div>Included</div>
+        </div>
+        <div class="compare-row">
+          <div>Domain management</div>
+          <div>Included</div>
+          <div>Included</div>
+        </div>
+        <div class="compare-row">
+          <div>Domain costs</div>
+          <div>Not included</div>
+          <div>Not included</div>
+        </div>
+        <div class="compare-row">
+          <div>Website updates per month</div>
+          <div>1</div>
+          <div>2</div>
+        </div>
+        <div class="compare-row">
+          <div>Minor web app changes</div>
+          <div>Not included</div>
+          <div>Included</div>
+        </div>
+        <div class="compare-row">
+          <div>Messaging system</div>
+          <div>Not included</div>
+          <div>Included</div>
+        </div>
+        <div class="compare-row">
+          <div>Push notifications</div>
+          <div>Not included</div>
+          <div>Included</div>
+        </div>
+        <div class="compare-row">
+          <div>More flexibility for small requests</div>
+          <div>Limited</div>
+          <div>Included</div>
+        </div>
+      </div>
+
+      <h2>Extra Work</h2>
+      <div class="grid">
+        <div class="card">
+          <h3>Big Changes</h3>
+          <p><strong>Quoted separately</strong></p>
+          <p>
+            A big change means work that goes beyond a normal small update. For example:
+          </p>
+          <ul>
+            <li>Changing how part of the app works</li>
+            <li>Large page redesigns</li>
+            <li>Large admin or dashboard changes</li>
+            <li>Workflow changes that affect several parts of the system</li>
+          </ul>
+        </div>
+        <div class="card">
+          <h3>New Features</h3>
+          <p><strong>From EUR 1,000</strong></p>
+          <p>
+            This applies when a completely new feature, tool, or module is added to the platform.
+          </p>
+        </div>
+      </div>
+
+      <div class="footnote">
+        The monthly service is meant for maintenance, small updates, and keeping
+        the platform healthy and properly managed. It is not an unlimited
+        development package.
+      </div>
+
+      <h2>Ireland Market References</h2>
+      <p class="lead">
+        These are public Ireland-based pricing references for websites, maintenance,
+        and custom software work. They are not exact copies of this project, but
+        they help show the normal market range around this type of service. It is
+        also important to note that many of these public prices are for websites
+        only, while this project includes the website and the private web app
+        together. In other words, the website is already included here, while a
+        private web app of this type would normally add even more value and cost.
+      </p>
+
+      <div class="compare-box">
+        <div class="compare-row compare-head">
+          <div>Market category</div>
+          <div>Typical public range</div>
+          <div>What that usually covers</div>
+        </div>
+        <div class="compare-row">
+          <div>Website projects</div>
+          <div>EUR 1,500 - EUR 15,000+</div>
+          <div>Mostly websites only, often without a private operations system behind them</div>
+        </div>
+        <div class="compare-row">
+          <div>SaaS / private platform projects</div>
+          <div>$15,000 - $250,000+</div>
+          <div>Dashboards, user roles, workflows, business logic, reporting, and long-term product structure</div>
+        </div>
+        <div class="compare-row">
+          <div>This project</div>
+          <div class="is-premium">Website + private web app together</div>
+          <div class="is-premium">Priced well below many public website-only and SaaS-style references</div>
+        </div>
+      </div>
+
+      <div class="source-list">
+        <div class="source">
+          <strong>RedStudio Ireland</strong>
+          <p>
+            Their 2026 guide places agency websites around <strong>EUR 3,000 - EUR 15,000</strong>,
+            and custom / enterprise projects at <strong>EUR 15,000+</strong>.
+          </p>
+          <a href="https://redstudio.ie/post/how-much-does-a-website-cost-in-ireland-in-2026">https://redstudio.ie/post/how-much-does-a-website-cost-in-ireland-in-2026</a>
+        </div>
+
+        <div class="source">
+          <strong>Vimar Ireland</strong>
+          <p>
+            Their 2026 guide lists small business websites around <strong>EUR 1,500 - EUR 7,000</strong>,
+            and enterprise / custom websites around <strong>EUR 10,000 - EUR 50,000+</strong>.
+          </p>
+          <a href="https://vimar.ie/blog/what-does-a-website-cost-in-ireland-in-2026-a-complete-web-design-pricing-guide/">https://vimar.ie/blog/what-does-a-website-cost-in-ireland-in-2026-a-complete-web-design-pricing-guide/</a>
+        </div>
+
+        <div class="source">
+          <strong>Insight Multimedia Ireland</strong>
+          <p>
+            Their 2026 maintenance guide places custom application / large-scale
+            website maintenance around <strong>EUR 500 - EUR 2,000+ per month</strong>.
+          </p>
+          <a href="https://www.insightmultimedia.ie/website-maintenance-costs-in-ireland-a-2026-price-guide/">https://www.insightmultimedia.ie/website-maintenance-costs-in-ireland-a-2026-price-guide/</a>
+        </div>
+
+        <div class="source">
+          <strong>Website Manager Ireland</strong>
+          <p>
+            Their public maintenance plans go up to <strong>EUR 149.95/month</strong> for a more
+            comprehensive website support package, which is useful as a baseline for
+            simple monthly support.
+          </p>
+          <a href="https://dev.websitemanager.ie/website-maintenance/understanding-website-maintenance-costs-in-ireland/">https://dev.websitemanager.ie/website-maintenance/understanding-website-maintenance-costs-in-ireland/</a>
+        </div>
+
+        <div class="source">
+          <strong>Craig Murray Web Design Dublin</strong>
+          <p>
+            Their public maintenance pricing includes <strong>EUR 75/month</strong> for standard
+            website maintenance and <strong>EUR 297/month</strong> for e-commerce maintenance.
+          </p>
+          <a href="https://craigmurray.ie/website-maintenance-prices/">https://craigmurray.ie/website-maintenance-prices/</a>
+        </div>
+
+        <div class="source">
+          <strong>Abbacus Technologies - Ireland developer cost overview</strong>
+          <p>
+            Their 2026 Ireland guide places agency rates around <strong>EUR 80 - EUR 160+ per hour</strong>,
+            which helps explain why custom dashboard and platform work can grow quickly in value.
+          </p>
+          <a href="https://www.abbacustechnologies.com/hiring-a-web-developer-in-ireland-cost-overview-2026/">https://www.abbacustechnologies.com/hiring-a-web-developer-in-ireland-cost-overview-2026/</a>
+        </div>
+
+        <div class="source">
+          <strong>Monocubed - Custom web portal development</strong>
+          <p>
+            Their guide places small to mid-sized customer portals around <strong>$15,000 - $50,000</strong>,
+            with larger multi-role portals going much higher.
+          </p>
+          <a href="https://www.monocubed.com/blog/custom-web-portal-development/">https://www.monocubed.com/blog/custom-web-portal-development/</a>
+        </div>
+
+        <div class="source">
+          <strong>ZTABS - Custom software pricing guide</strong>
+          <p>
+            Their guide places a simple web application around <strong>$25,000 - $50,000</strong> and
+            a SaaS platform around <strong>$50,000 - $250,000</strong>.
+          </p>
+          <a href="https://ztabs.co/blog/how-much-does-custom-software-development-cost">https://ztabs.co/blog/how-much-does-custom-software-development-cost</a>
+        </div>
+
+        <div class="source">
+          <strong>Azilen - SaaS development cost guide</strong>
+          <p>
+            Their guide places SaaS MVPs around <strong>$60,000 - $120,000</strong>, with more developed
+            products above that range.
+          </p>
+          <a href="https://www.azilen.com/learning/saas-development-cost/">https://www.azilen.com/learning/saas-development-cost/</a>
+        </div>
+      </div>
+
+      <div class="footnote">
+        These references are for context. The key difference is that many public Irish prices are for
+        websites only, while private platforms and SaaS-style systems are usually priced much higher.
+        This project includes both.
+      </div>
+
+      <h2>Personal Commitment</h2>
+      <p class="lead">
+        As your first client, you will get a very personal and hands-on approach from me.
+        I will take care of the project closely, stay involved, and keep learning and
+        improving as I grow, so I can continue giving you the best possible service
+        and the best result I can over time.
+      </p>
+    </div>
+  </body>
+</html>

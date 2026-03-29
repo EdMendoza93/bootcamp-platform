@@ -125,10 +125,17 @@ export function PushNotificationsProvider({ children }: { children: React.ReactN
         const supported = await isWebPushSupported();
 
         if (supported) {
-          unsubscribeForeground = subscribeToForegroundMessages((payload: any) => {
-            const title = payload?.data?.title || "Wild Atlantic Bootcamp";
-            const body = payload?.data?.body || "You have a new notification.";
-            const url = payload?.data?.url || "/dashboard";
+          unsubscribeForeground = subscribeToForegroundMessages((payload: unknown) => {
+            const messagePayload = payload as {
+              data?: {
+                title?: string;
+                body?: string;
+                url?: string;
+              };
+            };
+            const title = messagePayload?.data?.title || "Wild Atlantic Bootcamp";
+            const body = messagePayload?.data?.body || "You have a new notification.";
+            const url = messagePayload?.data?.url || "/dashboard";
 
             navigator.serviceWorker.getRegistration().then((registration) => {
               if (registration && Notification.permission === "granted") {

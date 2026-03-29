@@ -26,7 +26,10 @@ function getStripeClient() {
 }
 
 function getStripeAdminReturnUrl() {
+  const appBaseUrl = process.env.APP_BASE_URL?.replace(/\/$/, "");
+
   return (
+    (appBaseUrl ? `${appBaseUrl}/admin/payments` : "") ||
     process.env.STRIPE_CONNECT_RETURN_URL ||
     "https://app.bootcamp.rivcor.com/admin/payments"
   );

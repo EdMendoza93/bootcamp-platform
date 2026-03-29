@@ -4,7 +4,7 @@ importScripts("https://www.gstatic.com/firebasejs/12.10.0/firebase-messaging-com
 
 firebase.initializeApp({
   apiKey: "AIzaSyAc9WUQzLLGXdjCXXpvi7paqTFRHwc0E5M",
-  authDomain: "app.bootcamp.rivcor.com",
+  authDomain: self.location.hostname,
   projectId: "bootcamp-platform-27d16",
   storageBucket: "bootcamp-platform-27d16.firebasestorage.app",
   messagingSenderId: "780790284759",
