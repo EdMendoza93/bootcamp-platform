@@ -57,27 +57,38 @@ async function ensureUserDoc(
         fullName?: string;
       }
     | undefined;
-  const nextRole = normalizeRole(inviteData?.role);
+  const invitedRole = inviteSnap ? normalizeRole(inviteData?.role) : null;
   const nextName = inviteData?.fullName || displayName || "";
 
   if (!userSnap.exists()) {
     await setDoc(userRef, {
       email: String(email || "").trim().toLowerCase(),
       name: nextName,
-      role: nextRole,
+      role: invitedRole ?? "user",
       status: "active",
       createdAt: serverTimestamp(),
       updatedAt: serverTimestamp(),
     });
   } else {
+    const currentData = userSnap.data() as { role?: string; name?: string };
+    const updates: {
+      email: string;
+      name: string;
+      updatedAt: ReturnType<typeof serverTimestamp>;
+      role?: string;
+    } = {
+      email: String(email || "").trim().toLowerCase(),
+      name: nextName || currentData.name || "",
+      updatedAt: serverTimestamp(),
+    };
+
+    if (invitedRole) {
+      updates.role = invitedRole;
+    }
+
     await setDoc(
       userRef,
-      {
-        email: String(email || "").trim().toLowerCase(),
-        name: nextName,
-        role: nextRole,
-        updatedAt: serverTimestamp(),
-      },
+      updates,
       { merge: true }
     );
   }
