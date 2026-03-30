@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { db } from "@/lib/firebase";
 import {
@@ -24,6 +25,7 @@ import {
   updateDoc,
 } from "firebase/firestore";
 import { useToast } from "@/components/ui/ToastProvider";
+import SegmentedTabs from "@/components/ui/SegmentedTabs";
 
 type BootcampWeek = BootcampWeekRecord;
 
@@ -60,6 +62,15 @@ function formatDateLabel(date: string) {
   });
 }
 
+function formatMonthLabel(date: string) {
+  if (!date) return "Unknown month";
+  const parsed = toMiddayDate(date);
+  return parsed.toLocaleDateString("en-US", {
+    month: "long",
+    year: "numeric",
+  });
+}
+
 function getUsagePercent(booked: number, capacity: number) {
   if (!capacity || capacity <= 0) return 0;
   return Math.min(100, Math.round((booked / capacity) * 100));
@@ -69,8 +80,10 @@ export default function AdminAvailabilityPage() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [weeks, setWeeks] = useState<BootcampWeek[]>([]);
+  const [bookings, setBookings] = useState<BookingRecord[]>([]);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [form, setForm] = useState<WeekForm>(getEmptyForm());
+  const [activeMonth, setActiveMonth] = useState<string>("");
 
   const { showToast } = useToast();
 
@@ -102,6 +115,7 @@ export default function AdminAvailabilityPage() {
         ...(docItem.data() as Omit<BookingRecord, "id">),
       })) as BookingRecord[];
 
+      setBookings(bookingData);
       setWeeks(hydrateWeeksWithBookings(data, bookingData));
     } catch (error) {
       console.error("Load weeks error:", error);
@@ -153,6 +167,57 @@ export default function AdminAvailabilityPage() {
       startableThreeWeeks,
     };
   }, [weeks]);
+
+  const weekViewItems = useMemo(
+    () =>
+      weeks.map((week, index) => ({
+        week,
+        monthKey: week.startDate.slice(0, 7),
+        monthLabel: formatMonthLabel(week.startDate),
+        assignedBookings: bookings.filter(
+          (booking) =>
+            booking.status !== "cancelled" &&
+            booking.weekIds.includes(week.id)
+        ),
+        startableOneWeek: canStartDuration(weeks, index, 1),
+        startableTwoWeeks: canStartDuration(weeks, index, 2),
+        startableThreeWeeks: canStartDuration(weeks, index, 3),
+      })),
+    [bookings, weeks]
+  );
+
+  const monthTabs = useMemo(() => {
+    const seen = new Set<string>();
+
+    return weekViewItems
+      .filter((item) => {
+        if (seen.has(item.monthKey)) return false;
+        seen.add(item.monthKey);
+        return true;
+      })
+      .map((item) => ({
+        id: item.monthKey,
+        label: item.monthLabel,
+      }));
+  }, [weekViewItems]);
+
+  const visibleWeekItems = useMemo(() => {
+    if (!activeMonth) return weekViewItems;
+    return weekViewItems.filter((item) => item.monthKey === activeMonth);
+  }, [activeMonth, weekViewItems]);
+
+  useEffect(() => {
+    if (monthTabs.length === 0) {
+      if (activeMonth !== "") {
+        setActiveMonth("");
+      }
+      return;
+    }
+
+    if (!activeMonth || !monthTabs.some((tab) => tab.id === activeMonth)) {
+      setActiveMonth(monthTabs[0].id);
+    }
+  }, [activeMonth, monthTabs]);
 
   const resetForm = () => {
     setForm(getEmptyForm());
@@ -534,19 +599,29 @@ export default function AdminAvailabilityPage() {
             </div>
           ) : (
             <>
-              <div className="rounded-[24px] border border-slate-200 bg-slate-50/70 px-4 py-3 text-sm text-slate-600">
-                {weeks.length} weekly block{weeks.length === 1 ? "" : "s"} in the system
+              <div className="flex flex-col gap-3 rounded-[24px] border border-slate-200 bg-slate-50/70 px-4 py-4">
+                <div className="text-sm text-slate-600">
+                  {weeks.length} weekly block{weeks.length === 1 ? "" : "s"} in the system
+                </div>
+                {monthTabs.length > 0 && (
+                  <SegmentedTabs
+                    items={monthTabs}
+                    value={activeMonth}
+                    onChange={setActiveMonth}
+                  />
+                )}
               </div>
-              {weeks.map((week, index) => (
+              {visibleWeekItems.map((item) => (
                 <WeekCard
-                  key={week.id}
-                  week={week}
-                  startableOneWeek={canStartDuration(weeks, index, 1)}
-                  startableTwoWeeks={canStartDuration(weeks, index, 2)}
-                  startableThreeWeeks={canStartDuration(weeks, index, 3)}
-                  onEdit={() => startEdit(week)}
-                  onToggleActive={() => toggleActive(week)}
-                  onDelete={() => deleteWeek(week)}
+                  key={item.week.id}
+                  week={item.week}
+                  assignedBookings={item.assignedBookings}
+                  startableOneWeek={item.startableOneWeek}
+                  startableTwoWeeks={item.startableTwoWeeks}
+                  startableThreeWeeks={item.startableThreeWeeks}
+                  onEdit={() => startEdit(item.week)}
+                  onToggleActive={() => toggleActive(item.week)}
+                  onDelete={() => deleteWeek(item.week)}
                 />
               ))}
             </>
@@ -611,6 +686,7 @@ function SummaryCard({
 
 function WeekCard({
   week,
+  assignedBookings,
   startableOneWeek,
   startableTwoWeeks,
   startableThreeWeeks,
@@ -619,6 +695,7 @@ function WeekCard({
   onDelete,
 }: {
   week: BootcampWeek;
+  assignedBookings: BookingRecord[];
   startableOneWeek: boolean;
   startableTwoWeeks: boolean;
   startableThreeWeeks: boolean;
@@ -629,10 +706,15 @@ function WeekCard({
   const status = getWeekAvailabilityStatus(week);
   const remaining = getRemainingSpots(week);
   const usagePercent = getUsagePercent(week.booked, week.capacity);
+  const visibleAssignedBookings = assignedBookings.slice(0, 5);
+  const extraAssignedCount = Math.max(
+    0,
+    assignedBookings.length - visibleAssignedBookings.length
+  );
 
   return (
     <div className="rounded-[28px] border border-white/70 bg-white/95 p-6 shadow-[0_18px_50px_rgba(15,23,42,0.07)] backdrop-blur">
-      <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
+      <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_220px] xl:items-start">
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-center gap-2">
             <StatusPill status={status} />
@@ -671,42 +753,9 @@ function WeekCard({
             </div>
           )}
 
-          <div className="mt-5 rounded-[24px] border border-slate-100 bg-gradient-to-br from-slate-50 to-white p-5">
-            <div className="flex flex-wrap items-center justify-between gap-3">
-              <div>
-                <p className="text-sm font-semibold uppercase tracking-[0.16em] text-slate-500">
-                  Weekly Capacity
-                </p>
-                <p className="mt-2 text-3xl font-semibold tracking-tight text-slate-950">
-                  {remaining} spots left
-                </p>
-              </div>
-
-              <div className="text-right">
-                <p className="text-sm text-slate-500">
-                  {week.booked} booked / {week.capacity} capacity
-                </p>
-              </div>
-            </div>
-
-            <div className="mt-4 h-2 overflow-hidden rounded-full bg-white">
-              <div
-                className={`h-full rounded-full ${
-                  status === "soldout"
-                    ? "bg-rose-400"
-                    : status === "low"
-                    ? "bg-amber-400"
-                    : status === "open"
-                    ? "bg-emerald-400"
-                    : "bg-slate-300"
-                }`}
-                style={{ width: `${status === "inactive" ? 0 : usagePercent}%` }}
-              />
-            </div>
-          </div>
         </div>
 
-        <div className="flex flex-wrap gap-3 xl:w-[240px] xl:flex-col">
+        <div className="flex flex-wrap gap-3 xl:flex-col">
           <button
             type="button"
             onClick={onEdit}
@@ -730,6 +779,96 @@ function WeekCard({
           >
             Delete
           </button>
+        </div>
+      </div>
+
+      <div className="mt-5 grid gap-4 lg:grid-cols-2">
+        <div className="rounded-[24px] border border-slate-100 bg-gradient-to-br from-slate-50 to-white p-5">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <p className="text-sm font-semibold uppercase tracking-[0.16em] text-slate-500">
+                Weekly Capacity
+              </p>
+              <p className="mt-2 text-3xl font-semibold tracking-tight text-slate-950">
+                {remaining} spots left
+              </p>
+            </div>
+
+            <div className="text-right">
+              <p className="text-sm text-slate-500">
+                {week.booked} booked / {week.capacity} capacity
+              </p>
+            </div>
+          </div>
+
+          <div className="mt-4 h-2 overflow-hidden rounded-full bg-white">
+            <div
+              className={`h-full rounded-full ${
+                status === "soldout"
+                  ? "bg-rose-400"
+                  : status === "low"
+                  ? "bg-amber-400"
+                  : status === "open"
+                  ? "bg-emerald-400"
+                  : "bg-slate-300"
+              }`}
+              style={{ width: `${status === "inactive" ? 0 : usagePercent}%` }}
+            />
+          </div>
+        </div>
+
+        <div className="rounded-[24px] border border-slate-100 bg-gradient-to-br from-slate-50 to-white p-5">
+          <p className="text-sm font-semibold uppercase tracking-[0.16em] text-slate-500">
+            Assigned Clients
+          </p>
+          <p className="mt-2 text-sm text-slate-500">
+            {assignedBookings.length === 0
+              ? "No clients assigned to this week yet."
+              : `${assignedBookings.length} client${assignedBookings.length === 1 ? "" : "s"} assigned to this week.`}
+          </p>
+
+          {assignedBookings.length === 0 ? (
+            <div className="mt-4 rounded-2xl border border-dashed border-slate-200 bg-white/70 px-4 py-3 text-sm text-slate-500">
+              No active bookings for this week.
+            </div>
+          ) : (
+            <div className="mt-4 space-y-2">
+              {visibleAssignedBookings.map((booking) =>
+                booking.profileId ? (
+                  <Link
+                    key={booking.id}
+                    href={`/admin/profiles/${booking.profileId}`}
+                    className="flex items-center justify-between rounded-2xl border border-slate-200 bg-white/80 px-4 py-3 text-sm text-slate-700 transition hover:border-[#bfdbfe] hover:bg-[#eff6ff]"
+                  >
+                    <span className="font-medium text-slate-950">
+                      {booking.customerName || booking.customerEmail}
+                    </span>
+                    <span className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">
+                      Open profile
+                    </span>
+                  </Link>
+                ) : (
+                  <div
+                    key={booking.id}
+                    className="flex items-center justify-between rounded-2xl border border-slate-200 bg-white/80 px-4 py-3 text-sm text-slate-700"
+                  >
+                    <span className="font-medium text-slate-950">
+                      {booking.customerName || booking.customerEmail}
+                    </span>
+                    <span className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-400">
+                      No profile link
+                    </span>
+                  </div>
+                )
+              )}
+
+              {extraAssignedCount > 0 && (
+                <div className="rounded-2xl border border-slate-200 bg-white/70 px-4 py-3 text-sm text-slate-500">
+                  +{extraAssignedCount} more assigned client{extraAssignedCount === 1 ? "" : "s"}
+                </div>
+              )}
+            </div>
+          )}
         </div>
       </div>
 
@@ -771,12 +910,6 @@ function DurationCard({
           </span>
         )}
       </div>
-
-      <p className="mt-4 text-sm text-slate-600">
-        {available
-          ? `Clients can start a ${title.toLowerCase()} stay from this week.`
-          : `This week cannot currently start a ${title.toLowerCase()} stay.`}
-      </p>
     </div>
   );
 }
