@@ -7,6 +7,7 @@ import {
   createUserWithEmailAndPassword,
   getRedirectResult,
   onAuthStateChanged,
+  sendPasswordResetEmail,
   setPersistence,
   signOut,
   signInWithEmailAndPassword,
@@ -26,6 +27,12 @@ import {
   where,
 } from "firebase/firestore";
 import { getHomeRouteForRole, normalizeRole } from "@/lib/roles";
+
+const MIN_PASSWORD_LENGTH = 8;
+
+function isValidEmail(value: string) {
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value.trim());
+}
 
 async function findPendingInvite(email?: string | null) {
   const normalizedEmail = String(email || "").trim().toLowerCase();
@@ -130,7 +137,9 @@ export default function LoginContent() {
   const [emailLoading, setEmailLoading] = useState(false);
   const [googleLoading, setGoogleLoading] = useState(false);
   const [signupLoading, setSignupLoading] = useState(false);
+  const [resetLoading, setResetLoading] = useState(false);
   const [error, setError] = useState("");
+  const [successMessage, setSuccessMessage] = useState("");
 
   useEffect(() => {
     let cancelled = false;
@@ -196,6 +205,18 @@ export default function LoginContent() {
 
   const handleEmailLogin = async () => {
     setError("");
+    setSuccessMessage("");
+
+    if (!isValidEmail(email)) {
+      setError("Please enter a valid email address.");
+      return;
+    }
+
+    if (!password) {
+      setError("Please enter your password.");
+      return;
+    }
+
     setEmailLoading(true);
 
     try {
@@ -219,6 +240,18 @@ export default function LoginContent() {
 
   const handleCreateAccount = async () => {
     setError("");
+    setSuccessMessage("");
+
+    if (!isValidEmail(email)) {
+      setError("Please enter a valid email address.");
+      return;
+    }
+
+    if (password.length < MIN_PASSWORD_LENGTH) {
+      setError(`Password must be at least ${MIN_PASSWORD_LENGTH} characters.`);
+      return;
+    }
+
     setSignupLoading(true);
 
     try {
@@ -243,7 +276,7 @@ export default function LoginContent() {
       if (errorCode === "auth/email-already-in-use") {
         setError("That email is already in use.");
       } else if (errorCode === "auth/weak-password") {
-        setError("Password should be at least 6 characters.");
+        setError(`Password must be at least ${MIN_PASSWORD_LENGTH} characters.`);
       } else if (errorCode === "auth/invalid-email") {
         setError("Please enter a valid email address.");
       } else {
@@ -256,6 +289,7 @@ export default function LoginContent() {
 
   const handleGoogleLogin = async () => {
     setError("");
+    setSuccessMessage("");
     setGoogleLoading(true);
 
     try {
@@ -274,6 +308,39 @@ export default function LoginContent() {
       console.error("Google login error:", err);
       setError("Google sign-in failed. Please try again.");
       setGoogleLoading(false);
+    }
+  };
+
+  const handlePasswordReset = async () => {
+    setError("");
+    setSuccessMessage("");
+
+    if (!isValidEmail(email)) {
+      setError("Enter your email first to reset your password.");
+      return;
+    }
+
+    setResetLoading(true);
+
+    try {
+      await sendPasswordResetEmail(auth, email.trim());
+      setSuccessMessage("Password reset email sent. Check your inbox.");
+    } catch (err: unknown) {
+      console.error("Password reset error:", err);
+      const errorCode =
+        typeof err === "object" && err && "code" in err
+          ? String((err as { code?: string }).code || "")
+          : "";
+
+      if (errorCode === "auth/user-not-found") {
+        setError("No account was found for that email.");
+      } else if (errorCode === "auth/invalid-email") {
+        setError("Please enter a valid email address.");
+      } else {
+        setError("Could not send reset email.");
+      }
+    } finally {
+      setResetLoading(false);
     }
   };
 
@@ -357,6 +424,12 @@ export default function LoginContent() {
                 </div>
               )}
 
+              {successMessage && (
+                <div className="mt-5 rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700">
+                  {successMessage}
+                </div>
+              )}
+
               <div className="mt-6 space-y-4">
                 <div>
                   <label className="mb-2 block text-sm font-medium text-slate-700">
@@ -384,6 +457,10 @@ export default function LoginContent() {
                   />
                 </div>
 
+                <p className="text-xs text-slate-500">
+                  New accounts require at least {MIN_PASSWORD_LENGTH} characters.
+                </p>
+
                 <button
                   type="button"
                   onClick={handleEmailLogin}
@@ -400,6 +477,15 @@ export default function LoginContent() {
                   className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-medium text-slate-700 transition hover:bg-slate-50 disabled:opacity-50"
                 >
                   {signupLoading ? "Creating account..." : "Create account"}
+                </button>
+
+                <button
+                  type="button"
+                  onClick={handlePasswordReset}
+                  disabled={emailLoading || googleLoading || signupLoading || resetLoading}
+                  className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-medium text-slate-700 transition hover:bg-slate-100 disabled:opacity-50"
+                >
+                  {resetLoading ? "Sending reset email..." : "Forgot password?"}
                 </button>
 
                 <div className="relative py-1">
