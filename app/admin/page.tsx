@@ -1,10 +1,12 @@
 "use client";
 
+import Image from "next/image";
 import { useEffect, useMemo, useState } from "react";
 import { auth, db } from "@/lib/firebase";
 import { onAuthStateChanged } from "firebase/auth";
 import { collection, doc, getDoc, getDocs } from "firebase/firestore";
 import { useToast } from "@/components/ui/ToastProvider";
+import SegmentedTabs from "@/components/ui/SegmentedTabs";
 import {
   formatThreadTimestamp,
   getMessageCategoryClasses,
@@ -57,6 +59,8 @@ type ProgressPhoto = {
   };
 };
 
+type AdminTab = "overview" | "operations" | "activity";
+
 function getPhotoSortValue(photo: ProgressPhoto) {
   if (photo.photoDate) {
     return new Date(`${photo.photoDate}T12:00:00`).getTime();
@@ -101,6 +105,7 @@ export default function AdminPage() {
   const [progressPhotos, setProgressPhotos] = useState<ProgressPhoto[]>([]);
   const [onlineSessions, setOnlineSessions] = useState<OnlineSessionRecord[]>([]);
   const [messageThreads, setMessageThreads] = useState<MessageThreadRecord[]>([]);
+  const [activeTab, setActiveTab] = useState<AdminTab>("overview");
 
   const { showToast } = useToast();
 
@@ -408,6 +413,28 @@ export default function AdminPage() {
         />
       </section>
 
+      <section className="space-y-5">
+        <div className="flex flex-wrap items-center justify-between gap-4">
+          <div>
+            <h2 className="text-2xl font-semibold tracking-tight text-slate-950">
+              Daily focus
+            </h2>
+            <p className="mt-1 text-sm text-slate-500">
+              Keep one work lane open at a time.
+            </p>
+          </div>
+          <SegmentedTabs
+            items={[
+              { id: "overview", label: "Overview" },
+              { id: "operations", label: "Operations" },
+              { id: "activity", label: "Activity" },
+            ]}
+            value={activeTab}
+            onChange={setActiveTab}
+          />
+        </div>
+
+        {activeTab === "overview" ? (
       <section className="grid gap-4 xl:grid-cols-[1.2fr_0.8fr]">
         <div className="rounded-[28px] border border-white/70 bg-white/90 p-6 shadow-[0_18px_50px_rgba(15,23,42,0.07)] backdrop-blur">
           <p className="text-sm font-semibold uppercase tracking-[0.18em] text-[#1d4ed8]">
@@ -459,7 +486,9 @@ export default function AdminPage() {
           </div>
         </div>
       </section>
+        ) : null}
 
+        {activeTab === "operations" ? (
       <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
         <QuickLinkCard
           href="/admin/applications"
@@ -497,7 +526,10 @@ export default function AdminPage() {
           description="Stay on top of coach, nutrition, and private session threads."
         />
       </section>
+        ) : null}
 
+        {activeTab === "activity" ? (
+        <>
       <section className="grid gap-6 xl:grid-cols-2">
         <div className="rounded-[28px] border border-white/70 bg-white/90 p-6 shadow-[0_18px_50px_rgba(15,23,42,0.07)] backdrop-blur">
           <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
@@ -731,9 +763,11 @@ export default function AdminPage() {
                   <div className="flex items-center gap-4">
                     <div className="h-14 w-14 shrink-0 overflow-hidden rounded-2xl border border-slate-200 bg-white">
                       {item.imageUrl ? (
-                        <img
+                        <Image
                           src={item.imageUrl}
                           alt={item.title || "Progress update"}
+                          width={112}
+                          height={112}
                           className="h-full w-full object-cover"
                         />
                       ) : (
@@ -761,6 +795,9 @@ export default function AdminPage() {
           )}
         </section>
       </div>
+        </>
+        ) : null}
+      </section>
     </div>
   );
 }

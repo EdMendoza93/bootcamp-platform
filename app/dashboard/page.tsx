@@ -13,6 +13,7 @@ import {
   where,
 } from "firebase/firestore";
 import PushNotificationsCard from "@/components/dashboard/PushNotificationsCard";
+import SegmentedTabs from "@/components/ui/SegmentedTabs";
 import { getHomeRouteForRole, normalizeRole } from "@/lib/roles";
 import {
   formatThreadTimestamp,
@@ -79,6 +80,8 @@ type PhotoModalData = {
   uploadedByRole: "admin" | "user" | "";
   photoDate: string;
 };
+
+type DashboardTab = "overview" | "support" | "plan";
 
 function getPhotoSortValue(photo: ProgressPhoto) {
   if (photo.photoDate) {
@@ -173,6 +176,7 @@ export default function DashboardPage() {
     uploadedByRole: "",
     photoDate: "",
   });
+  const [activeTab, setActiveTab] = useState<DashboardTab>("overview");
 
   const resolveTemplateTitle = useCallback(async (
     type: ScheduleType,
@@ -654,9 +658,31 @@ export default function DashboardPage() {
           ))}
         </section>
 
-        <PushNotificationsCard />
+        <section className="space-y-5">
+          <div className="flex flex-wrap items-center justify-between gap-4">
+            <div>
+              <h2 className="text-2xl font-semibold tracking-tight text-slate-950">
+                Your focus
+              </h2>
+              <p className="mt-1 text-sm text-slate-500">
+                Open one lane at a time to keep the dashboard calm.
+              </p>
+            </div>
+            <SegmentedTabs
+              items={[
+                { id: "overview", label: "Overview" },
+                { id: "support", label: "Support" },
+                { id: "plan", label: "Plan" },
+              ]}
+              value={activeTab}
+              onChange={setActiveTab}
+            />
+          </div>
 
-        {hasProfile && (
+          {activeTab === "support" ? <PushNotificationsCard /> : null}
+        </section>
+
+        {activeTab === "support" && hasProfile && (
           <section className="grid gap-6 xl:grid-cols-2">
             <div className="rounded-[28px] border border-white/70 bg-white/90 p-6 shadow-[0_18px_50px_rgba(15,23,42,0.07)] backdrop-blur">
               <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
@@ -798,7 +824,7 @@ export default function DashboardPage() {
           </section>
         )}
 
-        {applicationStatus === "none" && (
+        {activeTab === "overview" && applicationStatus === "none" && (
           <section className="rounded-[28px] border border-white/70 bg-white/90 p-6 shadow-[0_18px_50px_rgba(15,23,42,0.07)] backdrop-blur">
             <h2 className="text-xl font-semibold text-slate-950">
               Complete your application
@@ -823,7 +849,7 @@ export default function DashboardPage() {
           </section>
         )}
 
-        {applicationStatus === "pending" && (
+        {activeTab === "overview" && applicationStatus === "pending" && (
           <section className="rounded-[28px] border border-white/70 bg-white/90 p-6 shadow-[0_18px_50px_rgba(15,23,42,0.07)] backdrop-blur">
             <h2 className="text-xl font-semibold text-slate-950">
               Application submitted
@@ -844,7 +870,7 @@ export default function DashboardPage() {
           </section>
         )}
 
-        {applicationStatus === "approved" && !hasProfile && (
+        {activeTab === "overview" && applicationStatus === "approved" && !hasProfile && (
           <section className="rounded-[28px] border border-white/70 bg-white/90 p-6 shadow-[0_18px_50px_rgba(15,23,42,0.07)] backdrop-blur">
             <h2 className="text-xl font-semibold text-slate-950">Approved</h2>
             <p className="mt-2 text-slate-600">
@@ -854,7 +880,8 @@ export default function DashboardPage() {
           </section>
         )}
 
-        {applicationStatus === "approved" &&
+        {activeTab === "overview" &&
+          applicationStatus === "approved" &&
           hasProfile &&
           onboardingStatus === "incomplete" && (
             <section className="rounded-[28px] border border-[#bfdbfe] bg-gradient-to-br from-[#eff6ff] to-white p-6 shadow-[0_18px_50px_rgba(15,23,42,0.07)]">
@@ -877,7 +904,7 @@ export default function DashboardPage() {
             </section>
           )}
 
-        {canSeeProgramContent && (
+        {activeTab === "overview" && canSeeProgramContent && (
           <section className="rounded-[28px] border border-white/70 bg-white/90 p-6 shadow-[0_18px_50px_rgba(15,23,42,0.07)] backdrop-blur">
             <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
               <div>
@@ -924,7 +951,7 @@ export default function DashboardPage() {
           </section>
         )}
 
-        {canSeeItinerary && scheduleItems.length > 0 && (
+        {activeTab === "plan" && canSeeItinerary && scheduleItems.length > 0 && (
           <section className="rounded-[28px] border border-white/70 bg-white/90 p-6 shadow-[0_18px_50px_rgba(15,23,42,0.07)] backdrop-blur">
             <div className="mb-4 flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
               <div>
@@ -984,7 +1011,7 @@ export default function DashboardPage() {
           </section>
         )}
 
-        {canSeeItinerary && scheduleItems.length === 0 && (
+        {activeTab === "plan" && canSeeItinerary && scheduleItems.length === 0 && (
           <section className="rounded-[28px] border border-white/70 bg-white/90 p-6 shadow-[0_18px_50px_rgba(15,23,42,0.07)] backdrop-blur">
             <h2 className="text-xl font-semibold text-slate-950">
               Your Itinerary
@@ -995,7 +1022,7 @@ export default function DashboardPage() {
           </section>
         )}
 
-        {canSeeProgress && recentProgressPhotos.length > 0 && (
+        {activeTab === "plan" && canSeeProgress && recentProgressPhotos.length > 0 && (
           <section className="rounded-[28px] border border-white/70 bg-white/90 p-6 shadow-[0_18px_50px_rgba(15,23,42,0.07)] backdrop-blur">
             <div className="mb-4 flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
               <div>

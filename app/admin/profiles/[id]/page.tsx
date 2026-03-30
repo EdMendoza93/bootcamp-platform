@@ -24,6 +24,7 @@ import {
   uploadBytes,
 } from "firebase/storage";
 import { useToast } from "@/components/ui/ToastProvider";
+import SegmentedTabs from "@/components/ui/SegmentedTabs";
 import { BookingRecord } from "@/lib/bookings";
 import {
   formatThreadTimestamp,
@@ -85,6 +86,7 @@ type ScheduleItem = {
 };
 
 type SessionBoardFilter = "all" | OnlineSessionStatus;
+type DetailTab = "profile" | "delivery" | "progress";
 
 type PhotoModalData = {
   open: boolean;
@@ -286,6 +288,7 @@ export default function AdminProfileDetailPage() {
     photoDate: "",
     uploadedByRole: "",
   });
+  const [activeTab, setActiveTab] = useState<DetailTab>("profile");
 
   const [form, setForm] = useState({
     fullName: "",
@@ -1133,6 +1136,28 @@ export default function AdminProfileDetailPage() {
           </div>
         </section>
 
+        <section className="flex flex-wrap items-center justify-between gap-4">
+          <div>
+            <h2 className="text-2xl font-semibold tracking-tight text-slate-950">
+              Client workspace
+            </h2>
+            <p className="mt-1 text-sm text-slate-500">
+              Open one lane at a time to keep the profile easier to scan.
+            </p>
+          </div>
+          <SegmentedTabs
+            items={[
+              { id: "profile", label: "Profile" },
+              { id: "delivery", label: "Delivery" },
+              { id: "progress", label: "Progress" },
+            ]}
+            value={activeTab}
+            onChange={setActiveTab}
+          />
+        </section>
+
+        {activeTab === "profile" ? (
+        <>
         <div className="grid gap-5 xl:grid-cols-2">
           <section className="rounded-[28px] border border-white/70 bg-white/90 p-5 shadow-[0_18px_50px_rgba(15,23,42,0.07)] backdrop-blur">
             <h2 className="text-base font-semibold text-slate-950">
@@ -1316,7 +1341,11 @@ export default function AdminProfileDetailPage() {
             />
           </div>
         </section>
+        </>
+        ) : null}
 
+        {activeTab === "delivery" ? (
+        <>
         <section className="rounded-[28px] border border-white/70 bg-white/90 p-5 shadow-[0_18px_50px_rgba(15,23,42,0.07)] backdrop-blur">
           <h2 className="text-base font-semibold text-slate-950">
             Client Schedule
@@ -1584,7 +1613,11 @@ export default function AdminProfileDetailPage() {
             )}
           </div>
         </section>
+        </>
+        ) : null}
 
+        {activeTab === "progress" ? (
+        <>
         <section className="rounded-[28px] border border-white/70 bg-white/90 p-5 shadow-[0_18px_50px_rgba(15,23,42,0.07)] backdrop-blur">
           <h2 className="text-base font-semibold text-slate-950">
             Health & Notes
@@ -1901,6 +1934,8 @@ export default function AdminProfileDetailPage() {
             </div>
           </div>
         </section>
+        </>
+        ) : null}
 
         <div className="pb-2">
           <button

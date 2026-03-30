@@ -5,6 +5,7 @@ import Link from "next/link";
 import { auth, db } from "@/lib/firebase";
 import { doc, getDoc, getDocs, collection } from "firebase/firestore";
 import { useToast } from "@/components/ui/ToastProvider";
+import SegmentedTabs from "@/components/ui/SegmentedTabs";
 import {
   AppRole,
   getRoleLabel,
@@ -46,6 +47,8 @@ type ScheduleItem = {
   profileId: string;
 };
 
+type StaffTab = "overview" | "delivery" | "inbox";
+
 export default function StaffOverviewPage() {
   const [loading, setLoading] = useState(true);
   const [role, setRole] = useState<AppRole>("coach");
@@ -54,6 +57,7 @@ export default function StaffOverviewPage() {
   const [scheduleItems, setScheduleItems] = useState<ScheduleItem[]>([]);
   const [sessions, setSessions] = useState<OnlineSessionRecord[]>([]);
   const [threads, setThreads] = useState<MessageThreadRecord[]>([]);
+  const [activeTab, setActiveTab] = useState<StaffTab>("overview");
 
   const { showToast } = useToast();
 
@@ -268,6 +272,27 @@ export default function StaffOverviewPage() {
         <MetricCard label="Unread Threads" value={String(summary.unreadThreads)} tone="light" />
       </section>
 
+      <section className="flex flex-wrap items-center justify-between gap-4">
+        <div>
+          <h2 className="text-2xl font-semibold tracking-tight text-slate-950">
+            Staff focus
+          </h2>
+          <p className="mt-1 text-sm text-slate-500">
+            Open one area at a time.
+          </p>
+        </div>
+        <SegmentedTabs
+          items={[
+            { id: "overview", label: "Overview" },
+            { id: "delivery", label: "Delivery" },
+            { id: "inbox", label: "Inbox" },
+          ]}
+          value={activeTab}
+          onChange={setActiveTab}
+        />
+      </section>
+
+      {activeTab === "delivery" ? (
       <section className="grid gap-6 xl:grid-cols-2">
         <div className="rounded-[28px] border border-white/70 bg-white/90 p-6 shadow-[0_18px_50px_rgba(15,23,42,0.07)] backdrop-blur">
           <div className="flex items-end justify-between gap-4">
@@ -394,7 +419,9 @@ export default function StaffOverviewPage() {
           )}
         </div>
       </section>
+      ) : null}
 
+      {activeTab === "inbox" || activeTab === "overview" ? (
       <section className="grid gap-6 xl:grid-cols-[1.1fr_0.9fr]">
         <div className="rounded-[28px] border border-white/70 bg-white/90 p-6 shadow-[0_18px_50px_rgba(15,23,42,0.07)] backdrop-blur">
           <div className="flex items-end justify-between gap-4">
@@ -482,6 +509,7 @@ export default function StaffOverviewPage() {
           />
         </div>
       </section>
+      ) : null}
     </div>
   );
 }
