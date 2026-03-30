@@ -430,7 +430,7 @@ export default function LoginContent() {
                 </div>
               )}
 
-              <div className="mt-6 space-y-4">
+              <div className="mt-6 space-y-3">
                 <div>
                   <label className="mb-2 block text-sm font-medium text-slate-700">
                     Email
@@ -439,7 +439,7 @@ export default function LoginContent() {
                     type="email"
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
-                    className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-[#93c5fd] focus:ring-4 focus:ring-[#dbeafe]"
+                    className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-2.5 text-sm text-slate-900 outline-none transition focus:border-[#93c5fd] focus:ring-4 focus:ring-[#dbeafe]"
                     placeholder="you@example.com"
                   />
                 </div>
@@ -452,7 +452,7 @@ export default function LoginContent() {
                     type="password"
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
-                    className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-[#93c5fd] focus:ring-4 focus:ring-[#dbeafe]"
+                    className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-2.5 text-sm text-slate-900 outline-none transition focus:border-[#93c5fd] focus:ring-4 focus:ring-[#dbeafe]"
                     placeholder="••••••••"
                   />
                 </div>
@@ -461,32 +461,36 @@ export default function LoginContent() {
                   New accounts require at least {MIN_PASSWORD_LENGTH} characters.
                 </p>
 
-                <button
-                  type="button"
-                  onClick={handleEmailLogin}
-                  disabled={emailLoading || googleLoading || signupLoading}
-                  className="w-full rounded-2xl bg-slate-950 px-4 py-3 text-sm font-medium text-white transition hover:bg-slate-800 disabled:opacity-50"
-                >
-                  {emailLoading ? "Signing in..." : "Sign in"}
-                </button>
+                <div className="grid grid-cols-2 gap-3">
+                  <button
+                    type="button"
+                    onClick={handleEmailLogin}
+                    disabled={emailLoading || googleLoading || signupLoading || resetLoading}
+                    className="w-full rounded-2xl bg-slate-950 px-4 py-2.5 text-sm font-medium text-white transition hover:bg-slate-800 disabled:opacity-50"
+                  >
+                    {emailLoading ? "Signing in..." : "Sign in"}
+                  </button>
 
-                <button
-                  type="button"
-                  onClick={handleCreateAccount}
-                  disabled={emailLoading || googleLoading || signupLoading}
-                  className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-medium text-slate-700 transition hover:bg-slate-50 disabled:opacity-50"
-                >
-                  {signupLoading ? "Creating account..." : "Create account"}
-                </button>
+                  <button
+                    type="button"
+                    onClick={handleCreateAccount}
+                    disabled={emailLoading || googleLoading || signupLoading || resetLoading}
+                    className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-medium text-slate-700 transition hover:bg-slate-50 disabled:opacity-50"
+                  >
+                    {signupLoading ? "Creating..." : "Create account"}
+                  </button>
+                </div>
 
-                <button
-                  type="button"
-                  onClick={handlePasswordReset}
-                  disabled={emailLoading || googleLoading || signupLoading || resetLoading}
-                  className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-medium text-slate-700 transition hover:bg-slate-100 disabled:opacity-50"
-                >
-                  {resetLoading ? "Sending reset email..." : "Forgot password?"}
-                </button>
+                <div className="flex justify-end">
+                  <button
+                    type="button"
+                    onClick={handlePasswordReset}
+                    disabled={emailLoading || googleLoading || signupLoading || resetLoading}
+                    className="text-sm font-medium text-slate-500 transition hover:text-slate-900 disabled:opacity-50"
+                  >
+                    {resetLoading ? "Sending reset email..." : "Forgot password?"}
+                  </button>
+                </div>
 
                 <div className="relative py-1">
                   <div className="absolute inset-0 flex items-center">
@@ -502,8 +506,8 @@ export default function LoginContent() {
                 <button
                   type="button"
                   onClick={handleGoogleLogin}
-                  disabled={emailLoading || googleLoading || signupLoading}
-                  className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-medium text-slate-700 transition hover:bg-slate-50 disabled:opacity-50"
+                  disabled={emailLoading || googleLoading || signupLoading || resetLoading}
+                  className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-medium text-slate-700 transition hover:bg-slate-50 disabled:opacity-50"
                 >
                   {googleLoading ? "Signing in..." : "Continue with Google"}
                 </button>
