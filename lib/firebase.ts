@@ -9,7 +9,7 @@ function resolveAuthDomain() {
     return process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN;
   }
 
-  return "bootcamp-platform-27d16.firebaseapp.com";
+  return "app.bootcamp.rivcor.com";
 }
 
 const firebaseConfig = {
