@@ -19,6 +19,8 @@ import {
   hydrateWeeksWithBookings,
 } from "@/lib/bookings";
 import { useToast } from "@/components/ui/ToastProvider";
+import SegmentedTabs from "@/components/ui/SegmentedTabs";
+import CollapsiblePanel from "@/components/ui/CollapsiblePanel";
 
 type BookingRow = BookingRecord & {
   createdAt?: {
@@ -68,6 +70,7 @@ type BookingFormState = {
 type BookingViewFilter = "recent" | "confirmed" | "cancelled" | "all";
 type BookingPaymentFilter = "all" | "manual" | "paid" | "pending";
 type BookingCapacityFilter = "all" | "consumes" | "no_capacity";
+type BookingTab = "overview" | "create" | "list";
 
 function getEmptyBookingForm(): BookingFormState {
   return {
@@ -157,6 +160,7 @@ export default function AdminBookingsPage() {
     useState<BookingPaymentFilter>("all");
   const [bookingCapacityFilter, setBookingCapacityFilter] =
     useState<BookingCapacityFilter>("all");
+  const [activeTab, setActiveTab] = useState<BookingTab>("overview");
 
   const { showToast } = useToast();
 
@@ -569,6 +573,18 @@ export default function AdminBookingsPage() {
             <p className="mt-3 max-w-3xl text-sm text-slate-600 md:text-base">
               This is the foundation for real stay reservations. It already reads weekly capacity and derives occupancy from the bookings collection.
             </p>
+
+            <div className="mt-6">
+              <SegmentedTabs<BookingTab>
+                items={[
+                  { id: "overview", label: "Overview" },
+                  { id: "create", label: editingBookingId ? "Edit booking" : "Create booking" },
+                  { id: "list", label: "Bookings" },
+                ]}
+                value={activeTab}
+                onChange={setActiveTab}
+              />
+            </div>
           </div>
         </div>
       </section>
@@ -581,8 +597,9 @@ export default function AdminBookingsPage() {
         <SummaryCard label="Open Weeks" value={String(summary.openWeeks)} tone="light" />
       </section>
 
-      <section className="grid gap-6 xl:grid-cols-[0.9fr_1.1fr]">
-        <div className="rounded-[28px] border border-white/70 bg-white/95 p-6 shadow-[0_18px_50px_rgba(15,23,42,0.07)] backdrop-blur">
+      {activeTab === "create" ? (
+        <section className="grid gap-6 xl:grid-cols-[0.95fr_1.05fr]">
+          <div className="rounded-[28px] border border-white/70 bg-white/95 p-6 shadow-[0_18px_50px_rgba(15,23,42,0.07)] backdrop-blur">
           <div className="flex items-center justify-between gap-3">
             <div>
               <h2 className="text-xl font-semibold text-slate-950">
@@ -605,148 +622,154 @@ export default function AdminBookingsPage() {
           </div>
 
           <div className="mt-6 space-y-4">
-            <div className="grid gap-4 md:grid-cols-2">
-              <div>
-                <label className="mb-2 block text-sm font-medium text-slate-700">
-                  Platform user
-                </label>
-                <input
-                  value={recipientSearch}
-                  onChange={(e) => setRecipientSearch(e.target.value)}
-                  placeholder="Search user by name or email"
-                  className="mb-3 w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-[#93c5fd] focus:ring-4 focus:ring-[#dbeafe]"
-                />
-                <div className="rounded-[24px] border border-slate-200 bg-slate-50/70 p-3">
-                  {selectedRecipient ? (
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setForm((prev) => ({
-                          ...prev,
-                          userId: "",
-                          customerName: "",
-                          customerEmail: "",
-                        }));
-                        setRecipientSearch("");
-                      }}
-                      className="flex w-full items-center gap-3 rounded-[20px] border border-[#bfdbfe] bg-white px-4 py-3 text-left shadow-sm transition hover:border-[#93c5fd]"
-                    >
-                      <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-slate-950 text-sm font-semibold text-white">
-                        {getRecipientInitials(selectedRecipient.displayName)}
-                      </div>
-                      <div className="min-w-0 flex-1">
-                        <p className="truncate text-sm font-semibold text-slate-950">
-                          {selectedRecipient.displayName}
-                        </p>
-                        <p className="truncate text-xs text-slate-500">
-                          {selectedRecipient.email || selectedRecipient.id}
-                        </p>
-                      </div>
-                      <StatusBadge
-                        tone={
-                          selectedRecipient.clientStatus === "inactive"
-                            ? "neutral"
-                            : "success"
-                        }
+            <CollapsiblePanel
+              title="Guest selection"
+              description="Choose the client first. Keep this panel closed once selected."
+              defaultOpen
+            >
+              <div className="grid gap-4 md:grid-cols-2">
+                <div>
+                  <label className="mb-2 block text-sm font-medium text-slate-700">
+                    Platform user
+                  </label>
+                  <input
+                    value={recipientSearch}
+                    onChange={(e) => setRecipientSearch(e.target.value)}
+                    placeholder="Search user by name or email"
+                    className="mb-3 w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-[#93c5fd] focus:ring-4 focus:ring-[#dbeafe]"
+                  />
+                  <div className="rounded-[24px] border border-slate-200 bg-slate-50/70 p-3">
+                    {selectedRecipient ? (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setForm((prev) => ({
+                            ...prev,
+                            userId: "",
+                            customerName: "",
+                            customerEmail: "",
+                          }));
+                          setRecipientSearch("");
+                        }}
+                        className="flex w-full items-center gap-3 rounded-[20px] border border-[#bfdbfe] bg-white px-4 py-3 text-left shadow-sm transition hover:border-[#93c5fd]"
                       >
-                        {selectedRecipient.clientStatus}
-                      </StatusBadge>
-                    </button>
-                  ) : (
-                    <div className="rounded-[20px] border border-dashed border-slate-200 bg-white px-4 py-6 text-center">
-                      <p className="text-sm font-medium text-slate-700">
-                        No user selected yet
-                      </p>
-                      <p className="mt-1 text-xs leading-5 text-slate-500">
-                        Search by name or email, then choose a client below.
-                      </p>
-                    </div>
-                  )}
-
-                  <div className="mt-3 max-h-64 space-y-2 overflow-y-auto pr-1">
-                    {filteredRecipientOptions.slice(0, 10).map((recipient) => {
-                      const isSelected = recipient.id === form.userId;
-
-                      return (
-                        <button
-                          key={recipient.id}
-                          type="button"
-                          onClick={() =>
-                            setForm((prev) => ({
-                              ...prev,
-                              userId: recipient.id,
-                              customerName: recipient.displayName || "",
-                              customerEmail: recipient.email || "",
-                            }))
+                        <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-slate-950 text-sm font-semibold text-white">
+                          {getRecipientInitials(selectedRecipient.displayName)}
+                        </div>
+                        <div className="min-w-0 flex-1">
+                          <p className="truncate text-sm font-semibold text-slate-950">
+                            {selectedRecipient.displayName}
+                          </p>
+                          <p className="truncate text-xs text-slate-500">
+                            {selectedRecipient.email || selectedRecipient.id}
+                          </p>
+                        </div>
+                        <StatusBadge
+                          tone={
+                            selectedRecipient.clientStatus === "inactive"
+                              ? "neutral"
+                              : "success"
                           }
-                          className={`flex w-full items-center gap-3 rounded-[18px] border px-3 py-3 text-left transition ${
-                            isSelected
-                              ? "border-[#93c5fd] bg-[#eff6ff]"
-                              : "border-slate-200 bg-white hover:border-slate-300 hover:bg-slate-50"
-                          }`}
                         >
-                          <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-slate-100 text-xs font-semibold text-slate-700">
-                            {getRecipientInitials(recipient.displayName)}
-                          </div>
-                          <div className="min-w-0 flex-1">
-                            <p className="truncate text-sm font-semibold text-slate-950">
-                              {recipient.displayName}
-                            </p>
-                            <p className="truncate text-xs text-slate-500">
-                              {recipient.email || recipient.id}
-                            </p>
-                          </div>
-                          <div className="flex flex-col items-end gap-1">
-                            <StatusBadge
-                              tone={
-                                recipient.clientStatus === "inactive"
-                                  ? "neutral"
-                                  : "success"
-                              }
-                            >
-                              {recipient.clientStatus}
-                            </StatusBadge>
-                            {isSelected && (
-                              <span className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[#1d4ed8]">
-                                selected
-                              </span>
-                            )}
-                          </div>
-                        </button>
-                      );
-                    })}
-
-                    {filteredRecipientOptions.length === 0 && (
-                      <div className="rounded-[18px] border border-dashed border-slate-200 bg-white px-4 py-5 text-center text-sm text-slate-500">
-                        No users matched your search.
+                          {selectedRecipient.clientStatus}
+                        </StatusBadge>
+                      </button>
+                    ) : (
+                      <div className="rounded-[20px] border border-dashed border-slate-200 bg-white px-4 py-6 text-center">
+                        <p className="text-sm font-medium text-slate-700">
+                          No user selected yet
+                        </p>
+                        <p className="mt-1 text-xs leading-5 text-slate-500">
+                          Search by name or email, then choose a client below.
+                        </p>
                       </div>
                     )}
-                  </div>
 
-                  <p className="mt-3 text-xs text-slate-500">
-                    {filteredRecipientOptions.length} matching user
-                    {filteredRecipientOptions.length === 1 ? "" : "s"}
-                    {filteredRecipientOptions.length > 10 ? " · showing first 10" : ""}
-                  </p>
+                    <div className="mt-3 max-h-64 space-y-2 overflow-y-auto pr-1">
+                      {filteredRecipientOptions.slice(0, 10).map((recipient) => {
+                        const isSelected = recipient.id === form.userId;
+
+                        return (
+                          <button
+                            key={recipient.id}
+                            type="button"
+                            onClick={() =>
+                              setForm((prev) => ({
+                                ...prev,
+                                userId: recipient.id,
+                                customerName: recipient.displayName || "",
+                                customerEmail: recipient.email || "",
+                              }))
+                            }
+                            className={`flex w-full items-center gap-3 rounded-[18px] border px-3 py-3 text-left transition ${
+                              isSelected
+                                ? "border-[#93c5fd] bg-[#eff6ff]"
+                                : "border-slate-200 bg-white hover:border-slate-300 hover:bg-slate-50"
+                            }`}
+                          >
+                            <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-slate-100 text-xs font-semibold text-slate-700">
+                              {getRecipientInitials(recipient.displayName)}
+                            </div>
+                            <div className="min-w-0 flex-1">
+                              <p className="truncate text-sm font-semibold text-slate-950">
+                                {recipient.displayName}
+                              </p>
+                              <p className="truncate text-xs text-slate-500">
+                                {recipient.email || recipient.id}
+                              </p>
+                            </div>
+                            <div className="flex flex-col items-end gap-1">
+                              <StatusBadge
+                                tone={
+                                  recipient.clientStatus === "inactive"
+                                    ? "neutral"
+                                    : "success"
+                                }
+                              >
+                                {recipient.clientStatus}
+                              </StatusBadge>
+                              {isSelected && (
+                                <span className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[#1d4ed8]">
+                                  selected
+                                </span>
+                              )}
+                            </div>
+                          </button>
+                        );
+                      })}
+
+                      {filteredRecipientOptions.length === 0 && (
+                        <div className="rounded-[18px] border border-dashed border-slate-200 bg-white px-4 py-5 text-center text-sm text-slate-500">
+                          No users matched your search.
+                        </div>
+                      )}
+                    </div>
+
+                    <p className="mt-3 text-xs text-slate-500">
+                      {filteredRecipientOptions.length} matching user
+                      {filteredRecipientOptions.length === 1 ? "" : "s"}
+                      {filteredRecipientOptions.length > 10 ? " · showing first 10" : ""}
+                    </p>
+                  </div>
+                </div>
+
+                <div>
+                  <label className="mb-2 block text-sm font-medium text-slate-700">
+                    Linked account
+                  </label>
+                  <input
+                    value={
+                      selectedRecipient
+                        ? `${selectedRecipient.displayName} · ${selectedRecipient.email || selectedRecipient.id}`
+                        : ""
+                    }
+                    readOnly
+                    placeholder="Select a platform user first"
+                    className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-700 outline-none"
+                  />
                 </div>
               </div>
-
-              <div>
-                <label className="mb-2 block text-sm font-medium text-slate-700">
-                  Linked account
-                </label>
-                <input
-                  value={
-                    selectedRecipient
-                      ? `${selectedRecipient.displayName} · ${selectedRecipient.email || selectedRecipient.id}`
-                      : ""
-                  }
-                  readOnly
-                  placeholder="Select a platform user first"
-                  className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-700 outline-none"
-                />
-              </div>
-            </div>
+            </CollapsiblePanel>
 
             <div className="grid gap-4 md:grid-cols-2">
               <div>
@@ -791,166 +814,196 @@ export default function AdminBookingsPage() {
               </div>
             </div>
 
-            <div className="grid gap-4 md:grid-cols-3">
-              <div>
-                <label className="mb-2 block text-sm font-medium text-slate-700">
-                  Booking status
+            <CollapsiblePanel
+              title="Booking details"
+              description="Payment, pricing, stay type, and internal notes."
+            >
+              <div className="space-y-4">
+                <div className="grid gap-4 md:grid-cols-3">
+                  <div>
+                    <label className="mb-2 block text-sm font-medium text-slate-700">
+                      Booking status
+                    </label>
+                    <select
+                      value={form.status}
+                      onChange={(e) =>
+                        setForm((prev) => ({
+                          ...prev,
+                          status: e.target.value as BookingFormState["status"],
+                        }))
+                      }
+                      className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-[#93c5fd] focus:ring-4 focus:ring-[#dbeafe]"
+                    >
+                      <option value="confirmed">Confirmed</option>
+                      <option value="pending">Pending</option>
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="mb-2 block text-sm font-medium text-slate-700">
+                      Payment status
+                    </label>
+                    <select
+                      value={form.paymentStatus}
+                      onChange={(e) =>
+                        setForm((prev) => ({
+                          ...prev,
+                          paymentStatus: e.target.value as BookingFormState["paymentStatus"],
+                        }))
+                      }
+                      className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-[#93c5fd] focus:ring-4 focus:ring-[#dbeafe]"
+                    >
+                      <option value="manual">Manual</option>
+                      <option value="paid">Paid</option>
+                      <option value="pending">Pending</option>
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="mb-2 block text-sm font-medium text-slate-700">
+                      Payment method
+                    </label>
+                    <select
+                      value={form.paymentMethod}
+                      onChange={(e) =>
+                        setForm((prev) => ({
+                          ...prev,
+                          paymentMethod: e.target.value as BookingFormState["paymentMethod"],
+                        }))
+                      }
+                      className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-[#93c5fd] focus:ring-4 focus:ring-[#dbeafe]"
+                    >
+                      <option value="manual">Manual</option>
+                      <option value="cash">Cash</option>
+                      <option value="bank_transfer">Bank transfer</option>
+                      <option value="stripe">Stripe</option>
+                    </select>
+                  </div>
+                </div>
+
+                <label className="flex items-center gap-3 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3">
+                  <input
+                    type="checkbox"
+                    checked={form.consumesCapacity}
+                    onChange={(e) =>
+                      setForm((prev) => ({ ...prev, consumesCapacity: e.target.checked }))
+                    }
+                  />
+                  <span className="text-sm font-medium text-slate-800">
+                    This booking consumes weekly capacity
+                  </span>
                 </label>
-                <select
-                  value={form.status}
-                  onChange={(e) =>
-                    setForm((prev) => ({
-                      ...prev,
-                      status: e.target.value as BookingFormState["status"],
-                    }))
-                  }
-                  className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-[#93c5fd] focus:ring-4 focus:ring-[#dbeafe]"
-                >
-                  <option value="confirmed">Confirmed</option>
-                  <option value="pending">Pending</option>
-                </select>
+
+                {form.shortStay && (
+                  <p className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+                    Short stays still reserve the full weekly room block, so capacity is always consumed.
+                  </p>
+                )}
+
+                <div className="grid gap-4 md:grid-cols-[1fr_180px]">
+                  <label className="flex items-center gap-3 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3">
+                    <input
+                      type="checkbox"
+                      checked={form.shortStay}
+                      onChange={(e) =>
+                        setForm((prev) => ({
+                          ...prev,
+                          shortStay: e.target.checked,
+                          shortStayNights: e.target.checked ? prev.shortStayNights : "",
+                        }))
+                      }
+                    />
+                    <span className="text-sm font-medium text-slate-800">
+                      Mark as short stay
+                    </span>
+                  </label>
+
+                  <div>
+                    <label className="mb-2 block text-sm font-medium text-slate-700">
+                      Nights
+                    </label>
+                    <input
+                      type="number"
+                      min="1"
+                      value={form.shortStayNights}
+                      onChange={(e) =>
+                        setForm((prev) => ({ ...prev, shortStayNights: e.target.value }))
+                      }
+                      disabled={!form.shortStay}
+                      placeholder="3"
+                      className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-[#93c5fd] focus:ring-4 focus:ring-[#dbeafe] disabled:opacity-50"
+                    />
+                  </div>
+                </div>
+
+                <div className="grid gap-4 md:grid-cols-[1fr_140px]">
+                  <div>
+                    <label className="mb-2 block text-sm font-medium text-slate-700">
+                      Custom price
+                    </label>
+                    <input
+                      type="number"
+                      min="0"
+                      step="0.01"
+                      value={form.customPrice}
+                      onChange={(e) => setForm((prev) => ({ ...prev, customPrice: e.target.value }))}
+                      placeholder="Optional"
+                      className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-[#93c5fd] focus:ring-4 focus:ring-[#dbeafe]"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="mb-2 block text-sm font-medium text-slate-700">
+                      Currency
+                    </label>
+                    <input
+                      value={form.currency}
+                      onChange={(e) => setForm((prev) => ({ ...prev, currency: e.target.value }))}
+                      maxLength={3}
+                      placeholder="EUR"
+                      className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm uppercase text-slate-900 outline-none transition focus:border-[#93c5fd] focus:ring-4 focus:ring-[#dbeafe]"
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="mb-2 block text-sm font-medium text-slate-700">
+                    Notes
+                  </label>
+                  <textarea
+                    value={form.notes}
+                    onChange={(e) => setForm((prev) => ({ ...prev, notes: e.target.value }))}
+                    placeholder="Optional internal note"
+                    className="min-h-[110px] w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-[#93c5fd] focus:ring-4 focus:ring-[#dbeafe]"
+                  />
+                </div>
               </div>
+            </CollapsiblePanel>
 
-              <div>
-                <label className="mb-2 block text-sm font-medium text-slate-700">
-                  Payment status
-                </label>
-                <select
-                  value={form.paymentStatus}
-                  onChange={(e) =>
-                    setForm((prev) => ({
-                      ...prev,
-                      paymentStatus: e.target.value as BookingFormState["paymentStatus"],
-                    }))
-                  }
-                  className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-[#93c5fd] focus:ring-4 focus:ring-[#dbeafe]"
-                >
-                  <option value="manual">Manual</option>
-                  <option value="paid">Paid</option>
-                  <option value="pending">Pending</option>
-                </select>
-              </div>
+            <button
+              type="button"
+              onClick={saveBooking}
+              disabled={!canSaveBooking || saving}
+              className="w-full rounded-2xl bg-slate-950 px-4 py-3 text-sm font-medium text-white transition hover:bg-slate-800 disabled:opacity-50"
+            >
+              {saving
+                ? editingBookingId
+                  ? "Saving booking..."
+                  : "Creating booking..."
+                : editingBookingId
+                ? "Save booking changes"
+                : "Create booking"}
+            </button>
+          </div>
+        </div>
 
-              <div>
-                <label className="mb-2 block text-sm font-medium text-slate-700">
-                  Payment method
-                </label>
-                <select
-                  value={form.paymentMethod}
-                  onChange={(e) =>
-                    setForm((prev) => ({
-                      ...prev,
-                      paymentMethod: e.target.value as BookingFormState["paymentMethod"],
-                    }))
-                  }
-                  className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-[#93c5fd] focus:ring-4 focus:ring-[#dbeafe]"
-                >
-                  <option value="manual">Manual</option>
-                  <option value="cash">Cash</option>
-                  <option value="bank_transfer">Bank transfer</option>
-                  <option value="stripe">Stripe</option>
-                </select>
-              </div>
-            </div>
+          <div className="rounded-[28px] border border-white/70 bg-white/95 p-6 shadow-[0_18px_50px_rgba(15,23,42,0.07)] backdrop-blur">
+            <h2 className="text-xl font-semibold text-slate-950">Booking preview</h2>
+            <p className="mt-2 text-sm text-slate-600">
+              Review the stay window and capacity impact before saving.
+            </p>
 
-            <label className="flex items-center gap-3 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3">
-              <input
-                type="checkbox"
-                checked={form.consumesCapacity}
-                onChange={(e) =>
-                  setForm((prev) => ({ ...prev, consumesCapacity: e.target.checked }))
-                }
-              />
-              <span className="text-sm font-medium text-slate-800">
-                This booking consumes weekly capacity
-              </span>
-            </label>
-
-            {form.shortStay && (
-              <p className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
-                Short stays still reserve the full weekly room block, so capacity is always consumed.
-              </p>
-            )}
-
-            <div className="grid gap-4 md:grid-cols-[1fr_180px]">
-              <label className="flex items-center gap-3 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3">
-                <input
-                  type="checkbox"
-                  checked={form.shortStay}
-                  onChange={(e) =>
-                    setForm((prev) => ({
-                      ...prev,
-                      shortStay: e.target.checked,
-                      shortStayNights: e.target.checked ? prev.shortStayNights : "",
-                    }))
-                  }
-                />
-                <span className="text-sm font-medium text-slate-800">
-                  Mark as short stay
-                </span>
-              </label>
-
-              <div>
-                <label className="mb-2 block text-sm font-medium text-slate-700">
-                  Nights
-                </label>
-                <input
-                  type="number"
-                  min="1"
-                  value={form.shortStayNights}
-                  onChange={(e) =>
-                    setForm((prev) => ({ ...prev, shortStayNights: e.target.value }))
-                  }
-                  disabled={!form.shortStay}
-                  placeholder="3"
-                  className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-[#93c5fd] focus:ring-4 focus:ring-[#dbeafe] disabled:opacity-50"
-                />
-              </div>
-            </div>
-
-            <div className="grid gap-4 md:grid-cols-[1fr_140px]">
-              <div>
-                <label className="mb-2 block text-sm font-medium text-slate-700">
-                  Custom price
-                </label>
-                <input
-                  type="number"
-                  min="0"
-                  step="0.01"
-                  value={form.customPrice}
-                  onChange={(e) => setForm((prev) => ({ ...prev, customPrice: e.target.value }))}
-                  placeholder="Optional"
-                  className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-[#93c5fd] focus:ring-4 focus:ring-[#dbeafe]"
-                />
-              </div>
-
-              <div>
-                <label className="mb-2 block text-sm font-medium text-slate-700">
-                  Currency
-                </label>
-                <input
-                  value={form.currency}
-                  onChange={(e) => setForm((prev) => ({ ...prev, currency: e.target.value }))}
-                  maxLength={3}
-                  placeholder="EUR"
-                  className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm uppercase text-slate-900 outline-none transition focus:border-[#93c5fd] focus:ring-4 focus:ring-[#dbeafe]"
-                />
-              </div>
-            </div>
-
-            <div>
-              <label className="mb-2 block text-sm font-medium text-slate-700">
-                Notes
-              </label>
-              <textarea
-                value={form.notes}
-                onChange={(e) => setForm((prev) => ({ ...prev, notes: e.target.value }))}
-                placeholder="Optional internal note"
-                className="min-h-[110px] w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-[#93c5fd] focus:ring-4 focus:ring-[#dbeafe]"
-              />
-            </div>
-
-            <div className="rounded-[24px] border border-slate-100 bg-gradient-to-br from-slate-50 to-white p-5">
+            <div className="mt-6 rounded-[24px] border border-slate-100 bg-gradient-to-br from-slate-50 to-white p-5">
               <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">
                 Consecutive weeks preview
               </p>
@@ -990,25 +1043,12 @@ export default function AdminBookingsPage() {
                 </p>
               )}
             </div>
-
-            <button
-              type="button"
-              onClick={saveBooking}
-              disabled={!canSaveBooking || saving}
-              className="w-full rounded-2xl bg-slate-950 px-4 py-3 text-sm font-medium text-white transition hover:bg-slate-800 disabled:opacity-50"
-            >
-              {saving
-                ? editingBookingId
-                  ? "Saving booking..."
-                  : "Creating booking..."
-                : editingBookingId
-                ? "Save booking changes"
-                : "Create booking"}
-            </button>
           </div>
-        </div>
+        </section>
+      ) : null}
 
-        <div className="rounded-[28px] border border-white/70 bg-white/95 p-6 shadow-[0_18px_50px_rgba(15,23,42,0.07)] backdrop-blur">
+      {activeTab === "list" ? (
+        <section className="rounded-[28px] border border-white/70 bg-white/95 p-6 shadow-[0_18px_50px_rgba(15,23,42,0.07)] backdrop-blur">
           <div className="flex items-center justify-between gap-3">
             <div>
               <h2 className="text-xl font-semibold text-slate-950">
@@ -1050,7 +1090,10 @@ export default function AdminBookingsPage() {
             ))}
           </div>
 
-          <div className="mt-5 rounded-[24px] border border-slate-200 bg-slate-50/70 p-3 md:p-4">
+          <CollapsiblePanel
+            title="Search and filters"
+            description="Use when you need to narrow the list."
+          >
             <div className="grid gap-3 md:grid-cols-[minmax(0,1.2fr)_180px_180px]">
             <input
               value={bookingSearch}
@@ -1119,7 +1162,7 @@ export default function AdminBookingsPage() {
                 )}
               </div>
             </div>
-          </div>
+          </CollapsiblePanel>
 
           {visibleBookings.length === 0 ? (
             <div className="mt-6 rounded-[24px] border border-dashed border-slate-200 bg-slate-50/70 p-8 text-center">
@@ -1230,11 +1273,11 @@ export default function AdminBookingsPage() {
               ))}
             </div>
           )}
-        </div>
+        </section>
+      ) : null}
 
-      </section>
-
-      <section className="grid gap-6 xl:grid-cols-[1.1fr_0.9fr]">
+      {activeTab === "overview" ? (
+        <section className="grid gap-6 xl:grid-cols-[1.1fr_0.9fr]">
         <div className="space-y-6">
           <div className="rounded-[28px] border border-white/70 bg-white/95 p-6 shadow-[0_18px_50px_rgba(15,23,42,0.07)] backdrop-blur">
             <h2 className="text-xl font-semibold text-slate-950">Capacity snapshot</h2>
@@ -1315,7 +1358,8 @@ export default function AdminBookingsPage() {
             </RuleCard>
           </div>
         </div>
-      </section>
+        </section>
+      ) : null}
     </div>
   );
 }

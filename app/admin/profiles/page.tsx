@@ -6,6 +6,8 @@ import { onAuthStateChanged } from "firebase/auth";
 import { collection, getDocs } from "firebase/firestore";
 import { buildCsv, downloadCsv } from "@/lib/export";
 import { BookingRecord } from "@/lib/bookings";
+import SegmentedTabs from "@/components/ui/SegmentedTabs";
+import CollapsiblePanel from "@/components/ui/CollapsiblePanel";
 
 type Profile = {
   id: string;
@@ -58,6 +60,7 @@ type OnboardingFilter = "all" | "active" | "incomplete";
 type ClientExportScope = "filtered" | "all" | "active" | "inactive";
 type BookingExportStatus = "all" | "confirmed" | "pending" | "cancelled";
 type BookingExportPayment = "all" | "paid" | "pending" | "manual";
+type ProfilesTab = "directory" | "exports";
 
 function getInitials(name: string) {
   const parts = String(name || "")
@@ -91,6 +94,7 @@ export default function AdminProfilesPage() {
   const [bookingExportPayment, setBookingExportPayment] =
     useState<BookingExportPayment>("all");
   const [bookingExportYear, setBookingExportYear] = useState("all");
+  const [activeTab, setActiveTab] = useState<ProfilesTab>("directory");
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
@@ -440,94 +444,15 @@ export default function AdminProfilesPage() {
             />
           </div>
 
-          <div className="mt-6 grid gap-4 xl:grid-cols-2">
-            <div className="rounded-[22px] border border-slate-200 bg-white/90 p-4">
-              <p className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">
-                Client Database Export
-              </p>
-              <p className="mt-2 text-sm text-slate-600">
-                Export all client records, or only active/inactive clients. `Filtered`
-                uses the current search and page filters.
-              </p>
-              <div className="mt-4 flex flex-col gap-3 sm:flex-row">
-                <select
-                  value={clientExportScope}
-                  onChange={(e) =>
-                    setClientExportScope(e.target.value as ClientExportScope)
-                  }
-                  className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 shadow-sm outline-none transition focus:border-[#93c5fd] focus:ring-4 focus:ring-[#dbeafe]"
-                >
-                  <option value="filtered">Current filtered view</option>
-                  <option value="all">All clients</option>
-                  <option value="active">Active only</option>
-                  <option value="inactive">Inactive only</option>
-                </select>
-                <button
-                  type="button"
-                  onClick={exportClientDatabase}
-                  className="rounded-2xl bg-slate-950 px-4 py-3 text-sm font-medium text-white shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:bg-slate-800 hover:shadow-md"
-                >
-                  Export Client CSV
-                </button>
-              </div>
-            </div>
-
-            <div className="rounded-[22px] border border-slate-200 bg-white/90 p-4">
-              <p className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">
-                Bookings & Payments Export
-              </p>
-              <p className="mt-2 text-sm text-slate-600">
-                Filter by booking status, payment status, and year. Year uses booking
-                creation timestamp because profiles do not currently store a reliable created date.
-              </p>
-              <div className="mt-4 grid gap-3 sm:grid-cols-3">
-                <select
-                  value={bookingExportStatus}
-                  onChange={(e) =>
-                    setBookingExportStatus(e.target.value as BookingExportStatus)
-                  }
-                  className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 shadow-sm outline-none transition focus:border-[#93c5fd] focus:ring-4 focus:ring-[#dbeafe]"
-                >
-                  <option value="all">All booking status</option>
-                  <option value="confirmed">Confirmed</option>
-                  <option value="pending">Pending</option>
-                  <option value="cancelled">Cancelled</option>
-                </select>
-                <select
-                  value={bookingExportPayment}
-                  onChange={(e) =>
-                    setBookingExportPayment(e.target.value as BookingExportPayment)
-                  }
-                  className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 shadow-sm outline-none transition focus:border-[#93c5fd] focus:ring-4 focus:ring-[#dbeafe]"
-                >
-                  <option value="all">All payment status</option>
-                  <option value="paid">Paid</option>
-                  <option value="pending">Pending</option>
-                  <option value="manual">Manual</option>
-                </select>
-                <select
-                  value={bookingExportYear}
-                  onChange={(e) => setBookingExportYear(e.target.value)}
-                  className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 shadow-sm outline-none transition focus:border-[#93c5fd] focus:ring-4 focus:ring-[#dbeafe]"
-                >
-                  <option value="all">All years</option>
-                  {availableBookingYears.map((year) => (
-                    <option key={year} value={year}>
-                      {year}
-                    </option>
-                  ))}
-                </select>
-              </div>
-              <div className="mt-3">
-                <button
-                  type="button"
-                  onClick={exportBookingsReport}
-                  className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-medium text-slate-700 shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:border-slate-300 hover:shadow-md"
-                >
-                  Export Bookings & Payments CSV
-                </button>
-              </div>
-            </div>
+          <div className="mt-6">
+            <SegmentedTabs<ProfilesTab>
+              items={[
+                { id: "directory", label: "Directory" },
+                { id: "exports", label: "Exports" },
+              ]}
+              value={activeTab}
+              onChange={setActiveTab}
+            />
           </div>
         </div>
       </section>
@@ -552,7 +477,106 @@ export default function AdminProfilesPage() {
         />
       </section>
 
+      {activeTab === "exports" ? (
+        <section className="grid gap-4 xl:grid-cols-2">
+          <div className="rounded-[22px] border border-slate-200 bg-white/90 p-4 shadow-[0_18px_50px_rgba(15,23,42,0.07)]">
+            <p className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">
+              Client Database Export
+            </p>
+            <p className="mt-2 text-sm text-slate-600">
+              Export all client records, or only active/inactive clients. `Filtered`
+              uses the current search and page filters.
+            </p>
+            <div className="mt-4 flex flex-col gap-3 sm:flex-row">
+              <select
+                value={clientExportScope}
+                onChange={(e) =>
+                  setClientExportScope(e.target.value as ClientExportScope)
+                }
+                className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 shadow-sm outline-none transition focus:border-[#93c5fd] focus:ring-4 focus:ring-[#dbeafe]"
+              >
+                <option value="filtered">Current filtered view</option>
+                <option value="all">All clients</option>
+                <option value="active">Active only</option>
+                <option value="inactive">Inactive only</option>
+              </select>
+              <button
+                type="button"
+                onClick={exportClientDatabase}
+                className="rounded-2xl bg-slate-950 px-4 py-3 text-sm font-medium text-white shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:bg-slate-800 hover:shadow-md"
+              >
+                Export Client CSV
+              </button>
+            </div>
+          </div>
+
+          <div className="rounded-[22px] border border-slate-200 bg-white/90 p-4 shadow-[0_18px_50px_rgba(15,23,42,0.07)]">
+            <p className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">
+              Bookings & Payments Export
+            </p>
+            <p className="mt-2 text-sm text-slate-600">
+              Filter by booking status, payment status, and year. Year uses booking
+              creation timestamp because profiles do not currently store a reliable created date.
+            </p>
+            <div className="mt-4 grid gap-3 sm:grid-cols-3">
+              <select
+                value={bookingExportStatus}
+                onChange={(e) =>
+                  setBookingExportStatus(e.target.value as BookingExportStatus)
+                }
+                className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 shadow-sm outline-none transition focus:border-[#93c5fd] focus:ring-4 focus:ring-[#dbeafe]"
+              >
+                <option value="all">All booking status</option>
+                <option value="confirmed">Confirmed</option>
+                <option value="pending">Pending</option>
+                <option value="cancelled">Cancelled</option>
+              </select>
+              <select
+                value={bookingExportPayment}
+                onChange={(e) =>
+                  setBookingExportPayment(e.target.value as BookingExportPayment)
+                }
+                className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 shadow-sm outline-none transition focus:border-[#93c5fd] focus:ring-4 focus:ring-[#dbeafe]"
+              >
+                <option value="all">All payment status</option>
+                <option value="paid">Paid</option>
+                <option value="pending">Pending</option>
+                <option value="manual">Manual</option>
+              </select>
+              <select
+                value={bookingExportYear}
+                onChange={(e) => setBookingExportYear(e.target.value)}
+                className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 shadow-sm outline-none transition focus:border-[#93c5fd] focus:ring-4 focus:ring-[#dbeafe]"
+              >
+                <option value="all">All years</option>
+                {availableBookingYears.map((year) => (
+                  <option key={year} value={year}>
+                    {year}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div className="mt-3">
+              <button
+                type="button"
+                onClick={exportBookingsReport}
+                className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-medium text-slate-700 shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:border-slate-300 hover:shadow-md"
+              >
+                Export Bookings & Payments CSV
+              </button>
+            </div>
+          </div>
+        </section>
+      ) : null}
+
+      {activeTab === "directory" ? (
+        <>
       <section className="rounded-[28px] border border-white/70 bg-white/90 p-4 shadow-[0_18px_50px_rgba(15,23,42,0.07)] backdrop-blur md:p-6">
+        <CollapsiblePanel
+          title="Search and filters"
+          description="Open only when you need to narrow the directory."
+          defaultOpen
+        >
         <div className="grid gap-3 lg:grid-cols-[minmax(0,1.2fr)_180px_180px_180px]">
           <input
             type="text"
@@ -634,6 +658,7 @@ export default function AdminProfilesPage() {
             )}
           </div>
         </div>
+        </CollapsiblePanel>
       </section>
 
       {filteredProfiles.length === 0 ? (
@@ -670,27 +695,23 @@ export default function AdminProfilesPage() {
                       {profile.clientStatus || "active"}
                     </StatusBadge>
 
+                    <StatusBadge tone="blue">
+                      {profile.assignedProgram || "No program"}
+                    </StatusBadge>
+
                     <StatusBadge tone="neutral">
                       payment: {profile.paymentStatus || "—"}
-                    </StatusBadge>
-
-                    <StatusBadge tone="blue">
-                      onboarding: {profile.onboardingStatus || "—"}
-                    </StatusBadge>
-
-                    <StatusBadge tone="neutral">
-                      approval: {profile.approvalStatus || "—"}
                     </StatusBadge>
                   </div>
 
                   <div className="mt-4 grid gap-3 md:grid-cols-2">
                     <ProfileMetaCard
-                      label="Assigned program"
-                      value={profile.assignedProgram || "Not assigned"}
-                    />
-                    <ProfileMetaCard
                       label="Next action"
                       value={getProfileNextAction(profile)}
+                    />
+                    <ProfileMetaCard
+                      label="Status check"
+                      value={`${profile.onboardingStatus || "—"} onboarding · ${profile.approvalStatus || "—"} approval`}
                     />
                   </div>
                 </div>
@@ -708,6 +729,8 @@ export default function AdminProfilesPage() {
           ))}
         </div>
       )}
+        </>
+      ) : null}
     </div>
   );
 }
