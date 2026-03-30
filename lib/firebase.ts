@@ -9,11 +9,7 @@ function resolveAuthDomain() {
     return process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN;
   }
 
-  if (typeof window !== "undefined" && window.location.hostname) {
-    return window.location.hostname;
-  }
-
-  return "app.bootcamp.rivcor.com";
+  return "bootcamp-platform-27d16.firebaseapp.com";
 }
 
 const firebaseConfig = {
