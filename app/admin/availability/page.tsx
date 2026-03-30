@@ -456,18 +456,17 @@ export default function AdminAvailabilityPage() {
         </div>
       </section>
 
-      <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        <SummaryCard label="Total Weeks" value={String(summary.totalWeeks)} tone="light" />
-        <SummaryCard label="Active Weeks" value={String(summary.activeWeeks)} tone="blue" />
-        <SummaryCard label="Sold Out Weeks" value={String(summary.soldOutWeeks)} tone="danger" />
-        <SummaryCard label="Total Reserved" value={String(summary.totalBooked)} tone="success" />
-      </section>
-
-      <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        <SummaryCard label="1 Week Starts" value={String(summary.startableOneWeek)} tone="blue" />
-        <SummaryCard label="2 Week Starts" value={String(summary.startableTwoWeeks)} tone="success" />
-        <SummaryCard label="3 Week Starts" value={String(summary.startableThreeWeeks)} tone="dark" />
-        <SummaryCard label="Total Capacity" value={String(summary.totalCapacity)} tone="light" />
+      <section className="overflow-x-auto pb-1">
+        <div className="flex min-w-max gap-2">
+          <SummaryCard label="Total Weeks" value={String(summary.totalWeeks)} tone="light" />
+          <SummaryCard label="Active Weeks" value={String(summary.activeWeeks)} tone="blue" />
+          <SummaryCard label="Sold Out Weeks" value={String(summary.soldOutWeeks)} tone="danger" />
+          <SummaryCard label="Total Reserved" value={String(summary.totalBooked)} tone="success" />
+          <SummaryCard label="1 Week Starts" value={String(summary.startableOneWeek)} tone="blue" />
+          <SummaryCard label="2 Week Starts" value={String(summary.startableTwoWeeks)} tone="success" />
+          <SummaryCard label="3 Week Starts" value={String(summary.startableThreeWeeks)} tone="dark" />
+          <SummaryCard label="Total Capacity" value={String(summary.totalCapacity)} tone="light" />
+        </div>
       </section>
 
       <section className="grid gap-6 xl:grid-cols-[420px_1fr]">
@@ -515,15 +514,6 @@ export default function AdminAvailabilityPage() {
               </p>
               <p className="mt-1 text-xs text-slate-500">
                 Weekly blocks always end 7 days after the start date.
-              </p>
-            </div>
-
-            <div className="rounded-[22px] border border-[#bfdbfe] bg-gradient-to-br from-[#eff6ff] to-white p-4">
-              <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[#1d4ed8]">
-                Block logic
-              </p>
-              <p className="mt-2 text-sm leading-6 text-slate-700">
-                Each week stays a clean 7-day capacity block. This premium pass only changes presentation, not overlap rules or booking behavior.
               </p>
             </div>
 
@@ -674,10 +664,12 @@ function SummaryCard({
 
   return (
     <div
-      className={`rounded-[24px] border p-5 shadow-[0_14px_40px_rgba(15,23,42,0.07)] ${styles[tone].card}`}
+      className={`min-w-[120px] flex-none rounded-[18px] border px-3 py-2.5 shadow-[0_8px_22px_rgba(15,23,42,0.04)] ${styles[tone].card}`}
     >
-      <p className={`text-sm font-semibold ${styles[tone].label}`}>{label}</p>
-      <p className={`mt-2 text-3xl font-semibold tracking-tight ${styles[tone].value}`}>
+      <p className={`text-[10px] font-semibold uppercase tracking-[0.12em] ${styles[tone].label}`}>
+        {label}
+      </p>
+      <p className={`mt-1 text-xl font-semibold tracking-tight ${styles[tone].value}`}>
         {value}
       </p>
     </div>
@@ -891,9 +883,15 @@ function DurationCard({
   tone: "blue" | "success" | "dark";
 }) {
   const toneStyles = {
-    blue: "border-[#bfdbfe] bg-gradient-to-br from-[#eff6ff] to-white",
-    success: "border-emerald-200 bg-gradient-to-br from-emerald-50 to-white",
-    dark: "border-slate-200 bg-gradient-to-br from-slate-50 to-white",
+    blue: available
+      ? "border-emerald-200 bg-gradient-to-br from-emerald-50 to-white"
+      : "border-slate-200 bg-gradient-to-br from-slate-50 to-white",
+    success: available
+      ? "border-emerald-200 bg-gradient-to-br from-emerald-50 to-white"
+      : "border-slate-200 bg-gradient-to-br from-slate-50 to-white",
+    dark: available
+      ? "border-emerald-200 bg-gradient-to-br from-emerald-50 to-white"
+      : "border-slate-200 bg-gradient-to-br from-slate-50 to-white",
   };
 
   return (
