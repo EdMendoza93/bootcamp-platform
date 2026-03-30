@@ -40,7 +40,7 @@ function getEmptyForm(): WeekForm {
     startDate: "",
     label: "",
     active: true,
-    capacity: "10",
+    capacity: "6",
     notes: "",
   };
 }
@@ -308,10 +308,18 @@ export default function AdminAvailabilityPage() {
   };
 
   const deleteWeek = async (week: BootcampWeek) => {
+    if (week.booked > 0) {
+      showToast({
+        title: "Week has assigned bookings",
+        description:
+          "This week cannot be deleted while clients are booked into it. Disable the week instead, or move or cancel those bookings first.",
+        type: "error",
+      });
+      return;
+    }
+
     const confirmed = window.confirm(
-      week.booked > 0
-        ? "This week already has bookings. Delete anyway?"
-        : "Delete this week?"
+      "Delete this week? This will remove the availability block entirely."
     );
     if (!confirmed) return;
 
