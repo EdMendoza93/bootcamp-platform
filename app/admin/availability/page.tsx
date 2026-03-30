@@ -25,7 +25,6 @@ import {
   updateDoc,
 } from "firebase/firestore";
 import { useToast } from "@/components/ui/ToastProvider";
-import SegmentedTabs from "@/components/ui/SegmentedTabs";
 
 type BootcampWeek = BootcampWeekRecord;
 
@@ -69,6 +68,13 @@ function formatMonthLabel(date: string) {
     month: "long",
     year: "numeric",
   });
+}
+
+function getCurrentMonthKey() {
+  const now = new Date();
+  const yyyy = now.getFullYear();
+  const mm = String(now.getMonth() + 1).padStart(2, "0");
+  return `${yyyy}-${mm}`;
 }
 
 function getUsagePercent(booked: number, capacity: number) {
@@ -168,6 +174,8 @@ export default function AdminAvailabilityPage() {
     };
   }, [weeks]);
 
+  const currentMonthKey = useMemo(() => getCurrentMonthKey(), []);
+
   const weekViewItems = useMemo(
     () =>
       weeks.map((week, index) => ({
@@ -191,6 +199,7 @@ export default function AdminAvailabilityPage() {
 
     return weekViewItems
       .filter((item) => {
+        if (item.monthKey < currentMonthKey) return false;
         if (seen.has(item.monthKey)) return false;
         seen.add(item.monthKey);
         return true;
@@ -199,12 +208,17 @@ export default function AdminAvailabilityPage() {
         id: item.monthKey,
         label: item.monthLabel,
       }));
-  }, [weekViewItems]);
+  }, [currentMonthKey, weekViewItems]);
 
   const visibleWeekItems = useMemo(() => {
-    if (!activeMonth) return weekViewItems;
-    return weekViewItems.filter((item) => item.monthKey === activeMonth);
-  }, [activeMonth, weekViewItems]);
+    const eligibleItems = weekViewItems.filter(
+      (item) => item.monthKey >= currentMonthKey
+    );
+
+    if (!activeMonth) return eligibleItems;
+
+    return eligibleItems.filter((item) => item.monthKey === activeMonth);
+  }, [activeMonth, currentMonthKey, weekViewItems]);
 
   useEffect(() => {
     if (monthTabs.length === 0) {
@@ -456,8 +470,8 @@ export default function AdminAvailabilityPage() {
         </div>
       </section>
 
-      <section className="overflow-x-auto pb-1">
-        <div className="flex min-w-max gap-2">
+      <section className="flex flex-wrap gap-2">
+        <div className="flex flex-wrap gap-2">
           <SummaryCard label="Total Weeks" value={String(summary.totalWeeks)} tone="light" />
           <SummaryCard label="Active Weeks" value={String(summary.activeWeeks)} tone="blue" />
           <SummaryCard label="Sold Out Weeks" value={String(summary.soldOutWeeks)} tone="danger" />
@@ -469,7 +483,7 @@ export default function AdminAvailabilityPage() {
         </div>
       </section>
 
-      <section className="grid gap-6 xl:grid-cols-[420px_1fr]">
+      <section className="grid gap-6 xl:grid-cols-[420px_minmax(0,1fr)]">
         <div className="rounded-[28px] border border-white/70 bg-white/95 p-6 shadow-[0_18px_50px_rgba(15,23,42,0.07)] backdrop-blur">
           <div className="flex items-center justify-between gap-3">
             <div>
@@ -582,38 +596,63 @@ export default function AdminAvailabilityPage() {
           </div>
         </div>
 
-        <div className="space-y-4">
+        <div className="min-w-0 space-y-4">
           {weeks.length === 0 ? (
             <div className="rounded-[28px] border border-dashed border-slate-200 bg-white/80 p-10 text-center text-sm text-slate-500">
               No weekly blocks added yet.
             </div>
           ) : (
             <>
-              <div className="flex flex-col gap-3 rounded-[24px] border border-slate-200 bg-slate-50/70 px-4 py-4">
+              <div className="min-w-0 flex flex-col gap-3 rounded-[24px] border border-slate-200 bg-slate-50/70 px-4 py-4">
                 <div className="text-sm text-slate-600">
                   {weeks.length} weekly block{weeks.length === 1 ? "" : "s"} in the system
                 </div>
                 {monthTabs.length > 0 && (
-                  <SegmentedTabs
-                    items={monthTabs}
-                    value={activeMonth}
-                    onChange={setActiveMonth}
-                  />
+                  <div className="min-w-0 w-full overflow-hidden">
+                    <div className="max-w-full overflow-x-auto overflow-y-hidden pb-1">
+                      <div className="inline-flex w-max gap-2 rounded-[22px] border border-slate-200 bg-white/90 p-1.5 shadow-sm">
+                      {monthTabs.map((tab) => {
+                        const active = tab.id === activeMonth;
+
+                        return (
+                          <button
+                            key={tab.id}
+                            type="button"
+                            onClick={() => setActiveMonth(tab.id)}
+                            className={`whitespace-nowrap rounded-2xl px-4 py-2 text-sm font-medium transition ${
+                              active
+                                ? "bg-slate-950 text-white shadow-sm"
+                                : "text-slate-600 hover:bg-slate-100 hover:text-slate-900"
+                            }`}
+                          >
+                            {tab.label}
+                          </button>
+                        );
+                      })}
+                      </div>
+                    </div>
+                  </div>
                 )}
               </div>
-              {visibleWeekItems.map((item) => (
-                <WeekCard
-                  key={item.week.id}
-                  week={item.week}
-                  assignedBookings={item.assignedBookings}
-                  startableOneWeek={item.startableOneWeek}
-                  startableTwoWeeks={item.startableTwoWeeks}
-                  startableThreeWeeks={item.startableThreeWeeks}
-                  onEdit={() => startEdit(item.week)}
-                  onToggleActive={() => toggleActive(item.week)}
-                  onDelete={() => deleteWeek(item.week)}
-                />
-              ))}
+              {visibleWeekItems.length === 0 ? (
+                <div className="rounded-[28px] border border-dashed border-slate-200 bg-white/80 p-10 text-center text-sm text-slate-500">
+                  No weekly blocks in the current or upcoming months.
+                </div>
+              ) : (
+                visibleWeekItems.map((item) => (
+                  <WeekCard
+                    key={item.week.id}
+                    week={item.week}
+                    assignedBookings={item.assignedBookings}
+                    startableOneWeek={item.startableOneWeek}
+                    startableTwoWeeks={item.startableTwoWeeks}
+                    startableThreeWeeks={item.startableThreeWeeks}
+                    onEdit={() => startEdit(item.week)}
+                    onToggleActive={() => toggleActive(item.week)}
+                    onDelete={() => deleteWeek(item.week)}
+                  />
+                ))
+              )}
             </>
           )}
         </div>
