@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Image from "next/image";
 import { useSearchParams } from "next/navigation";
 import {
   GoogleAuthProvider,
@@ -410,9 +411,21 @@ export default function LoginContent() {
                 Wild Atlantic Bootcamp
               </div>
 
-              <h2 className="mt-4 text-3xl font-semibold tracking-tight text-slate-950">
-                Sign in
-              </h2>
+              <div className="mt-4 flex items-center gap-3">
+                <div className="flex h-11 w-11 items-center justify-center rounded-2xl border border-slate-200 bg-white shadow-sm">
+                  <Image
+                    src="/icon.png"
+                    alt="Wild Atlantic Bootcamp"
+                    width={28}
+                    height={28}
+                    className="h-7 w-7 rounded-lg"
+                    priority
+                  />
+                </div>
+                <h2 className="text-3xl font-semibold tracking-tight text-slate-950">
+                  Sign in
+                </h2>
+              </div>
 
               <p className="mt-2 text-sm text-slate-600">
                 Access your dashboard and progress updates.
