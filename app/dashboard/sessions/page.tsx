@@ -4,6 +4,8 @@ import { useEffect, useMemo, useState } from "react";
 import { collection, getDocs, query, where } from "firebase/firestore";
 import { auth, db } from "@/lib/firebase";
 import { useToast } from "@/components/ui/ToastProvider";
+import SegmentedTabs from "@/components/ui/SegmentedTabs";
+import CollapsiblePanel from "@/components/ui/CollapsiblePanel";
 import {
   getDeliveryMethodLabel,
   getProviderRoleLabel,
@@ -22,10 +24,13 @@ type Profile = {
   fullName: string;
 };
 
+type SessionTab = "overview" | "timeline";
+
 export default function DashboardSessionsPage() {
   const [loading, setLoading] = useState(true);
   const [profile, setProfile] = useState<Profile | null>(null);
   const [sessions, setSessions] = useState<OnlineSessionRecord[]>([]);
+  const [activeTab, setActiveTab] = useState<SessionTab>("overview");
   const [statusFilter, setStatusFilter] = useState<"all" | OnlineSessionStatus>("all");
 
   const { showToast } = useToast();
@@ -147,36 +152,62 @@ export default function DashboardSessionsPage() {
               <HeaderPill label="Client" value={profile?.fullName || "Profile pending"} />
               <HeaderPill label="Total" value={String(summary.total)} />
               <HeaderPill label="Upcoming" value={String(summary.upcoming)} />
-              <HeaderPill label="Completed" value={String(summary.completed)} />
               <HeaderPill
                 label="Payment pending"
                 value={String(summary.paymentPending)}
+              />
+            </div>
+
+            <div className="mt-6">
+              <SegmentedTabs<SessionTab>
+                items={[
+                  { id: "overview", label: "Overview" },
+                  { id: "timeline", label: "Timeline" },
+                ]}
+                value={activeTab}
+                onChange={setActiveTab}
               />
             </div>
           </div>
         </div>
       </section>
 
+      {activeTab === "overview" ? (
+        <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+          <StatusCard label="Total sessions" value={String(summary.total)} />
+          <StatusCard label="Upcoming" value={String(summary.upcoming)} />
+          <StatusCard label="Completed" value={String(summary.completed)} />
+          <StatusCard label="Payment pending" value={String(summary.paymentPending)} />
+        </section>
+      ) : null}
+
+      {activeTab === "timeline" ? (
       <section className="rounded-[28px] border border-white/70 bg-white/95 p-6 shadow-[0_18px_50px_rgba(15,23,42,0.07)] backdrop-blur">
-        <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
-          <div>
-            <h2 className="text-xl font-semibold text-slate-950">Session timeline</h2>
-            <p className="mt-2 text-sm text-slate-600">
-              You will find your meeting type, date, status, and direct link here.
-            </p>
-          </div>
-          <select
-            value={statusFilter}
-            onChange={(e) =>
-              setStatusFilter(e.target.value as "all" | OnlineSessionStatus)
-            }
-            className="rounded-2xl border border-slate-200 bg-white px-4 py-2.5 text-sm text-slate-700 outline-none"
+        <div>
+          <h2 className="text-xl font-semibold text-slate-950">Session timeline</h2>
+          <p className="mt-2 text-sm text-slate-600">
+            You will find your meeting type, date, status, and direct link here.
+          </p>
+        </div>
+
+        <div className="mt-5">
+          <CollapsiblePanel
+            title="Status filter"
+            description="Open only when you need to narrow the list."
           >
-            <option value="all">All status</option>
-            <option value="scheduled">Scheduled</option>
-            <option value="completed">Completed</option>
-            <option value="cancelled">Cancelled</option>
-          </select>
+            <select
+              value={statusFilter}
+              onChange={(e) =>
+                setStatusFilter(e.target.value as "all" | OnlineSessionStatus)
+              }
+              className="rounded-2xl border border-slate-200 bg-white px-4 py-2.5 text-sm text-slate-700 outline-none"
+            >
+              <option value="all">All status</option>
+              <option value="scheduled">Scheduled</option>
+              <option value="completed">Completed</option>
+              <option value="cancelled">Cancelled</option>
+            </select>
+          </CollapsiblePanel>
         </div>
 
         {!profile ? (
@@ -254,6 +285,7 @@ export default function DashboardSessionsPage() {
           </div>
         )}
       </section>
+      ) : null}
     </div>
   );
 }
@@ -282,5 +314,14 @@ function StatusPill({ status }: { status: OnlineSessionStatus }) {
     >
       {status}
     </span>
+  );
+}
+
+function StatusCard({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="rounded-[22px] border border-slate-100 bg-gradient-to-br from-slate-50 to-white p-4 shadow-sm">
+      <p className="text-sm font-semibold text-slate-700">{label}</p>
+      <p className="mt-2 text-lg font-semibold text-slate-950">{value}</p>
+    </div>
   );
 }

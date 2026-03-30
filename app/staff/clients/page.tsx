@@ -5,6 +5,7 @@ import { useEffect, useMemo, useState } from "react";
 import { collection, getDocs } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { useToast } from "@/components/ui/ToastProvider";
+import CollapsiblePanel from "@/components/ui/CollapsiblePanel";
 
 type Profile = {
   id: string;
@@ -132,26 +133,32 @@ export default function StaffClientsPage() {
       </section>
 
       <section className="rounded-[28px] border border-white/70 bg-white/90 p-4 shadow-[0_18px_50px_rgba(15,23,42,0.07)] backdrop-blur md:p-6">
-        <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_180px]">
-          <input
-            type="text"
-            placeholder="Search by client, program, payment, onboarding..."
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 shadow-sm outline-none transition focus:border-[#93c5fd] focus:ring-4 focus:ring-[#dbeafe]"
-          />
-          <select
-            value={statusFilter}
-            onChange={(e) =>
-              setStatusFilter(e.target.value as "all" | "active" | "inactive")
-            }
-            className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 shadow-sm outline-none transition focus:border-[#93c5fd] focus:ring-4 focus:ring-[#dbeafe]"
-          >
-            <option value="all">All status</option>
-            <option value="active">Active</option>
-            <option value="inactive">Inactive</option>
-          </select>
-        </div>
+        <CollapsiblePanel
+          title="Search and filters"
+          description="Open only when you need to narrow the client list."
+          defaultOpen
+        >
+          <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_180px]">
+            <input
+              type="text"
+              placeholder="Search by client, program, payment, onboarding..."
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 shadow-sm outline-none transition focus:border-[#93c5fd] focus:ring-4 focus:ring-[#dbeafe]"
+            />
+            <select
+              value={statusFilter}
+              onChange={(e) =>
+                setStatusFilter(e.target.value as "all" | "active" | "inactive")
+              }
+              className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 shadow-sm outline-none transition focus:border-[#93c5fd] focus:ring-4 focus:ring-[#dbeafe]"
+            >
+              <option value="all">All status</option>
+              <option value="active">Active</option>
+              <option value="inactive">Inactive</option>
+            </select>
+          </div>
+        </CollapsiblePanel>
       </section>
 
       {filteredProfiles.length === 0 ? (
@@ -188,19 +195,17 @@ export default function StaffClientsPage() {
                     <StatusBadge tone="neutral">
                       payment: {profile.paymentStatus || "—"}
                     </StatusBadge>
-                    <StatusBadge tone="blue">
-                      onboarding: {profile.onboardingStatus || "—"}
-                    </StatusBadge>
+                    <StatusBadge tone="blue">{profile.assignedProgram || "No program"}</StatusBadge>
                   </div>
 
                   <div className="mt-4 grid gap-3 md:grid-cols-2">
                     <MetaCard
-                      label="Assigned program"
-                      value={profile.assignedProgram || "Not assigned"}
-                    />
-                    <MetaCard
                       label="Workspace focus"
                       value="Schedule, sessions, and inbox"
+                    />
+                    <MetaCard
+                      label="Status check"
+                      value={`${profile.onboardingStatus || "—"} onboarding`}
                     />
                   </div>
                 </div>

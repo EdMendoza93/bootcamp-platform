@@ -13,8 +13,11 @@ import {
 } from "firebase/firestore";
 import { useToast } from "@/components/ui/ToastProvider";
 import { getHomeRouteForRole, normalizeRole } from "@/lib/roles";
+import SegmentedTabs from "@/components/ui/SegmentedTabs";
+import CollapsiblePanel from "@/components/ui/CollapsiblePanel";
 
 type OnboardingStatus = "none" | "incomplete" | "active";
+type ProfileTab = "overview" | "details" | "health";
 
 type ProfileForm = {
   profileId: string;
@@ -33,6 +36,7 @@ type ProfileForm = {
 export default function DashboardProfilePage() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [activeTab, setActiveTab] = useState<ProfileTab>("overview");
   const [userEmail, setUserEmail] = useState("");
   const [hasProfile, setHasProfile] = useState(false);
 
@@ -294,17 +298,29 @@ export default function DashboardProfilePage() {
               </a>
             </div>
 
-            <div className="mt-8 grid gap-4 sm:grid-cols-3">
-              <StatusCard label="Profile status" value={formatProfileStatus(form.onboardingStatus)} />
-              <StatusCard label="Payment" value={formatPaymentStatus(form.paymentStatus)} />
-              <StatusCard
-                label="Completion"
-                value={`${completionState.percent}%`}
-              />
-            </div>
+              <div className="mt-8 grid gap-4 sm:grid-cols-3">
+                <StatusCard label="Profile status" value={formatProfileStatus(form.onboardingStatus)} />
+                <StatusCard label="Payment" value={formatPaymentStatus(form.paymentStatus)} />
+                <StatusCard
+                  label="Completion"
+                  value={`${completionState.percent}%`}
+                />
+              </div>
 
-            <div className="mt-6 rounded-[24px] border border-[#bfdbfe] bg-gradient-to-br from-[#eff6ff] to-white p-5 shadow-sm">
-              <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+              <div className="mt-6">
+                <SegmentedTabs<ProfileTab>
+                  items={[
+                    { id: "overview", label: "Overview" },
+                    { id: "details", label: "Personal details" },
+                    { id: "health", label: "Health and notes" },
+                  ]}
+                  value={activeTab}
+                  onChange={setActiveTab}
+                />
+              </div>
+
+              <div className="mt-6 rounded-[24px] border border-[#bfdbfe] bg-gradient-to-br from-[#eff6ff] to-white p-5 shadow-sm">
+                <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
                 <div>
                   <p className="text-sm font-semibold text-[#1d4ed8]">
                     Profile progress
@@ -329,117 +345,148 @@ export default function DashboardProfilePage() {
           </div>
         </section>
 
-        <section className="rounded-[28px] border border-white/70 bg-white/90 p-6 shadow-[0_18px_50px_rgba(15,23,42,0.07)] backdrop-blur md:p-8">
-          <SectionHeader
-            eyebrow="Basic information"
-            title="Personal Details"
-            description="These details help the team prepare your experience properly."
-          />
+        {activeTab === "overview" ? (
+          <section className="rounded-[28px] border border-white/70 bg-white/90 p-6 shadow-[0_18px_50px_rgba(15,23,42,0.07)] backdrop-blur md:p-8">
+            <SectionHeader
+              eyebrow="Overview"
+              title="What matters first"
+              description="Keep the essential profile fields complete so the team can work from accurate information."
+            />
 
-          <div className="mt-6 grid gap-4 md:grid-cols-2">
-            <FieldGroup label="Full name" required>
-              <input
-                className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 shadow-sm outline-none transition focus:border-[#93c5fd] focus:ring-4 focus:ring-[#dbeafe]"
-                placeholder="Full name"
-                value={form.fullName}
-                onChange={(e) =>
-                  setForm((prev) => ({ ...prev, fullName: e.target.value }))
-                }
-              />
-            </FieldGroup>
+            <div className="mt-6 grid gap-4 md:grid-cols-3">
+              <StatusCard label="Full name" value={form.fullName || "Missing"} />
+              <StatusCard label="Main goal" value={form.goal || "Missing"} />
+              <StatusCard label="Health notes" value={form.notes.trim() ? "Added" : "Not added"} />
+            </div>
 
-            <FieldGroup label="Age" required>
-              <input
-                className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 shadow-sm outline-none transition focus:border-[#93c5fd] focus:ring-4 focus:ring-[#dbeafe]"
-                placeholder="Age"
-                value={form.age}
-                onChange={(e) =>
-                  setForm((prev) => ({ ...prev, age: e.target.value }))
-                }
-              />
-            </FieldGroup>
+            <div className="mt-6 grid gap-4 md:grid-cols-2">
+              <StatusCard label="Allergies" value={form.allergies.trim() ? "Added" : "None added"} />
+              <StatusCard label="Injuries" value={form.injuries.trim() ? "Added" : "None added"} />
+            </div>
 
-            <FieldGroup label="Height" required>
-              <input
-                className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 shadow-sm outline-none transition focus:border-[#93c5fd] focus:ring-4 focus:ring-[#dbeafe]"
-                placeholder="Height"
-                value={form.height}
-                onChange={(e) =>
-                  setForm((prev) => ({ ...prev, height: e.target.value }))
-                }
-              />
-            </FieldGroup>
+            <div className="mt-6 rounded-[22px] border border-[#bfdbfe] bg-gradient-to-br from-[#eff6ff] to-white p-4 text-sm leading-6 text-slate-700">
+              Keeping this profile complete helps the team tailor your plan, support, and communication without asking for the same details again later.
+            </div>
+          </section>
+        ) : null}
 
-            <FieldGroup label="Weight" required>
-              <input
-                className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 shadow-sm outline-none transition focus:border-[#93c5fd] focus:ring-4 focus:ring-[#dbeafe]"
-                placeholder="Weight"
-                value={form.weight}
-                onChange={(e) =>
-                  setForm((prev) => ({ ...prev, weight: e.target.value }))
-                }
-              />
-            </FieldGroup>
+        {activeTab === "details" ? (
+          <section className="rounded-[28px] border border-white/70 bg-white/90 p-6 shadow-[0_18px_50px_rgba(15,23,42,0.07)] backdrop-blur md:p-8">
+            <SectionHeader
+              eyebrow="Basic information"
+              title="Personal Details"
+              description="These details help the team prepare your experience properly."
+            />
 
-            <FieldGroup label="Main goal" required className="md:col-span-2">
-              <input
-                className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 shadow-sm outline-none transition focus:border-[#93c5fd] focus:ring-4 focus:ring-[#dbeafe]"
-                placeholder="Main goal"
-                value={form.goal}
-                onChange={(e) =>
-                  setForm((prev) => ({ ...prev, goal: e.target.value }))
-                }
-              />
-            </FieldGroup>
-          </div>
-        </section>
+            <div className="mt-6 grid gap-4 md:grid-cols-2">
+              <FieldGroup label="Full name" required>
+                <input
+                  className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 shadow-sm outline-none transition focus:border-[#93c5fd] focus:ring-4 focus:ring-[#dbeafe]"
+                  placeholder="Full name"
+                  value={form.fullName}
+                  onChange={(e) =>
+                    setForm((prev) => ({ ...prev, fullName: e.target.value }))
+                  }
+                />
+              </FieldGroup>
 
-        <section className="rounded-[28px] border border-white/70 bg-white/90 p-6 shadow-[0_18px_50px_rgba(15,23,42,0.07)] backdrop-blur md:p-8">
-          <SectionHeader
-            eyebrow="Health & notes"
-            title="Additional Information"
-            description="Share anything relevant so your training and support can be adjusted appropriately."
-          />
+              <FieldGroup label="Age" required>
+                <input
+                  className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 shadow-sm outline-none transition focus:border-[#93c5fd] focus:ring-4 focus:ring-[#dbeafe]"
+                  placeholder="Age"
+                  value={form.age}
+                  onChange={(e) =>
+                    setForm((prev) => ({ ...prev, age: e.target.value }))
+                  }
+                />
+              </FieldGroup>
 
-          <div className="mt-6 grid gap-4 md:grid-cols-2">
-            <FieldGroup label="Allergies">
-              <textarea
-                className="min-h-[150px] w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 shadow-sm outline-none transition focus:border-[#93c5fd] focus:ring-4 focus:ring-[#dbeafe]"
-                placeholder="Allergies"
-                value={form.allergies}
-                onChange={(e) =>
-                  setForm((prev) => ({ ...prev, allergies: e.target.value }))
-                }
-              />
-            </FieldGroup>
+              <FieldGroup label="Height" required>
+                <input
+                  className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 shadow-sm outline-none transition focus:border-[#93c5fd] focus:ring-4 focus:ring-[#dbeafe]"
+                  placeholder="Height"
+                  value={form.height}
+                  onChange={(e) =>
+                    setForm((prev) => ({ ...prev, height: e.target.value }))
+                  }
+                />
+              </FieldGroup>
 
-            <FieldGroup label="Injuries">
-              <textarea
-                className="min-h-[150px] w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 shadow-sm outline-none transition focus:border-[#93c5fd] focus:ring-4 focus:ring-[#dbeafe]"
-                placeholder="Injuries"
-                value={form.injuries}
-                onChange={(e) =>
-                  setForm((prev) => ({ ...prev, injuries: e.target.value }))
-                }
-              />
-            </FieldGroup>
+              <FieldGroup label="Weight" required>
+                <input
+                  className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 shadow-sm outline-none transition focus:border-[#93c5fd] focus:ring-4 focus:ring-[#dbeafe]"
+                  placeholder="Weight"
+                  value={form.weight}
+                  onChange={(e) =>
+                    setForm((prev) => ({ ...prev, weight: e.target.value }))
+                  }
+                />
+              </FieldGroup>
 
-            <FieldGroup label="Notes" className="md:col-span-2">
-              <textarea
-                className="min-h-[170px] w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 shadow-sm outline-none transition focus:border-[#93c5fd] focus:ring-4 focus:ring-[#dbeafe]"
-                placeholder="Anything else your coach should know"
-                value={form.notes}
-                onChange={(e) =>
-                  setForm((prev) => ({ ...prev, notes: e.target.value }))
-                }
-              />
-            </FieldGroup>
-          </div>
+              <FieldGroup label="Main goal" required className="md:col-span-2">
+                <input
+                  className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 shadow-sm outline-none transition focus:border-[#93c5fd] focus:ring-4 focus:ring-[#dbeafe]"
+                  placeholder="Main goal"
+                  value={form.goal}
+                  onChange={(e) =>
+                    setForm((prev) => ({ ...prev, goal: e.target.value }))
+                  }
+                />
+              </FieldGroup>
+            </div>
+          </section>
+        ) : null}
 
-          <div className="mt-6 rounded-[22px] border border-[#bfdbfe] bg-gradient-to-br from-[#eff6ff] to-white p-4 text-sm leading-6 text-slate-700">
-            Keeping this profile complete helps the team tailor your plan, support, and communication without needing to ask for the same details again later.
-          </div>
-        </section>
+        {activeTab === "health" ? (
+          <section className="rounded-[28px] border border-white/70 bg-white/90 p-6 shadow-[0_18px_50px_rgba(15,23,42,0.07)] backdrop-blur md:p-8">
+            <SectionHeader
+              eyebrow="Health & notes"
+              title="Additional Information"
+              description="Share anything relevant so your training and support can be adjusted appropriately."
+            />
+
+            <CollapsiblePanel
+              title="Health details"
+              description="Use these fields for information the team should keep in mind."
+              defaultOpen
+            >
+              <div className="grid gap-4 md:grid-cols-2">
+                <FieldGroup label="Allergies">
+                  <textarea
+                    className="min-h-[150px] w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 shadow-sm outline-none transition focus:border-[#93c5fd] focus:ring-4 focus:ring-[#dbeafe]"
+                    placeholder="Allergies"
+                    value={form.allergies}
+                    onChange={(e) =>
+                      setForm((prev) => ({ ...prev, allergies: e.target.value }))
+                    }
+                  />
+                </FieldGroup>
+
+                <FieldGroup label="Injuries">
+                  <textarea
+                    className="min-h-[150px] w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 shadow-sm outline-none transition focus:border-[#93c5fd] focus:ring-4 focus:ring-[#dbeafe]"
+                    placeholder="Injuries"
+                    value={form.injuries}
+                    onChange={(e) =>
+                      setForm((prev) => ({ ...prev, injuries: e.target.value }))
+                    }
+                  />
+                </FieldGroup>
+
+                <FieldGroup label="Notes" className="md:col-span-2">
+                  <textarea
+                    className="min-h-[170px] w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 shadow-sm outline-none transition focus:border-[#93c5fd] focus:ring-4 focus:ring-[#dbeafe]"
+                    placeholder="Anything else your coach should know"
+                    value={form.notes}
+                    onChange={(e) =>
+                      setForm((prev) => ({ ...prev, notes: e.target.value }))
+                    }
+                  />
+                </FieldGroup>
+              </div>
+            </CollapsiblePanel>
+          </section>
+        ) : null}
       </div>
 
       <div className="fixed bottom-0 left-0 right-0 z-40 border-t border-white/70 bg-white/85 backdrop-blur">
