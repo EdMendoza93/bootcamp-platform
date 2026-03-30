@@ -704,12 +704,6 @@ function WeekCard({
               />
             </div>
           </div>
-
-          <div className="mt-5 grid gap-4 lg:grid-cols-3">
-            <DurationCard title="1 Week" available={startableOneWeek} tone="blue" />
-            <DurationCard title="2 Weeks" available={startableTwoWeeks} tone="success" />
-            <DurationCard title="3 Weeks" available={startableThreeWeeks} tone="dark" />
-          </div>
         </div>
 
         <div className="flex flex-wrap gap-3 xl:w-[240px] xl:flex-col">
@@ -738,6 +732,12 @@ function WeekCard({
           </button>
         </div>
       </div>
+
+      <div className="mt-5 grid gap-6 md:grid-cols-3">
+        <DurationCard title="1 Week" available={startableOneWeek} tone="blue" />
+        <DurationCard title="2 Weeks" available={startableTwoWeeks} tone="success" />
+        <DurationCard title="3 Weeks" available={startableThreeWeeks} tone="dark" />
+      </div>
     </div>
   );
 }
@@ -759,7 +759,7 @@ function DurationCard({
 
   return (
     <div className={`rounded-[24px] border p-4 ${toneStyles[tone]}`}>
-      <div className="flex items-center justify-between gap-2">
+      <div className="flex items-center justify-between gap-3">
         <p className="text-base font-semibold text-slate-950">{title}</p>
         {available ? (
           <span className="rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.14em] text-emerald-700">
