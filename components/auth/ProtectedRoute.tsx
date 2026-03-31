@@ -19,7 +19,11 @@ export default function ProtectedRoute({
     if (loading) return;
 
     if (!firebaseUser) {
-      router.replace("/login");
+      const nextPath =
+        typeof window !== "undefined"
+          ? `${window.location.pathname}${window.location.search}`
+          : "/dashboard";
+      router.replace(`/login?next=${encodeURIComponent(nextPath)}`);
       return;
     }
 

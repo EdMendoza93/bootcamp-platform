@@ -35,6 +35,16 @@ function isValidEmail(value: string) {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value.trim());
 }
 
+function resolveNextPath(value?: string | null) {
+  const next = String(value || "").trim();
+
+  if (!next.startsWith("/") || next.startsWith("//")) {
+    return "";
+  }
+
+  return next;
+}
+
 async function findPendingInvite(email?: string | null) {
   const normalizedEmail = String(email || "").trim().toLowerCase();
   if (!normalizedEmail) return null;
@@ -110,12 +120,12 @@ async function ensureUserDoc(
   }
 }
 
-async function routeUserByRole(uid: string) {
+async function routeUserByRole(uid: string, nextPath?: string | null) {
   const userRef = doc(db, "users", uid);
   const userSnap = await getDoc(userRef);
 
   if (!userSnap.exists()) {
-    window.location.replace("/dashboard");
+    window.location.replace(resolveNextPath(nextPath) || "/dashboard");
     return;
   }
 
@@ -125,11 +135,19 @@ async function routeUserByRole(uid: string) {
     window.location.replace("/login");
     return;
   }
+  const safeNextPath = resolveNextPath(nextPath);
+
+  if (safeNextPath && normalizeRole(data.role) === "user") {
+    window.location.replace(safeNextPath);
+    return;
+  }
+
   window.location.replace(getHomeRouteForRole(data.role));
 }
 
 export default function LoginContent() {
   const searchParams = useSearchParams();
+  const nextPath = resolveNextPath(searchParams.get("next"));
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -156,7 +174,7 @@ export default function LoginContent() {
           if (user) {
             try {
               await ensureUserDoc(user.uid, user.email, user.displayName);
-              await routeUserByRole(user.uid);
+              await routeUserByRole(user.uid, nextPath);
             } catch (err) {
               console.error("Route user error:", err);
               if (!cancelled) {
@@ -202,7 +220,7 @@ export default function LoginContent() {
       cancelled = true;
       if (unsubscribe) unsubscribe();
     };
-  }, [searchParams]);
+  }, [nextPath, searchParams]);
 
   const handleEmailLogin = async () => {
     setError("");
@@ -230,7 +248,7 @@ export default function LoginContent() {
       );
 
       await ensureUserDoc(cred.user.uid, cred.user.email, cred.user.displayName);
-      await routeUserByRole(cred.user.uid);
+      await routeUserByRole(cred.user.uid, nextPath);
     } catch (err) {
       console.error("Email login error:", err);
       setError("Incorrect email or password.");
@@ -265,7 +283,7 @@ export default function LoginContent() {
       );
 
       await ensureUserDoc(cred.user.uid, cred.user.email, cred.user.displayName);
-      await routeUserByRole(cred.user.uid);
+      await routeUserByRole(cred.user.uid, nextPath);
     } catch (err: unknown) {
       console.error("Create account error:", err);
 
@@ -304,7 +322,7 @@ export default function LoginContent() {
       const cred = await signInWithPopup(auth, provider);
 
       await ensureUserDoc(cred.user.uid, cred.user.email, cred.user.displayName);
-      await routeUserByRole(cred.user.uid);
+      await routeUserByRole(cred.user.uid, nextPath);
     } catch (err) {
       console.error("Google login error:", err);
       setError("Google sign-in failed. Please try again.");

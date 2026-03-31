@@ -49,6 +49,29 @@ type ProfileRow = {
   clientStatus?: "active" | "inactive";
 };
 
+type BookingEntitlementRow = {
+  id: string;
+  code?: string;
+  customerEmail?: string;
+  customerName?: string;
+  durationWeeks: BookingDurationWeeks;
+  amount?: number | null;
+  currency?: string;
+  status?: "issued" | "claimed" | "redeemed" | "cancelled" | "expired";
+  notes?: string;
+  claimedByUid?: string;
+  claimedByEmail?: string;
+  bookingId?: string;
+  createdAt?: {
+    seconds?: number;
+    nanoseconds?: number;
+  };
+  redeemedAt?: {
+    seconds?: number;
+    nanoseconds?: number;
+  };
+};
+
 type BookingFormState = {
   userId: string;
   customerName: string;
@@ -67,10 +90,19 @@ type BookingFormState = {
   notes: string;
 };
 
+type EntitlementFormState = {
+  customerEmail: string;
+  customerName: string;
+  durationWeeks: BookingDurationWeeks;
+  amount: string;
+  currency: string;
+  notes: string;
+};
+
 type BookingViewFilter = "recent" | "confirmed" | "cancelled" | "all";
 type BookingPaymentFilter = "all" | "manual" | "paid" | "pending";
 type BookingCapacityFilter = "all" | "consumes" | "no_capacity";
-type BookingTab = "overview" | "create" | "list";
+type BookingTab = "overview" | "create" | "codes" | "list";
 
 function getEmptyBookingForm(): BookingFormState {
   return {
@@ -90,6 +122,21 @@ function getEmptyBookingForm(): BookingFormState {
     currency: "EUR",
     notes: "",
   };
+}
+
+function getEmptyEntitlementForm(): EntitlementFormState {
+  return {
+    customerEmail: "",
+    customerName: "",
+    durationWeeks: 1,
+    amount: "",
+    currency: "EUR",
+    notes: "",
+  };
+}
+
+function isValidEmail(value: string) {
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value.trim());
 }
 
 function formatDateLabel(date: string) {
@@ -150,8 +197,20 @@ export default function AdminBookingsPage() {
   const [bookings, setBookings] = useState<BookingRow[]>([]);
   const [users, setUsers] = useState<UserRow[]>([]);
   const [profiles, setProfiles] = useState<ProfileRow[]>([]);
+  const [entitlements, setEntitlements] = useState<BookingEntitlementRow[]>([]);
   const [form, setForm] = useState<BookingFormState>(getEmptyBookingForm());
+  const [entitlementForm, setEntitlementForm] = useState<EntitlementFormState>(
+    getEmptyEntitlementForm()
+  );
   const [editingBookingId, setEditingBookingId] = useState<string | null>(null);
+  const [entitlementSaving, setEntitlementSaving] = useState(false);
+  const [lastIssuedCode, setLastIssuedCode] = useState<{
+    code: string;
+    customerEmail: string;
+    durationWeeks: BookingDurationWeeks;
+    amount?: number | null;
+    currency?: string;
+  } | null>(null);
   const [bookingViewFilter, setBookingViewFilter] =
     useState<BookingViewFilter>("recent");
   const [recipientSearch, setRecipientSearch] = useState("");
@@ -173,12 +232,15 @@ export default function AdminBookingsPage() {
       const bookingsQuery = query(collection(db, "bookings"));
       const usersQuery = query(collection(db, "users"));
       const profilesQuery = query(collection(db, "profiles"));
+      const entitlementsQuery = query(collection(db, "bookingEntitlements"));
 
-      const [weeksSnap, bookingsSnap, usersSnap, profilesSnap] = await Promise.all([
+      const [weeksSnap, bookingsSnap, usersSnap, profilesSnap, entitlementsSnap] =
+        await Promise.all([
         getDocs(weeksQuery),
         getDocs(bookingsQuery),
         getDocs(usersQuery),
         getDocs(profilesQuery),
+        getDocs(entitlementsQuery),
       ]);
 
       const weekData = weeksSnap.docs.map((docItem) => ({
@@ -203,10 +265,22 @@ export default function AdminBookingsPage() {
         ...(docItem.data() as Omit<ProfileRow, "id">),
       })) as ProfileRow[];
 
+      const entitlementData = entitlementsSnap.docs
+        .map((docItem) => ({
+          id: docItem.id,
+          ...(docItem.data() as Omit<BookingEntitlementRow, "id">),
+        }))
+        .sort((a, b) => {
+          const aValue = a.createdAt?.seconds || 0;
+          const bValue = b.createdAt?.seconds || 0;
+          return bValue - aValue;
+        }) as BookingEntitlementRow[];
+
       setWeeks(weekData);
       setBookings(bookingData);
       setUsers(userData);
       setProfiles(profileData);
+      setEntitlements(entitlementData);
     } catch (error) {
       console.error("Load bookings error:", error);
       showToast({
@@ -369,6 +443,19 @@ export default function AdminBookingsPage() {
     );
   }, [editableHydratedWeeks]);
 
+  const activeEntitlements = useMemo(
+    () =>
+      entitlements.filter(
+        (item) => item.status === "issued" || item.status === "claimed"
+      ),
+    [entitlements]
+  );
+
+  const recentEntitlements = useMemo(
+    () => entitlements.slice(0, 8),
+    [entitlements]
+  );
+
   const selectedWeeks = useMemo(() => {
     if (!form.startWeekId) return [];
     return getConsecutiveBookingWeeks(
@@ -382,6 +469,8 @@ export default function AdminBookingsPage() {
     form.userId.trim().length > 0 &&
     (!form.shortStay || Number(form.shortStayNights || 0) > 0) &&
     selectedWeeks.length === form.durationWeeks;
+
+  const canSaveEntitlement = isValidEmail(entitlementForm.customerEmail);
 
   const resetForm = () => {
     setForm(getEmptyBookingForm());
@@ -542,6 +631,65 @@ export default function AdminBookingsPage() {
     }
   };
 
+  const saveEntitlement = async () => {
+    if (!canSaveEntitlement || entitlementSaving) return;
+
+    setEntitlementSaving(true);
+
+    try {
+      const createEntitlementCall = httpsCallable(
+        functions,
+        "createBookingEntitlement"
+      );
+      const result = await createEntitlementCall({
+        customerEmail: entitlementForm.customerEmail.trim().toLowerCase(),
+        customerName: entitlementForm.customerName.trim(),
+        durationWeeks: entitlementForm.durationWeeks,
+        amount: Number(entitlementForm.amount || 0) > 0
+          ? Number(entitlementForm.amount)
+          : null,
+        currency: entitlementForm.currency.trim().toUpperCase() || "EUR",
+        notes: entitlementForm.notes.trim(),
+      });
+      const data = (result.data || {}) as {
+        code?: string;
+        customerEmail?: string;
+        durationWeeks?: BookingDurationWeeks;
+        amount?: number;
+        currency?: string;
+      };
+
+      setLastIssuedCode({
+        code: String(data.code || ""),
+        customerEmail: String(data.customerEmail || entitlementForm.customerEmail),
+        durationWeeks:
+          data.durationWeeks === 2 || data.durationWeeks === 3 ? data.durationWeeks : 1,
+        amount: typeof data.amount === "number" ? data.amount : null,
+        currency: String(data.currency || entitlementForm.currency || "EUR"),
+      });
+      setEntitlementForm(getEmptyEntitlementForm());
+
+      showToast({
+        title: "Redemption code created",
+        description: `${String(data.code || "").trim()} is ready for ${String(
+          data.customerEmail || entitlementForm.customerEmail
+        ).trim()}.`,
+        type: "success",
+      });
+
+      await loadData();
+    } catch (error) {
+      console.error("Create entitlement error:", error);
+      showToast({
+        title: "Could not create redemption code",
+        description: "Please check the email and pricing details, then try again.",
+        type: "error",
+      });
+    } finally {
+      setEntitlementSaving(false);
+    }
+  };
+
   if (loading) {
     return (
       <div className="rounded-[28px] border border-white/70 bg-white/90 p-8 shadow-[0_20px_60px_rgba(15,23,42,0.08)] backdrop-blur">
@@ -579,6 +727,7 @@ export default function AdminBookingsPage() {
                 items={[
                   { id: "overview", label: "Overview" },
                   { id: "create", label: editingBookingId ? "Edit booking" : "Create booking" },
+                  { id: "codes", label: "Redeem codes" },
                   { id: "list", label: "Bookings" },
                 ]}
                 value={activeTab}
@@ -1276,6 +1425,251 @@ export default function AdminBookingsPage() {
         </section>
       ) : null}
 
+      {activeTab === "codes" ? (
+        <section className="grid gap-6 xl:grid-cols-[0.92fr_1.08fr]">
+          <div className="rounded-[28px] border border-white/70 bg-white/95 p-6 shadow-[0_18px_50px_rgba(15,23,42,0.07)] backdrop-blur">
+            <div>
+              <h2 className="text-xl font-semibold text-slate-950">
+                External sale redemption code
+              </h2>
+              <p className="mt-1 text-sm text-slate-500">
+                Create a redeemable credit for someone who paid outside the platform.
+              </p>
+            </div>
+
+            <div className="mt-6 space-y-4">
+              <div>
+                <label className="mb-2 block text-sm font-medium text-slate-700">
+                  Customer email
+                </label>
+                <input
+                  type="email"
+                  value={entitlementForm.customerEmail}
+                  onChange={(e) =>
+                    setEntitlementForm((prev) => ({
+                      ...prev,
+                      customerEmail: e.target.value,
+                    }))
+                  }
+                  placeholder="name@example.com"
+                  className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-[#93c5fd] focus:ring-4 focus:ring-[#dbeafe]"
+                />
+              </div>
+
+              <div>
+                <label className="mb-2 block text-sm font-medium text-slate-700">
+                  Customer name
+                </label>
+                <input
+                  value={entitlementForm.customerName}
+                  onChange={(e) =>
+                    setEntitlementForm((prev) => ({
+                      ...prev,
+                      customerName: e.target.value,
+                    }))
+                  }
+                  placeholder="Optional"
+                  className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-[#93c5fd] focus:ring-4 focus:ring-[#dbeafe]"
+                />
+              </div>
+
+              <div className="grid gap-4 md:grid-cols-3">
+                <div>
+                  <label className="mb-2 block text-sm font-medium text-slate-700">
+                    Duration
+                  </label>
+                  <select
+                    value={String(entitlementForm.durationWeeks)}
+                    onChange={(e) =>
+                      setEntitlementForm((prev) => ({
+                        ...prev,
+                        durationWeeks: Number(e.target.value) as BookingDurationWeeks,
+                      }))
+                    }
+                    className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-[#93c5fd] focus:ring-4 focus:ring-[#dbeafe]"
+                  >
+                    <option value="1">1 week</option>
+                    <option value="2">2 weeks</option>
+                    <option value="3">3 weeks</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="mb-2 block text-sm font-medium text-slate-700">
+                    Amount
+                  </label>
+                  <input
+                    type="number"
+                    min="0"
+                    step="0.01"
+                    value={entitlementForm.amount}
+                    onChange={(e) =>
+                      setEntitlementForm((prev) => ({
+                        ...prev,
+                        amount: e.target.value,
+                      }))
+                    }
+                    placeholder="Defaults to pricing matrix"
+                    className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-[#93c5fd] focus:ring-4 focus:ring-[#dbeafe]"
+                  />
+                </div>
+
+                <div>
+                  <label className="mb-2 block text-sm font-medium text-slate-700">
+                    Currency
+                  </label>
+                  <input
+                    value={entitlementForm.currency}
+                    onChange={(e) =>
+                      setEntitlementForm((prev) => ({
+                        ...prev,
+                        currency: e.target.value,
+                      }))
+                    }
+                    maxLength={3}
+                    placeholder="EUR"
+                    className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm uppercase text-slate-900 outline-none transition focus:border-[#93c5fd] focus:ring-4 focus:ring-[#dbeafe]"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="mb-2 block text-sm font-medium text-slate-700">
+                  Notes
+                </label>
+                <textarea
+                  value={entitlementForm.notes}
+                  onChange={(e) =>
+                    setEntitlementForm((prev) => ({
+                      ...prev,
+                      notes: e.target.value,
+                    }))
+                  }
+                  placeholder="Optional internal note about the external sale"
+                  className="min-h-[120px] w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-[#93c5fd] focus:ring-4 focus:ring-[#dbeafe]"
+                />
+              </div>
+
+              <div className="rounded-[22px] border border-[#bfdbfe] bg-[#eff6ff] px-4 py-3 text-sm text-slate-700">
+                This creates a credit only. Capacity is not reserved until the client redeems the code on a specific start week.
+              </div>
+
+              <button
+                type="button"
+                onClick={saveEntitlement}
+                disabled={!canSaveEntitlement || entitlementSaving}
+                className="w-full rounded-2xl bg-slate-950 px-4 py-3 text-sm font-medium text-white transition hover:bg-slate-800 disabled:opacity-50"
+              >
+                {entitlementSaving ? "Creating code..." : "Create redemption code"}
+              </button>
+            </div>
+          </div>
+
+          <div className="space-y-6">
+            {lastIssuedCode ? (
+              <div className="rounded-[28px] border border-[#bfdbfe] bg-gradient-to-br from-[#eff6ff] to-white p-6 shadow-[0_18px_50px_rgba(15,23,42,0.07)]">
+                <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[#1d4ed8]">
+                  Latest code
+                </p>
+                <p className="mt-3 text-2xl font-semibold tracking-[0.08em] text-slate-950">
+                  {lastIssuedCode.code}
+                </p>
+                <p className="mt-2 text-sm text-slate-700">
+                  {lastIssuedCode.durationWeeks} week
+                  {lastIssuedCode.durationWeeks === 1 ? "" : "s"} ·{" "}
+                  {formatMoney(
+                    lastIssuedCode.amount,
+                    lastIssuedCode.currency || "EUR"
+                  )}{" "}
+                  · {lastIssuedCode.customerEmail}
+                </p>
+              </div>
+            ) : null}
+
+            <div className="rounded-[28px] border border-white/70 bg-white/95 p-6 shadow-[0_18px_50px_rgba(15,23,42,0.07)] backdrop-blur">
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <div>
+                  <h2 className="text-xl font-semibold text-slate-950">
+                    Recent codes
+                  </h2>
+                  <p className="mt-1 text-sm text-slate-500">
+                    Active credits: {activeEntitlements.length}
+                  </p>
+                </div>
+              </div>
+
+              {recentEntitlements.length === 0 ? (
+                <div className="mt-6 rounded-[22px] border border-dashed border-slate-200 p-8 text-center text-sm text-slate-500">
+                  No redemption codes created yet.
+                </div>
+              ) : (
+                <div className="mt-6 space-y-3">
+                  {recentEntitlements.map((item) => (
+                    <div
+                      key={item.id}
+                      className="rounded-[22px] border border-slate-100 bg-gradient-to-br from-slate-50 to-white p-4"
+                    >
+                      <div className="flex flex-wrap items-center gap-2">
+                        <StatusBadge
+                          tone={
+                            item.status === "redeemed"
+                              ? "success"
+                              : item.status === "claimed"
+                              ? "blue"
+                              : item.status === "expired" || item.status === "cancelled"
+                              ? "danger"
+                              : "warning"
+                          }
+                        >
+                          {item.status || "issued"}
+                        </StatusBadge>
+                        <StatusBadge tone="neutral">
+                          {item.durationWeeks} week{item.durationWeeks === 1 ? "" : "s"}
+                        </StatusBadge>
+                      </div>
+
+                      <p className="mt-3 text-sm font-semibold tracking-[0.08em] text-slate-950">
+                        {item.code || item.id}
+                      </p>
+                      <p className="mt-1 text-sm text-slate-600">
+                        {item.customerName || item.customerEmail || "No recipient"}
+                      </p>
+                      <p className="mt-1 text-sm text-slate-500">
+                        {item.customerEmail || "No email"} ·{" "}
+                        {formatMoney(item.amount, item.currency || "EUR")}
+                      </p>
+
+                      <div className="mt-3 grid gap-3 sm:grid-cols-3">
+                        <MetaItem label="Created" value={formatCreatedAt(item.createdAt)} />
+                        <MetaItem
+                          label="Claimed by"
+                          value={item.claimedByEmail || "Not claimed"}
+                        />
+                        <MetaItem
+                          label="Booking"
+                          value={item.bookingId || "Not redeemed"}
+                        />
+                      </div>
+
+                      {item.notes ? (
+                        <div className="mt-3 rounded-[18px] border border-amber-200 bg-amber-50 px-4 py-3">
+                          <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-amber-800">
+                            Internal note
+                          </p>
+                          <p className="mt-2 text-sm leading-6 text-amber-900">
+                            {item.notes}
+                          </p>
+                        </div>
+                      ) : null}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+        </section>
+      ) : null}
+
       {activeTab === "overview" ? (
         <section className="grid gap-6 xl:grid-cols-[1.1fr_0.9fr]">
         <div className="space-y-6">
@@ -1333,31 +1727,11 @@ export default function AdminBookingsPage() {
           <div className="rounded-[28px] border border-[#bfdbfe] bg-gradient-to-br from-[#eff6ff] to-white p-6 shadow-[0_18px_50px_rgba(15,23,42,0.07)]">
             <h2 className="text-lg font-semibold text-slate-950">Admin flexibility</h2>
             <p className="mt-2 text-sm leading-6 text-slate-700">
-              This first version already lets admin create capacity-consuming bookings manually. Next we can add edit, cancel, short-stay flags, custom pricing, and public-site linkage.
+              Admin can now handle both sides of the stay flow: direct manual bookings and external-sale redemption codes that the client can use later inside their own Book page.
             </p>
           </div>
         </div>
 
-        <div className="rounded-[28px] border border-white/70 bg-white/95 p-6 shadow-[0_18px_50px_rgba(15,23,42,0.07)] backdrop-blur">
-          <h2 className="text-xl font-semibold text-slate-950">Booking rules now enforced</h2>
-          <div className="mt-5 space-y-3">
-            <RuleCard title="Consecutive weeks only">
-              2 or 3 week stays only work when every required week starts exactly 7 days after the previous one.
-            </RuleCard>
-            <RuleCard title="No inactive starts">
-              A stay cannot begin if any required week is inactive.
-            </RuleCard>
-            <RuleCard title="No sold-out weeks">
-              A stay cannot be created if any required week has no remaining room capacity.
-            </RuleCard>
-            <RuleCard title="Capacity derived from bookings">
-              Weekly occupancy shown here comes from bookings that consume capacity, not from manual typing.
-            </RuleCard>
-            <RuleCard title="Short stays still block the week">
-              Short stays are tracked as metadata for admin and pricing, but they still reserve the full weekly room block in this version.
-            </RuleCard>
-          </div>
-        </div>
         </section>
       ) : null}
     </div>
@@ -1430,21 +1804,6 @@ function MetaItem({
         {label}
       </p>
       <p className="mt-2 text-sm font-medium text-slate-900">{value}</p>
-    </div>
-  );
-}
-
-function RuleCard({
-  title,
-  children,
-}: {
-  title: string;
-  children: React.ReactNode;
-}) {
-  return (
-    <div className="rounded-[22px] border border-slate-100 bg-gradient-to-br from-slate-50 to-white p-4">
-      <p className="text-sm font-semibold text-slate-950">{title}</p>
-      <p className="mt-2 text-sm leading-6 text-slate-600">{children}</p>
     </div>
   );
 }

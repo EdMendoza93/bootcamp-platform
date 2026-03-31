@@ -56,6 +56,66 @@ cd ..
 firebase deploy --only functions
 ```
 
+## Stripe Connect setup
+
+This project now uses Stripe Connect onboarding for `standard` connected accounts from `/admin/payments`.
+
+### Required functions environment
+
+Set these in your functions environment before deploying:
+
+```bash
+STRIPE_SECRET_KEY=sk_test_...
+APP_BASE_URL=https://app.bootcamp.rivcor.com
+STRIPE_WEBHOOK_SECRET=whsec_...
+RESEND_API_KEY=re_...
+RESEND_FROM_EMAIL=bookings@your-domain.com
+```
+
+Optional, only if you still need the legacy OAuth fallback for an already-connected account:
+
+```bash
+STRIPE_CONNECT_CLIENT_ID=ca_...
+```
+
+### What the admin flow does
+
+- Creates or reuses a Stripe `standard` connected account
+- Generates a hosted onboarding link with `return_url` and `refresh_url`
+- Syncs `charges_enabled`, `payouts_enabled`, `details_submitted`, and pending requirements back into `settings/payments`
+
+## Stripe checkout and entitlement emails
+
+This project now includes:
+
+- `createUserBookingCheckoutSession` for logged-in client purchases
+- `createExternalBookingCheckoutSession` for purchases made outside the client account flow
+- `stripeWebhook` to confirm paid bookings and to generate redemption codes after external Stripe payments
+- automatic entitlement email delivery through Resend
+
+### Webhook behavior
+
+- Internal checkout:
+  - creates a pending booking first
+  - Stripe webhook marks it `paid` and `confirmed`
+- External checkout:
+  - Stripe webhook creates a `bookingEntitlements` document
+  - generates a redemption code
+  - emails the code to the buyer
+
+### Webhook endpoint
+
+After deploying functions, configure this endpoint in Stripe:
+
+```bash
+https://us-central1-YOUR_FIREBASE_PROJECT.cloudfunctions.net/stripeWebhook
+```
+
+Listen at minimum for:
+
+- `checkout.session.completed`
+- `checkout.session.async_payment_succeeded`
+
 ### Notes
 
 - Admin send UI is available at `/admin/notifications`.

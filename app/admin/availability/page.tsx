@@ -18,10 +18,12 @@ import {
   collection,
   deleteDoc,
   doc,
+  getDoc,
   getDocs,
   orderBy,
   query,
   serverTimestamp,
+  setDoc,
   updateDoc,
 } from "firebase/firestore";
 import { useToast } from "@/components/ui/ToastProvider";
@@ -36,6 +38,13 @@ type WeekForm = {
   notes: string;
 };
 
+type PricingForm = {
+  oneWeekPrice: string;
+  twoWeekPrice: string;
+  threeWeekPrice: string;
+  currency: string;
+};
+
 function getEmptyForm(): WeekForm {
   return {
     startDate: "",
@@ -43,6 +52,15 @@ function getEmptyForm(): WeekForm {
     active: true,
     capacity: "6",
     notes: "",
+  };
+}
+
+function getEmptyPricingForm(): PricingForm {
+  return {
+    oneWeekPrice: "",
+    twoWeekPrice: "",
+    threeWeekPrice: "",
+    currency: "EUR",
   };
 }
 
@@ -85,10 +103,15 @@ function getUsagePercent(booked: number, capacity: number) {
 export default function AdminAvailabilityPage() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [pricingSaving, setPricingSaving] = useState(false);
+  const [pricingExpanded, setPricingExpanded] = useState(false);
   const [weeks, setWeeks] = useState<BootcampWeek[]>([]);
   const [bookings, setBookings] = useState<BookingRecord[]>([]);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [form, setForm] = useState<WeekForm>(getEmptyForm());
+  const [pricingForm, setPricingForm] = useState<PricingForm>(
+    getEmptyPricingForm()
+  );
   const [activeMonth, setActiveMonth] = useState<string>("");
 
   const { showToast } = useToast();
@@ -105,10 +128,12 @@ export default function AdminAvailabilityPage() {
         orderBy("startDate", "asc")
       );
       const bookingsQuery = query(collection(db, "bookings"));
+      const pricingRef = doc(db, "settings", "bookingPricing");
 
-      const [weeksSnapshot, bookingsSnapshot] = await Promise.all([
+      const [weeksSnapshot, bookingsSnapshot, pricingSnapshot] = await Promise.all([
         getDocs(weeksQuery),
         getDocs(bookingsQuery),
+        getDoc(pricingRef),
       ]);
 
       const data = weeksSnapshot.docs.map((docItem) => ({
@@ -121,8 +146,26 @@ export default function AdminAvailabilityPage() {
         ...(docItem.data() as Omit<BookingRecord, "id">),
       })) as BookingRecord[];
 
+      const pricingData = pricingSnapshot.exists() ? pricingSnapshot.data() : null;
+
       setBookings(bookingData);
       setWeeks(hydrateWeeksWithBookings(data, bookingData));
+      setPricingForm({
+        oneWeekPrice:
+          typeof pricingData?.oneWeekPrice === "number"
+            ? String(pricingData.oneWeekPrice)
+            : "",
+        twoWeekPrice:
+          typeof pricingData?.twoWeekPrice === "number"
+            ? String(pricingData.twoWeekPrice)
+            : "",
+        threeWeekPrice:
+          typeof pricingData?.threeWeekPrice === "number"
+            ? String(pricingData.threeWeekPrice)
+            : "",
+        currency:
+          String(pricingData?.currency || "EUR").trim().toUpperCase() || "EUR",
+      });
     } catch (error) {
       console.error("Load weeks error:", error);
       showToast({
@@ -236,6 +279,93 @@ export default function AdminAvailabilityPage() {
   const resetForm = () => {
     setForm(getEmptyForm());
     setEditingId(null);
+  };
+
+  const savePricing = async () => {
+    const oneWeekPrice = Number(pricingForm.oneWeekPrice || 0);
+    const twoWeekPrice = Number(pricingForm.twoWeekPrice || 0);
+    const threeWeekPrice = Number(pricingForm.threeWeekPrice || 0);
+    const currency = pricingForm.currency.trim().toUpperCase() || "EUR";
+
+    if (
+      !Number.isFinite(oneWeekPrice) ||
+      !Number.isFinite(twoWeekPrice) ||
+      !Number.isFinite(threeWeekPrice) ||
+      oneWeekPrice <= 0 ||
+      twoWeekPrice <= 0 ||
+      threeWeekPrice <= 0
+    ) {
+      showToast({
+        title: "Valid prices required",
+        description:
+          "Please enter a price greater than zero for 1, 2, and 3 weeks.",
+        type: "error",
+      });
+      return;
+    }
+
+    if (!/^[A-Z]{3}$/.test(currency)) {
+      showToast({
+        title: "Currency code required",
+        description: "Use a 3-letter ISO currency code such as EUR or USD.",
+        type: "error",
+      });
+      return;
+    }
+
+    setPricingSaving(true);
+
+    try {
+      await setDoc(
+        doc(db, "settings", "bookingPricing"),
+        {
+          oneWeekPrice,
+          twoWeekPrice,
+          threeWeekPrice,
+          currency,
+          updatedAt: serverTimestamp(),
+        },
+        { merge: true }
+      );
+
+      const pricingSnapshot = await getDoc(doc(db, "settings", "bookingPricing"));
+      const pricingData = pricingSnapshot.exists() ? pricingSnapshot.data() : null;
+
+      setPricingForm({
+        oneWeekPrice:
+          typeof pricingData?.oneWeekPrice === "number"
+            ? String(pricingData.oneWeekPrice)
+            : "",
+        twoWeekPrice:
+          typeof pricingData?.twoWeekPrice === "number"
+            ? String(pricingData.twoWeekPrice)
+            : "",
+        threeWeekPrice:
+          typeof pricingData?.threeWeekPrice === "number"
+            ? String(pricingData.threeWeekPrice)
+            : "",
+        currency:
+          String(pricingData?.currency || currency).trim().toUpperCase() ||
+          currency,
+      });
+
+      showToast({
+        title: "Pricing saved",
+        description:
+          "Default 1, 2, and 3 week prices are now stored for future payment flows.",
+        type: "success",
+      });
+      setPricingExpanded(false);
+    } catch (error) {
+      console.error("Save pricing error:", error);
+      showToast({
+        title: "Could not save pricing",
+        description: "Please try again.",
+        type: "error",
+      });
+    } finally {
+      setPricingSaving(false);
+    }
   };
 
   const saveWeek = async () => {
@@ -483,116 +613,207 @@ export default function AdminAvailabilityPage() {
         </div>
       </section>
 
-      <section className="grid gap-6 xl:grid-cols-[420px_minmax(0,1fr)]">
-        <div className="rounded-[28px] border border-white/70 bg-white/95 p-6 shadow-[0_18px_50px_rgba(15,23,42,0.07)] backdrop-blur">
-          <div className="flex items-center justify-between gap-3">
-            <div>
-              <h2 className="text-xl font-semibold text-slate-950">
-                {editingId ? "Edit week" : "Create week"}
-              </h2>
-              <p className="mt-1 text-sm text-slate-500">
-                Set the week start date and total room capacity.
-              </p>
-            </div>
-
-            {editingId && (
-              <button
-                type="button"
-                onClick={resetForm}
-                className="rounded-2xl border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-50"
-              >
-                Cancel
-              </button>
-            )}
-          </div>
-
-          <div className="mt-6 space-y-4">
-            <div>
-              <label className="mb-2 block text-sm font-medium text-slate-700">
-                Start date
-              </label>
-              <input
-                type="date"
-                value={form.startDate}
-                onChange={(e) => setForm({ ...form, startDate: e.target.value })}
-                className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-[#93c5fd] focus:ring-4 focus:ring-[#dbeafe]"
-              />
-            </div>
-
-            <div className="rounded-[22px] border border-slate-200 bg-slate-50 p-4">
-              <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">
-                Auto End Date
-              </p>
-              <p className="mt-2 text-sm font-medium text-slate-900">
-                {autoEndDate ? formatDateLabel(autoEndDate) : "Select a start date first"}
-              </p>
-              <p className="mt-1 text-xs text-slate-500">
-                Weekly blocks always end 7 days after the start date.
-              </p>
-            </div>
-
-            <div>
-              <label className="mb-2 block text-sm font-medium text-slate-700">
-                Display label
-              </label>
-              <input
-                type="text"
-                value={form.label}
-                onChange={(e) => setForm({ ...form, label: e.target.value })}
-                placeholder="e.g. May 3rd - May 10th"
-                className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-[#93c5fd] focus:ring-4 focus:ring-[#dbeafe]"
-              />
-            </div>
-
-            <div>
-              <label className="mb-2 block text-sm font-medium text-slate-700">
-                Total room capacity
-              </label>
-              <input
-                type="number"
-                value={form.capacity}
-                onChange={(e) => setForm({ ...form, capacity: e.target.value })}
-                className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-[#93c5fd] focus:ring-4 focus:ring-[#dbeafe]"
-              />
-            </div>
-
-            <label className="flex items-center gap-3 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3">
-              <input
-                type="checkbox"
-                checked={form.active}
-                onChange={(e) => setForm({ ...form, active: e.target.checked })}
-              />
-              <span className="text-sm font-medium text-slate-800">
-                Week active and available for new bookings
-              </span>
-            </label>
-
-            <div>
-              <label className="mb-2 block text-sm font-medium text-slate-700">
-                Notes
-              </label>
-              <textarea
-                value={form.notes}
-                onChange={(e) => setForm({ ...form, notes: e.target.value })}
-                placeholder="Optional internal note"
-                className="min-h-[120px] w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-[#93c5fd] focus:ring-4 focus:ring-[#dbeafe]"
-              />
-            </div>
+      <section className="overflow-hidden rounded-[24px] border border-white/80 bg-[linear-gradient(135deg,#0f172a_0%,#123b76_52%,#2EA0FF_100%)] p-[1px] shadow-[0_22px_50px_rgba(15,23,42,0.14)]">
+        <div className="rounded-[23px] bg-[radial-gradient(circle_at_top_right,rgba(255,255,255,0.18),transparent_28%),linear-gradient(180deg,rgba(15,23,42,0.96),rgba(18,59,118,0.94))] p-4 md:p-5">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <h3 className="text-base font-semibold text-white">
+              Pricing matrix
+            </h3>
 
             <button
               type="button"
-              onClick={saveWeek}
-              disabled={saving}
-              className="w-full rounded-2xl bg-slate-950 px-4 py-3 text-sm font-medium text-white transition hover:bg-slate-800 disabled:opacity-50"
+              onClick={() => setPricingExpanded((prev) => !prev)}
+              className="rounded-xl border border-white/20 bg-white/10 px-4 py-2 text-xs font-semibold uppercase tracking-[0.12em] text-white transition hover:bg-white/16"
             >
-              {saving
-                ? editingId
-                  ? "Saving..."
-                  : "Creating..."
-                : editingId
+              {pricingExpanded ? "Close" : "Modify pricing"}
+            </button>
+          </div>
+
+          {pricingExpanded && (
+            <div className="mt-4 space-y-3 border-t border-white/10 pt-4">
+              <div className="grid gap-3 md:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_minmax(0,1fr)_96px]">
+                <PricingFieldCard
+                  label="1 Week"
+                  value={pricingForm.oneWeekPrice}
+                  placeholder="750"
+                  onChange={(value) =>
+                    setPricingForm((prev) => ({
+                      ...prev,
+                      oneWeekPrice: value,
+                    }))
+                  }
+                />
+                <PricingFieldCard
+                  label="2 Weeks"
+                  value={pricingForm.twoWeekPrice}
+                  placeholder="1400"
+                  onChange={(value) =>
+                    setPricingForm((prev) => ({
+                      ...prev,
+                      twoWeekPrice: value,
+                    }))
+                  }
+                />
+                <PricingFieldCard
+                  label="3 Weeks"
+                  value={pricingForm.threeWeekPrice}
+                  placeholder="1950"
+                  onChange={(value) =>
+                    setPricingForm((prev) => ({
+                      ...prev,
+                      threeWeekPrice: value,
+                    }))
+                  }
+                />
+
+                <div className="rounded-[18px] border border-white/12 bg-white/10 p-3">
+                  <label className="block text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-200">
+                    Currency
+                  </label>
+                  <input
+                    type="text"
+                    maxLength={3}
+                    value={pricingForm.currency}
+                    onChange={(e) =>
+                      setPricingForm((prev) => ({
+                        ...prev,
+                        currency: e.target.value.toUpperCase(),
+                      }))
+                    }
+                    className="mt-2 w-full rounded-xl border border-white/10 bg-white px-3 py-2 text-sm uppercase text-slate-900 outline-none transition focus:border-[#93c5fd] focus:ring-4 focus:ring-[#dbeafe]"
+                  />
+                </div>
+              </div>
+
+              <div className="flex justify-end">
+                <button
+                  type="button"
+                  onClick={savePricing}
+                  disabled={pricingSaving}
+                  className="rounded-xl bg-white px-4 py-2 text-xs font-semibold uppercase tracking-[0.12em] text-[#123b76] transition hover:bg-slate-100 disabled:opacity-50"
+                >
+                  {pricingSaving ? "Saving..." : "Save pricing"}
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
+      </section>
+
+      <section className="grid gap-6 xl:grid-cols-[420px_minmax(0,1fr)]">
+        <div>
+          <div className="rounded-[28px] border border-white/70 bg-white/95 p-6 shadow-[0_18px_50px_rgba(15,23,42,0.07)] backdrop-blur">
+            <div className="flex items-center justify-between gap-3">
+              <div>
+                <h2 className="text-xl font-semibold text-slate-950">
+                  {editingId ? "Edit week" : "Create week"}
+                </h2>
+                <p className="mt-1 text-sm text-slate-500">
+                  Set the week start date and total room capacity.
+                </p>
+              </div>
+
+              {editingId && (
+                <button
+                  type="button"
+                  onClick={resetForm}
+                  className="rounded-2xl border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-50"
+                >
+                  Cancel
+                </button>
+              )}
+            </div>
+
+            <div className="mt-6 space-y-4">
+              <div>
+                <label className="mb-2 block text-sm font-medium text-slate-700">
+                  Start date
+                </label>
+                <input
+                  type="date"
+                  value={form.startDate}
+                  onChange={(e) => setForm({ ...form, startDate: e.target.value })}
+                  className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-[#93c5fd] focus:ring-4 focus:ring-[#dbeafe]"
+                />
+              </div>
+
+              <div className="rounded-[22px] border border-slate-200 bg-slate-50 p-4">
+                <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">
+                  Auto End Date
+                </p>
+                <p className="mt-2 text-sm font-medium text-slate-900">
+                  {autoEndDate
+                    ? formatDateLabel(autoEndDate)
+                    : "Select a start date first"}
+                </p>
+                <p className="mt-1 text-xs text-slate-500">
+                  Weekly blocks always end 7 days after the start date.
+                </p>
+              </div>
+
+              <div>
+                <label className="mb-2 block text-sm font-medium text-slate-700">
+                  Display label
+                </label>
+                <input
+                  type="text"
+                  value={form.label}
+                  onChange={(e) => setForm({ ...form, label: e.target.value })}
+                  placeholder="e.g. May 3rd - May 10th"
+                  className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-[#93c5fd] focus:ring-4 focus:ring-[#dbeafe]"
+                />
+              </div>
+
+              <div>
+                <label className="mb-2 block text-sm font-medium text-slate-700">
+                  Total room capacity
+                </label>
+                <input
+                  type="number"
+                  value={form.capacity}
+                  onChange={(e) => setForm({ ...form, capacity: e.target.value })}
+                  className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-[#93c5fd] focus:ring-4 focus:ring-[#dbeafe]"
+                />
+              </div>
+
+              <label className="flex items-center gap-3 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3">
+                <input
+                  type="checkbox"
+                  checked={form.active}
+                  onChange={(e) => setForm({ ...form, active: e.target.checked })}
+                />
+                <span className="text-sm font-medium text-slate-800">
+                  Week active and available for new bookings
+                </span>
+              </label>
+
+              <div>
+                <label className="mb-2 block text-sm font-medium text-slate-700">
+                  Notes
+                </label>
+                <textarea
+                  value={form.notes}
+                  onChange={(e) => setForm({ ...form, notes: e.target.value })}
+                  placeholder="Optional internal note"
+                  className="min-h-[120px] w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-[#93c5fd] focus:ring-4 focus:ring-[#dbeafe]"
+                />
+              </div>
+
+              <button
+                type="button"
+                onClick={saveWeek}
+                disabled={saving}
+                className="w-full rounded-2xl bg-slate-950 px-4 py-3 text-sm font-medium text-white transition hover:bg-slate-800 disabled:opacity-50"
+              >
+                {saving
+                  ? editingId
+                    ? "Saving..."
+                    : "Creating..."
+                  : editingId
                 ? "Save Changes"
                 : "Create Week"}
-            </button>
+              </button>
+            </div>
           </div>
         </div>
 
@@ -711,6 +932,35 @@ function SummaryCard({
       <p className={`mt-1 text-xl font-semibold tracking-tight ${styles[tone].value}`}>
         {value}
       </p>
+    </div>
+  );
+}
+
+function PricingFieldCard({
+  label,
+  value,
+  placeholder,
+  onChange,
+}: {
+  label: string;
+  value: string;
+  placeholder: string;
+  onChange: (value: string) => void;
+}) {
+  return (
+    <div className="rounded-[18px] border border-slate-200 bg-slate-50 p-3">
+      <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-500">
+        {label}
+      </p>
+      <input
+        type="number"
+        min="0"
+        step="0.01"
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        placeholder={placeholder}
+        className="mt-2 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 outline-none transition focus:border-[#93c5fd] focus:ring-4 focus:ring-[#dbeafe]"
+      />
     </div>
   );
 }

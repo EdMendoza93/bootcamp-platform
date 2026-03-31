@@ -13,13 +13,23 @@ type PaymentsSettings = {
   detailsSubmitted?: boolean;
   onboardingComplete?: boolean;
   accountEmail?: string;
+  businessName?: string;
   country?: string;
   currency?: string;
   accountType?: "standard";
-  connectionMode?: "oauth";
+  connectionMode?: "oauth" | "hosted_onboarding";
   livemode?: boolean;
   scope?: string;
   provider?: "stripe_connect";
+  requirementsCurrentlyDue?: string[];
+  requirementsEventuallyDue?: string[];
+  requirementsPastDue?: string[];
+  requirementsPendingVerification?: string[];
+  requirementsDisabledReason?: string;
+  requirementsCurrentDeadline?: {
+    seconds?: number;
+    nanoseconds?: number;
+  };
   updatedAt?: {
     seconds?: number;
     nanoseconds?: number;
@@ -43,6 +53,23 @@ function formatTimestamp(
   });
 }
 
+function formatRequirementLabel(value: string) {
+  return value
+    .split(".")
+    .map((part) =>
+      part
+        .replace(/_/g, " ")
+        .replace(/\b\w/g, (letter) => letter.toUpperCase())
+    )
+    .join(" / ");
+}
+
+function formatConnectionMode(value?: PaymentsSettings["connectionMode"]) {
+  if (value === "oauth") return "Legacy OAuth";
+  if (value === "hosted_onboarding") return "Hosted onboarding";
+  return "Not connected yet";
+}
+
 export default function AdminPaymentsPage() {
   const [loading, setLoading] = useState(true);
   const [connecting, setConnecting] = useState(false);
@@ -55,7 +82,11 @@ export default function AdminPaymentsPage() {
   const loadSettings = useCallback(async () => {
     try {
       const snap = await getDoc(doc(db, "settings", "payments"));
-      setSettings(snap.exists() ? (snap.data() as PaymentsSettings) : null);
+      const nextSettings = snap.exists()
+        ? (snap.data() as PaymentsSettings)
+        : null;
+      setSettings(nextSettings);
+      return nextSettings;
     } catch (error) {
       console.error("Load payments settings error:", error);
       showToast({
@@ -63,6 +94,7 @@ export default function AdminPaymentsPage() {
         description: "Please refresh the page.",
         type: "error",
       });
+      return null;
     } finally {
       setLoading(false);
     }
@@ -72,12 +104,95 @@ export default function AdminPaymentsPage() {
     loadSettings();
   }, [loadSettings]);
 
+  const connectionState = useMemo(() => {
+    if (!settings?.stripeAccountId) return "not_connected";
+    if (settings.chargesEnabled && settings.payoutsEnabled) return "ready";
+    return "incomplete";
+  }, [settings]);
+
+  const pendingRequirements = useMemo(
+    () =>
+      [
+        ...new Set([
+          ...(settings?.requirementsPastDue || []),
+          ...(settings?.requirementsCurrentlyDue || []),
+        ]),
+      ],
+    [settings]
+  );
+
+  const startStripeConnect = useCallback(async () => {
+    try {
+      setConnecting(true);
+
+      const connectStripeCall = httpsCallable(
+        functions,
+        "createStripeConnectAuthorizeUrl"
+      );
+      const result = await connectStripeCall();
+      const data = (result.data || {}) as { url?: string };
+
+      if (!data.url) {
+        throw new Error("Stripe onboarding URL was not returned.");
+      }
+
+      window.location.assign(data.url);
+    } catch (error) {
+      console.error("Connect Stripe error:", error);
+      showToast({
+        title: "Could not start Stripe onboarding",
+        description: "Please verify functions deployment and Stripe configuration.",
+        type: "error",
+      });
+    } finally {
+      setConnecting(false);
+    }
+  }, [showToast]);
+
+  const refreshStripeStatus = useCallback(
+    async (options?: { showSuccessToast?: boolean }) => {
+      try {
+        setRefreshing(true);
+
+        const refreshStripeCall = httpsCallable(
+          functions,
+          "refreshStripeConnectStatus"
+        );
+        await refreshStripeCall();
+        const latestSettings = await loadSettings();
+
+        if (options?.showSuccessToast !== false) {
+          showToast({
+            title: "Stripe status refreshed",
+            description: "Latest Stripe capabilities were loaded successfully.",
+            type: "success",
+          });
+        }
+
+        return latestSettings;
+      } catch (error) {
+        console.error("Refresh Stripe status error:", error);
+        showToast({
+          title: "Could not refresh Stripe status",
+          description:
+            "Please verify the Stripe account is connected and functions are deployed.",
+          type: "error",
+        });
+        return null;
+      } finally {
+        setRefreshing(false);
+      }
+    },
+    [loadSettings, showToast]
+  );
+
   useEffect(() => {
     if (typeof window === "undefined") return;
 
     const params = new URLSearchParams(window.location.search);
     const code = params.get("code");
     const state = params.get("state");
+    const stripeFlow = params.get("stripe");
     const stripeError = params.get("error");
     const stripeErrorDescription = params.get("error_description");
 
@@ -92,13 +207,9 @@ export default function AdminPaymentsPage() {
       return;
     }
 
-    if (!code || !state) {
-      return;
-    }
-
     let cancelled = false;
 
-    const finalizeConnection = async () => {
+    const handleLegacyOauthReturn = async () => {
       try {
         setCompleting(true);
 
@@ -133,74 +244,59 @@ export default function AdminPaymentsPage() {
       }
     };
 
-    void finalizeConnection();
+    const handleHostedOnboardingReturn = async () => {
+      try {
+        setCompleting(true);
+
+        const latestSettings = await refreshStripeStatus({
+          showSuccessToast: false,
+        });
+
+        if (cancelled || !latestSettings) return;
+
+        const ready = Boolean(
+          latestSettings?.chargesEnabled && latestSettings?.payoutsEnabled
+        );
+
+        showToast({
+          title: ready
+            ? "Stripe account ready"
+            : "Stripe onboarding still needs attention",
+          description: ready
+            ? "The connected Stripe account can now accept charges and payouts."
+            : "Stripe returned to the app, but the account still has pending requirements.",
+          type: ready ? "success" : "info",
+        });
+      } finally {
+        if (!cancelled) {
+          setCompleting(false);
+          window.history.replaceState({}, "", window.location.pathname);
+        }
+      }
+    };
+
+    const handleHostedOnboardingRefresh = async () => {
+      try {
+        await startStripeConnect();
+      } finally {
+        if (!cancelled) {
+          window.history.replaceState({}, "", window.location.pathname);
+        }
+      }
+    };
+
+    if (code && state) {
+      void handleLegacyOauthReturn();
+    } else if (stripeFlow === "return") {
+      void handleHostedOnboardingReturn();
+    } else if (stripeFlow === "refresh") {
+      void handleHostedOnboardingRefresh();
+    }
 
     return () => {
       cancelled = true;
     };
-  }, [loadSettings, showToast]);
-
-  const connectionState = useMemo(() => {
-    if (!settings?.stripeAccountId) return "not_connected";
-    if (settings.onboardingComplete && settings.chargesEnabled) return "ready";
-    return "incomplete";
-  }, [settings]);
-
-  const startStripeConnect = async () => {
-    try {
-      setConnecting(true);
-
-      const connectStripeCall = httpsCallable(
-        functions,
-        "createStripeConnectAuthorizeUrl"
-      );
-      const result = await connectStripeCall();
-      const data = (result.data || {}) as { url?: string };
-
-      if (!data.url) {
-        throw new Error("Stripe onboarding URL was not returned.");
-      }
-
-      window.location.assign(data.url);
-    } catch (error) {
-      console.error("Connect Stripe error:", error);
-      showToast({
-        title: "Could not start Stripe onboarding",
-        description: "Please verify functions deployment and Stripe configuration.",
-        type: "error",
-      });
-    } finally {
-      setConnecting(false);
-    }
-  };
-
-  const refreshStripeStatus = async () => {
-    try {
-      setRefreshing(true);
-
-      const refreshStripeCall = httpsCallable(
-        functions,
-        "refreshStripeConnectStatus"
-      );
-      await refreshStripeCall();
-      await loadSettings();
-
-      showToast({
-        title: "Stripe status refreshed",
-        description: "Latest Stripe capabilities were loaded successfully.",
-        type: "success",
-      });
-    } catch (error) {
-      console.error("Refresh Stripe status error:", error);
-      showToast({
-        title: "Could not refresh Stripe status",
-        description: "Please verify the Stripe account is connected and functions are deployed.",
-        type: "error",
-      });
-    } finally {
-      setRefreshing(false);
-    }
-  };
+  }, [loadSettings, refreshStripeStatus, showToast, startStripeConnect]);
 
   if (loading) {
     return (
@@ -231,7 +327,7 @@ export default function AdminPaymentsPage() {
             </h1>
 
             <p className="mt-3 max-w-3xl text-sm text-slate-600 md:text-base">
-              The bootcamp owner can connect Stripe directly from this area. They do not need to send you their Stripe keys or log into Firebase.
+              The bootcamp owner can complete Stripe-hosted onboarding directly from this area. They do not need to send you Stripe keys or touch Firebase.
             </p>
 
             <div className="mt-6 flex flex-wrap gap-3">
@@ -242,17 +338,21 @@ export default function AdminPaymentsPage() {
                 className="rounded-2xl bg-slate-950 px-4 py-2.5 text-sm font-medium text-white transition hover:bg-slate-800 disabled:opacity-50"
               >
                 {completing
-                  ? "Completing connection..."
+                  ? "Syncing Stripe..."
                   : connecting
                   ? "Opening Stripe..."
                   : connectionState === "not_connected"
-                  ? "Connect Stripe"
-                  : "Reconnect Stripe"}
+                  ? "Start onboarding"
+                  : connectionState === "incomplete"
+                  ? "Continue onboarding"
+                  : "Review Stripe setup"}
               </button>
 
               <button
                 type="button"
-                onClick={refreshStripeStatus}
+                onClick={() => {
+                  void refreshStripeStatus();
+                }}
                 disabled={refreshing || completing || !settings?.stripeAccountId}
                 className="rounded-2xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-medium text-slate-700 transition hover:bg-slate-50 disabled:opacity-50"
               >
@@ -297,6 +397,11 @@ export default function AdminPaymentsPage() {
           tone={settings?.chargesEnabled ? "success" : "light"}
         />
         <SummaryCard
+          label="Payouts"
+          value={settings?.payoutsEnabled ? "Enabled" : "Not Enabled"}
+          tone={settings?.payoutsEnabled ? "success" : "light"}
+        />
+        <SummaryCard
           label="Mode"
           value={settings?.livemode ? "Live" : settings?.stripeAccountId ? "Test" : "Pending"}
           tone={settings?.livemode ? "success" : "light"}
@@ -307,13 +412,17 @@ export default function AdminPaymentsPage() {
         <div className="rounded-[28px] border border-white/70 bg-white/95 p-6 shadow-[0_18px_50px_rgba(15,23,42,0.07)] backdrop-blur">
           <h2 className="text-xl font-semibold text-slate-950">Owner-controlled setup</h2>
           <p className="mt-2 text-sm leading-6 text-slate-600">
-            The owner signs in here, clicks Connect Stripe, and authorizes their Stripe account with Stripe directly. This keeps onboarding self-service inside admin.
+            The owner signs in here, starts onboarding, and finishes the Stripe-hosted flow directly with Stripe. This keeps setup self-serve inside admin.
           </p>
 
           <div className="mt-6 space-y-4">
             <StatusRow
               label="Stripe account"
               value={settings?.stripeAccountId || "Not connected yet"}
+            />
+            <StatusRow
+              label="Business name"
+              value={settings?.businessName || "Not available yet"}
             />
             <StatusRow
               label="Account email"
@@ -328,8 +437,8 @@ export default function AdminPaymentsPage() {
               value={settings?.currency || "Not set"}
             />
             <StatusRow
-              label="Access scope"
-              value={settings?.scope || "Not connected yet"}
+              label="Connection mode"
+              value={formatConnectionMode(settings?.connectionMode)}
             />
             <StatusRow
               label="Last update"
@@ -337,11 +446,74 @@ export default function AdminPaymentsPage() {
             />
           </div>
 
-          <div className="mt-6 rounded-[24px] border border-amber-200 bg-amber-50 p-5">
-            <p className="text-sm font-semibold text-amber-900">Current status</p>
-            <p className="mt-2 text-sm leading-6 text-amber-800">
-              Stripe connection now uses a Standard Connect style flow. The next step after connection is payment session creation and webhook synchronization for booking payments.
+          <div
+            className={`mt-6 rounded-[24px] border p-5 ${
+              connectionState === "ready"
+                ? "border-emerald-200 bg-emerald-50"
+                : "border-amber-200 bg-amber-50"
+            }`}
+          >
+            <p
+              className={`text-sm font-semibold ${
+                connectionState === "ready"
+                  ? "text-emerald-900"
+                  : "text-amber-900"
+              }`}
+            >
+              Current status
             </p>
+            <p
+              className={`mt-2 text-sm leading-6 ${
+                connectionState === "ready"
+                  ? "text-emerald-800"
+                  : "text-amber-800"
+              }`}
+            >
+              {connectionState === "ready"
+                ? "Stripe is connected and the account reports both charges and payouts enabled."
+                : connectionState === "incomplete"
+                ? "Stripe returned to the app, but the account still has pending onboarding or verification requirements."
+                : "No Stripe account has been linked yet. Start onboarding from this page."}
+            </p>
+
+            {connectionState !== "ready" && settings?.stripeAccountId && (
+              <div className="mt-4 space-y-3">
+                {settings.requirementsDisabledReason && (
+                  <p className="text-sm text-amber-800">
+                    Disabled reason:{" "}
+                    {formatRequirementLabel(settings.requirementsDisabledReason)}
+                  </p>
+                )}
+
+                {settings.requirementsCurrentDeadline?.seconds && (
+                  <p className="text-sm text-amber-800">
+                    Deadline: {formatTimestamp(settings.requirementsCurrentDeadline)}
+                  </p>
+                )}
+
+                {pendingRequirements.length > 0 ? (
+                  <div>
+                    <p className="text-sm font-semibold text-amber-900">
+                      Pending requirements
+                    </p>
+                    <div className="mt-3 flex flex-wrap gap-2">
+                      {pendingRequirements.map((item) => (
+                        <span
+                          key={item}
+                          className="rounded-full border border-amber-200 bg-white px-3 py-1 text-xs font-medium text-amber-900"
+                        >
+                          {formatRequirementLabel(item)}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                ) : (
+                  <p className="text-sm text-amber-800">
+                    Use Continue onboarding or Refresh Stripe status to confirm the latest requirements.
+                  </p>
+                )}
+              </div>
+            )}
           </div>
         </div>
 
@@ -349,17 +521,17 @@ export default function AdminPaymentsPage() {
           <div className="rounded-[28px] border border-white/70 bg-white/95 p-6 shadow-[0_18px_50px_rgba(15,23,42,0.07)] backdrop-blur">
             <h2 className="text-xl font-semibold text-slate-950">Architecture decisions</h2>
             <div className="mt-5 space-y-3">
-              <RuleCard title="Owner connects Stripe directly">
-                The platform opens Stripe authorization from the admin panel so the owner connects their own Stripe account without handing you credentials.
+              <RuleCard title="Hosted onboarding over key sharing">
+                The platform opens Stripe-hosted onboarding from the admin panel so the owner connects their own account without handing you credentials.
               </RuleCard>
               <RuleCard title="Client never enters Firebase">
                 The owner should only use this admin panel and Stripe&apos;s own screens. They should not have to log into Firebase or touch deployment settings.
               </RuleCard>
-              <RuleCard title="Platform configuration happens once">
-                This app still needs one Stripe Connect application behind the scenes, but that is product setup, not a per-client key-sharing step.
+              <RuleCard title="Status is synced from Stripe">
+                The platform stores Stripe capability flags and pending requirements locally so admin can see what still blocks activation without opening the Stripe Dashboard first.
               </RuleCard>
-              <RuleCard title="Bookings will link to payments">
-                Each booking will eventually store Stripe references such as a checkout session or payment intent tied to the connected Stripe account.
+              <RuleCard title="Platform configuration happens once">
+                This app still needs one Stripe platform behind the scenes, but that is product setup, not a per-client key-sharing step.
               </RuleCard>
             </div>
           </div>
