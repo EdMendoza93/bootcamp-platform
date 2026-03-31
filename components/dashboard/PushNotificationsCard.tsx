@@ -1,27 +1,12 @@
 "use client";
 
-import { useEffect, useState } from "react";
 import { usePushNotifications } from "@/components/providers/PushNotificationsProvider";
 
 export default function PushNotificationsCard() {
   const { pushState, enablePush, infoMessage } = usePushNotifications();
-  const [showSuccess, setShowSuccess] = useState(false);
-
-  useEffect(() => {
-    if (pushState === "enabled") {
-      setShowSuccess(true);
-
-      const timeout = window.setTimeout(() => {
-        setShowSuccess(false);
-      }, 2500);
-
-      return () => window.clearTimeout(timeout);
-    }
-  }, [pushState]);
-
   const showButtonCard = pushState === "ready" || pushState === "error";
 
-  if (showSuccess) {
+  if (pushState === "enabled") {
     return (
       <section className="rounded-[28px] border border-emerald-200 bg-emerald-50 p-6 shadow-[0_18px_50px_rgba(15,23,42,0.07)]">
         <p className="text-sm font-medium text-emerald-700">

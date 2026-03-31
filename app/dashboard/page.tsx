@@ -648,7 +648,7 @@ export default function DashboardPage() {
           </div>
         </section>
 
-        <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
           {statusCards.map((card) => (
             <StatusCard
               key={card.label}
@@ -1218,9 +1218,9 @@ function StatusCard({
   value: string;
 }) {
   return (
-    <div className="rounded-[24px] border border-white/80 bg-gradient-to-br from-white to-slate-50 p-5 shadow-[0_14px_40px_rgba(15,23,42,0.07)]">
-      <p className="text-sm font-semibold uppercase tracking-[0.14em] text-slate-500">{label}</p>
-      <p className="mt-2 text-xl font-semibold capitalize text-slate-950">
+    <div className="rounded-[18px] border border-white/80 bg-gradient-to-br from-white to-slate-50 px-4 py-3.5 shadow-[0_10px_24px_rgba(15,23,42,0.06)]">
+      <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">{label}</p>
+      <p className="mt-1.5 text-lg font-semibold capitalize text-slate-950">
         {value}
       </p>
     </div>

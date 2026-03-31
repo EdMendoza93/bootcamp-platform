@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { db } from "@/lib/firebase";
+import { db, functions } from "@/lib/firebase";
 import {
   addDays,
   BookingRecord,
@@ -26,6 +26,7 @@ import {
   setDoc,
   updateDoc,
 } from "firebase/firestore";
+import { httpsCallable } from "firebase/functions";
 import { useToast } from "@/components/ui/ToastProvider";
 
 type BootcampWeek = BootcampWeekRecord;
@@ -316,6 +317,11 @@ export default function AdminAvailabilityPage() {
     setPricingSaving(true);
 
     try {
+      const notifyWebsitePricingUpdated = httpsCallable(
+        functions,
+        "notifyWebsitePricingUpdated"
+      );
+
       await setDoc(
         doc(db, "settings", "bookingPricing"),
         {
@@ -349,10 +355,24 @@ export default function AdminAvailabilityPage() {
           currency,
       });
 
+      try {
+        await notifyWebsitePricingUpdated();
+      } catch (revalidationError) {
+        console.error("Website pricing revalidation error:", revalidationError);
+        showToast({
+          title: "Pricing saved",
+          description:
+            "The new prices were saved, but the website refresh did not trigger. It may still update after cache expiry.",
+          type: "error",
+        });
+        setPricingExpanded(false);
+        return;
+      }
+
       showToast({
         title: "Pricing saved",
         description:
-          "Default 1, 2, and 3 week prices are now stored for future payment flows.",
+          "Default 1, 2, and 3 week prices are now stored and the website is refreshing.",
         type: "success",
       });
       setPricingExpanded(false);

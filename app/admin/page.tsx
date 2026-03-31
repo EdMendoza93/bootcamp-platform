@@ -390,7 +390,7 @@ export default function AdminPage() {
         </div>
       </section>
 
-      <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+      <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
         <MetricCard
           label="Pending Applications"
           value={String(pendingApplications)}
@@ -839,11 +839,13 @@ function MetricCard({
 
   return (
     <div
-      className={`rounded-[24px] border p-6 shadow-[0_14px_40px_rgba(15,23,42,0.07)] ${styles[tone].card}`}
+      className={`rounded-[18px] border px-4 py-3.5 shadow-[0_10px_24px_rgba(15,23,42,0.06)] ${styles[tone].card}`}
     >
-      <p className={`text-sm font-semibold ${styles[tone].label}`}>{label}</p>
+      <p className={`text-[11px] font-semibold uppercase tracking-[0.16em] ${styles[tone].label}`}>
+        {label}
+      </p>
       <p
-        className={`mt-3 text-3xl font-semibold tracking-tight ${styles[tone].value}`}
+        className={`mt-1.5 text-2xl font-semibold tracking-tight ${styles[tone].value}`}
       >
         {value}
       </p>

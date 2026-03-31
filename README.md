@@ -1,122 +1,170 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Bootcamp Platform
 
-## Getting Started
+Plataforma interna para Wild Atlantic Bootcamp construida con Next.js, Firebase y Cloud Functions. El proyecto cubre tres áreas principales:
 
-First, run the development server:
+- panel de cliente
+- panel de staff
+- panel de administración
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
-```
+También incluye mensajería, reservas, sesiones online, progreso del cliente, push notifications y cobros con Stripe Connect y Stripe Checkout.
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+## Stack
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+- Next.js 16 + React 19
+- Firebase Auth
+- Firestore
+- Firebase Storage
+- Firebase Cloud Functions
+- Firebase Cloud Messaging
+- Stripe Connect + Stripe Checkout
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+## Estructura
 
-## Learn More
+- `app/`: rutas de la aplicación
+- `components/`: layout, auth, dashboard y UI compartida
+- `lib/`: acceso a Firebase y lógica reutilizable
+- `functions/`: Cloud Functions para pagos, webhooks, emails y utilidades backend
+- `public/`: assets estáticos y service worker de FCM
+- `docs/`: material comercial y mockups
 
-To learn more about Next.js, take a look at the following resources:
+## Requisitos
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+- Node.js 20+
+- Firebase CLI
+- proyecto Firebase configurado
+- cuenta Stripe con webhooks configurados
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+## Variables de entorno
 
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
-
-## Web push setup
-
-This project now includes Firebase Cloud Functions + Web Push plumbing.
-
-### Environment variables (Next.js)
-
-Create `.env.local` with:
+### Frontend (`.env.local`)
 
 ```bash
-NEXT_PUBLIC_FIREBASE_VAPID_KEY=YOUR_WEB_PUSH_CERTIFICATE_KEY_PAIR_PUBLIC_KEY
+NEXT_PUBLIC_FIREBASE_API_KEY=...
+NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN=...
+NEXT_PUBLIC_FIREBASE_PROJECT_ID=...
+NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET=...
+NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID=...
+NEXT_PUBLIC_FIREBASE_APP_ID=...
+NEXT_PUBLIC_FIREBASE_MEASUREMENT_ID=...
+NEXT_PUBLIC_FIREBASE_VAPID_KEY=...
 ```
 
-### Deploy functions
-
-```bash
-cd functions
-npm install
-cd ..
-firebase deploy --only functions
-```
-
-## Stripe Connect setup
-
-This project now uses Stripe Connect onboarding for `standard` connected accounts from `/admin/payments`.
-
-### Required functions environment
-
-Set these in your functions environment before deploying:
+### Cloud Functions
 
 ```bash
 STRIPE_SECRET_KEY=sk_test_...
-APP_BASE_URL=https://app.bootcamp.rivcor.com
 STRIPE_WEBHOOK_SECRET=whsec_...
+STRIPE_CONNECT_WEBHOOK_SECRET=whsec_...
+APP_BASE_URL=https://app.bootcamp.rivcor.com
 RESEND_API_KEY=re_...
 RESEND_FROM_EMAIL=bookings@your-domain.com
+WEBSITE_PRICING_REVALIDATE_SECRET=...
+WEBSITE_PRICING_REVALIDATE_URL=https://www.bootcamp.rivcor.com/api/revalidate-pricing
 ```
 
-Optional, only if you still need the legacy OAuth fallback for an already-connected account:
+Opcional:
 
 ```bash
+STRIPE_CONNECT_RETURN_URL=https://app.bootcamp.rivcor.com/admin/payments
 STRIPE_CONNECT_CLIENT_ID=ca_...
 ```
 
-### What the admin flow does
+## Desarrollo local
 
-- Creates or reuses a Stripe `standard` connected account
-- Generates a hosted onboarding link with `return_url` and `refresh_url`
-- Syncs `charges_enabled`, `payouts_enabled`, `details_submitted`, and pending requirements back into `settings/payments`
+Instalar dependencias:
 
-## Stripe checkout and entitlement emails
+```bash
+npm install
+cd functions && npm install && cd ..
+```
 
-This project now includes:
+Levantar la app:
 
-- `createUserBookingCheckoutSession` for logged-in client purchases
-- `createExternalBookingCheckoutSession` for purchases made outside the client account flow
-- `stripeWebhook` to confirm paid bookings and to generate redemption codes after external Stripe payments
-- automatic entitlement email delivery through Resend
+```bash
+npm run dev
+```
 
-### Webhook behavior
+Validación básica:
 
-- Internal checkout:
-  - creates a pending booking first
-  - Stripe webhook marks it `paid` and `confirmed`
-- External checkout:
-  - Stripe webhook creates a `bookingEntitlements` document
-  - generates a redemption code
-  - emails the code to the buyer
+```bash
+npm run lint
+npm run build
+```
 
-### Webhook endpoint
+Functions en local:
 
-After deploying functions, configure this endpoint in Stripe:
+```bash
+cd functions
+npm run serve
+```
+
+## Despliegue
+
+Desplegar Cloud Functions:
+
+```bash
+cd functions
+npm run deploy
+```
+
+Si usas Firebase Hosting para estáticos:
+
+```bash
+firebase deploy
+```
+
+## Integraciones críticas
+
+### Stripe Connect
+
+Desde `/admin/payments` el admin puede:
+
+- crear o reutilizar una cuenta conectada `standard`
+- iniciar onboarding hospedado por Stripe
+- refrescar estado de capacidades
+- revisar requisitos pendientes
+
+### Stripe Checkout
+
+Flujos soportados:
+
+- compra interna para clientes autenticados
+- compra externa con generación de entitlement y código de canje
+
+Webhook mínimo requerido:
+
+- `checkout.session.completed`
+- `checkout.session.async_payment_succeeded`
+
+Endpoint:
 
 ```bash
 https://us-central1-YOUR_FIREBASE_PROJECT.cloudfunctions.net/stripeWebhook
 ```
 
-Listen at minimum for:
+### Push notifications
 
-- `checkout.session.completed`
-- `checkout.session.async_payment_succeeded`
+- el frontend usa FCM web
+- el service worker vive en `public/firebase-messaging-sw.js`
+- se requiere `NEXT_PUBLIC_FIREBASE_VAPID_KEY`
 
-### Notes
+## Cierre técnico recomendado antes de producción
 
-- Admin send UI is available at `/admin/notifications`.
-- iOS web push is constrained and only works where iOS/browser support it, generally in Home Screen apps.
+- verificar secretos reales en Firebase Functions
+- confirmar webhooks de Stripe en entorno productivo
+- probar onboarding Stripe Connect de punta a punta
+- probar checkout interno y externo con webhook real
+- probar envío de email de entitlement
+- probar permisos por rol: `admin`, `staff`, `client`
+- revisar si `/test-external-checkout` debe existir en producción o quedarse solo para operaciones internas
+
+## Estado actual del repo
+
+En este momento la aplicación compila y pasa `lint`:
+
+```bash
+npm run lint
+npm run build
+```
+
+No hay suite de tests automatizados todavía, así que el siguiente salto de calidad recomendable es agregar smoke tests para auth, pagos y permisos por rol.

@@ -173,7 +173,7 @@ export default function DashboardSessionsPage() {
       </section>
 
       {activeTab === "overview" ? (
-        <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
           <StatusCard label="Total sessions" value={String(summary.total)} />
           <StatusCard label="Upcoming" value={String(summary.upcoming)} />
           <StatusCard label="Completed" value={String(summary.completed)} />
@@ -319,9 +319,9 @@ function StatusPill({ status }: { status: OnlineSessionStatus }) {
 
 function StatusCard({ label, value }: { label: string; value: string }) {
   return (
-    <div className="rounded-[22px] border border-slate-100 bg-gradient-to-br from-slate-50 to-white p-4 shadow-sm">
-      <p className="text-sm font-semibold text-slate-700">{label}</p>
-      <p className="mt-2 text-lg font-semibold text-slate-950">{value}</p>
+    <div className="rounded-[18px] border border-slate-100 bg-gradient-to-br from-slate-50 to-white px-4 py-3.5 shadow-[0_10px_24px_rgba(15,23,42,0.06)]">
+      <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">{label}</p>
+      <p className="mt-1.5 text-base font-semibold text-slate-950">{value}</p>
     </div>
   );
 }

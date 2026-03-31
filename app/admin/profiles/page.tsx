@@ -457,7 +457,7 @@ export default function AdminProfilesPage() {
         </div>
       </section>
 
-      <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+      <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
         <SummaryCard label="Total Profiles" value={String(summary.total)} tone="light" />
         <SummaryCard label="Active Clients" value={String(summary.active)} tone="success" />
         <SummaryCard label="Inactive Clients" value={String(summary.inactive)} tone="danger" />
@@ -776,10 +776,12 @@ function SummaryCard({
 
   return (
     <div
-      className={`rounded-[24px] border p-5 shadow-[0_14px_40px_rgba(15,23,42,0.07)] ${styles[tone].card}`}
+      className={`rounded-[18px] border px-4 py-3.5 shadow-[0_10px_24px_rgba(15,23,42,0.06)] ${styles[tone].card}`}
     >
-      <p className={`text-sm font-semibold ${styles[tone].label}`}>{label}</p>
-      <p className={`mt-2 text-3xl font-semibold tracking-tight ${styles[tone].value}`}>
+      <p className={`text-[11px] font-semibold uppercase tracking-[0.16em] ${styles[tone].label}`}>
+        {label}
+      </p>
+      <p className={`mt-1.5 text-2xl font-semibold tracking-tight ${styles[tone].value}`}>
         {value}
       </p>
     </div>

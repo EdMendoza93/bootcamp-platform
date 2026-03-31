@@ -103,6 +103,55 @@ function getFunctionsBaseUrl() {
   return `https://us-central1-${projectId}.cloudfunctions.net`;
 }
 
+function getWebsitePricingRevalidateUrl() {
+  return (
+    process.env.WEBSITE_PRICING_REVALIDATE_URL?.replace(/\/$/, "") ||
+    "https://www.bootcamp.rivcor.com/api/revalidate-pricing"
+  );
+}
+
+function getWebsitePricingRevalidateSecret() {
+  const secret = process.env.WEBSITE_PRICING_REVALIDATE_SECRET;
+
+  if (!secret) {
+    throw new HttpsError(
+      "failed-precondition",
+      "Missing WEBSITE_PRICING_REVALIDATE_SECRET in functions environment."
+    );
+  }
+
+  return secret;
+}
+
+async function triggerWebsitePricingRevalidation() {
+  const response = await fetch(getWebsitePricingRevalidateUrl(), {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "x-revalidate-secret": getWebsitePricingRevalidateSecret(),
+    },
+    body: JSON.stringify({
+      source: "bootcamp-platform",
+      target: "booking-pricing",
+    }),
+  });
+
+  const payload = await response
+    .json()
+    .catch(() => ({ error: "Invalid response from website revalidation endpoint." }));
+
+  if (!response.ok) {
+    throw new HttpsError(
+      "internal",
+      typeof payload?.error === "string"
+        ? payload.error
+        : "Website pricing revalidation failed."
+    );
+  }
+
+  return payload;
+}
+
 function getStripeAdminPaymentsUrl(params = {}) {
   const appBaseUrl = process.env.APP_BASE_URL?.replace(/\/$/, "");
   const fallbackUrl =
@@ -127,19 +176,6 @@ function getStripeAdminReturnUrl() {
 
 function getStripeAdminRefreshUrl() {
   return getStripeAdminPaymentsUrl({ stripe: "refresh" });
-}
-
-function getStripeConnectClientId() {
-  const clientId = process.env.STRIPE_CONNECT_CLIENT_ID;
-
-  if (!clientId) {
-    throw new HttpsError(
-      "failed-precondition",
-      "Missing STRIPE_CONNECT_CLIENT_ID in functions environment."
-    );
-  }
-
-  return clientId;
 }
 
 function formatStripeRequirementErrors(errors) {
@@ -1455,6 +1491,30 @@ export const getPublicBookingPricing = onRequest(
             ? error.message
             : "Could not load public booking pricing.",
       });
+    }
+  }
+);
+
+export const notifyWebsitePricingUpdated = onCall(
+  { region: "us-central1" },
+  async (request) => {
+    try {
+      await assertAdmin(request.auth);
+      const payload = await triggerWebsitePricingRevalidation();
+
+      return {
+        ok: true,
+        ...payload,
+      };
+    } catch (error) {
+      console.error("notifyWebsitePricingUpdated error:", error);
+      if (error instanceof HttpsError) throw error;
+      throw new HttpsError(
+        "internal",
+        error instanceof Error
+          ? error.message
+          : "Could not notify website pricing update."
+      );
     }
   }
 );

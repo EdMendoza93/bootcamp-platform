@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { auth, db } from "@/lib/firebase";
 import { onAuthStateChanged } from "firebase/auth";
 import {
@@ -54,7 +54,7 @@ export default function AdminApplicationsPage() {
 
   const { showToast } = useToast();
 
-  const loadApplications = async () => {
+  const loadApplications = useCallback(async () => {
     try {
       const [appsSnapshot, profilesSnapshot] = await Promise.all([
         getDocs(collection(db, "applications")),
@@ -99,7 +99,7 @@ export default function AdminApplicationsPage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [showToast]);
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
@@ -128,7 +128,7 @@ export default function AdminApplicationsPage() {
     });
 
     return () => unsubscribe();
-  }, []);
+  }, [loadApplications]);
 
   const ensureProfileForApplication = async (app: Application) => {
     const existingProfileQuery = query(
@@ -358,7 +358,7 @@ export default function AdminApplicationsPage() {
         </div>
       </section>
 
-      <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
+      <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
         <SummaryCard label="Total" value={String(summary.total)} tone="light" />
         <SummaryCard label="Pending" value={String(summary.pending)} tone="blue" />
         <SummaryCard
@@ -614,11 +614,13 @@ function SummaryCard({
 
   return (
     <div
-      className={`rounded-[24px] border p-5 shadow-[0_14px_40px_rgba(15,23,42,0.07)] ${styles[tone].card}`}
+      className={`rounded-[18px] border px-4 py-3.5 shadow-[0_10px_24px_rgba(15,23,42,0.06)] ${styles[tone].card}`}
     >
-      <p className={`text-sm font-semibold ${styles[tone].label}`}>{label}</p>
+      <p className={`text-[11px] font-semibold uppercase tracking-[0.16em] ${styles[tone].label}`}>
+        {label}
+      </p>
       <p
-        className={`mt-3 text-3xl font-semibold tracking-tight ${styles[tone].value}`}
+        className={`mt-1.5 text-2xl font-semibold tracking-tight ${styles[tone].value}`}
       >
         {value}
       </p>

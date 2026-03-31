@@ -298,7 +298,7 @@ export default function DashboardProfilePage() {
               </a>
             </div>
 
-              <div className="mt-8 grid gap-4 sm:grid-cols-3">
+              <div className="mt-8 grid gap-3 sm:grid-cols-3">
                 <StatusCard label="Profile status" value={formatProfileStatus(form.onboardingStatus)} />
                 <StatusCard label="Payment" value={formatPaymentStatus(form.paymentStatus)} />
                 <StatusCard
@@ -353,13 +353,13 @@ export default function DashboardProfilePage() {
               description="Keep the essential profile fields complete so the team can work from accurate information."
             />
 
-            <div className="mt-6 grid gap-4 md:grid-cols-3">
+            <div className="mt-6 grid gap-3 md:grid-cols-3">
               <StatusCard label="Full name" value={form.fullName || "Missing"} />
               <StatusCard label="Main goal" value={form.goal || "Missing"} />
               <StatusCard label="Health notes" value={form.notes.trim() ? "Added" : "Not added"} />
             </div>
 
-            <div className="mt-6 grid gap-4 md:grid-cols-2">
+            <div className="mt-6 grid gap-3 md:grid-cols-2">
               <StatusCard label="Allergies" value={form.allergies.trim() ? "Added" : "None added"} />
               <StatusCard label="Injuries" value={form.injuries.trim() ? "Added" : "None added"} />
             </div>
@@ -554,9 +554,9 @@ function StatusCard({
   value: string;
 }) {
   return (
-    <div className="rounded-[22px] border border-slate-100 bg-gradient-to-br from-slate-50 to-white p-4">
-      <p className="text-sm font-semibold text-slate-700">{label}</p>
-      <p className="mt-2 text-sm font-semibold text-slate-900">{value}</p>
+    <div className="rounded-[18px] border border-slate-100 bg-gradient-to-br from-slate-50 to-white px-4 py-3.5 shadow-[0_10px_24px_rgba(15,23,42,0.06)]">
+      <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">{label}</p>
+      <p className="mt-1.5 text-sm font-semibold text-slate-900">{value}</p>
     </div>
   );
 }

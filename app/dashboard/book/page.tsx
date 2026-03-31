@@ -534,7 +534,7 @@ export default function DashboardBookPage() {
         </div>
       </section>
 
-      <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+      <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
         <SummaryCard
           label="1 week"
           value={formatMoney(pricing.oneWeekPrice, pricing.currency)}
@@ -805,11 +805,11 @@ function HeaderPill({ label, value }: { label: string; value: string }) {
 
 function SummaryCard({ label, value }: { label: string; value: string }) {
   return (
-    <div className="rounded-[24px] border border-[#bfdbfe] bg-gradient-to-br from-[#eff6ff] via-white to-[#f8fbff] p-5 shadow-[0_14px_40px_rgba(15,23,42,0.07)]">
+    <div className="rounded-[18px] border border-[#bfdbfe] bg-gradient-to-br from-[#eff6ff] via-white to-[#f8fbff] px-4 py-3.5 shadow-[0_10px_24px_rgba(15,23,42,0.06)]">
       <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[#1d4ed8]">
         {label}
       </p>
-      <p className="mt-3 text-2xl font-semibold tracking-tight text-slate-950">
+      <p className="mt-1.5 text-xl font-semibold tracking-tight text-slate-950">
         {value}
       </p>
     </div>
