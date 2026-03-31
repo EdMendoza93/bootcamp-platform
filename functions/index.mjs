@@ -1,4 +1,4 @@
-import { onCall, HttpsError } from "firebase-functions/v2/https";
+import { onCall, onRequest, HttpsError } from "firebase-functions/v2/https";
 import { onDocumentCreated } from "firebase-functions/v2/firestore";
 import { initializeApp } from "firebase-admin/app";
 import { getFirestore, FieldValue } from "firebase-admin/firestore";
@@ -25,14 +25,86 @@ function getStripeClient() {
   });
 }
 
-function getStripeAdminReturnUrl() {
-  const appBaseUrl = process.env.APP_BASE_URL?.replace(/\/$/, "");
-
+function getAppBaseUrl() {
   return (
-    (appBaseUrl ? `${appBaseUrl}/admin/payments` : "") ||
-    process.env.STRIPE_CONNECT_RETURN_URL ||
-    "https://app.bootcamp.rivcor.com/admin/payments"
+    process.env.APP_BASE_URL?.replace(/\/$/, "") ||
+    "https://app.bootcamp.rivcor.com"
   );
+}
+
+function getStripeWebhookSecret() {
+  const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET;
+
+  if (!webhookSecret) {
+    throw new HttpsError(
+      "failed-precondition",
+      "Missing STRIPE_WEBHOOK_SECRET in functions environment."
+    );
+  }
+
+  return webhookSecret;
+}
+
+function getResendApiKey() {
+  const apiKey = process.env.RESEND_API_KEY;
+
+  if (!apiKey) {
+    throw new HttpsError(
+      "failed-precondition",
+      "Missing RESEND_API_KEY in functions environment."
+    );
+  }
+
+  return apiKey;
+}
+
+function getResendFromEmail() {
+  const fromEmail = process.env.RESEND_FROM_EMAIL;
+
+  if (!fromEmail) {
+    throw new HttpsError(
+      "failed-precondition",
+      "Missing RESEND_FROM_EMAIL in functions environment."
+    );
+  }
+
+  return fromEmail;
+}
+
+function resolveCheckoutReturnUrl(path, fallbackPath) {
+  const appBaseUrl = getAppBaseUrl();
+  const safePath =
+    typeof path === "string" && path.trim().startsWith("/")
+      ? path.trim()
+      : fallbackPath;
+
+  return `${appBaseUrl}${safePath}`;
+}
+
+function getStripeAdminPaymentsUrl(params = {}) {
+  const appBaseUrl = process.env.APP_BASE_URL?.replace(/\/$/, "");
+  const fallbackUrl =
+    process.env.STRIPE_CONNECT_RETURN_URL ||
+    (appBaseUrl ? `${appBaseUrl}/admin/payments` : "") ||
+    "https://app.bootcamp.rivcor.com/admin/payments";
+
+  const url = new URL(fallbackUrl);
+
+  Object.entries(params).forEach(([key, value]) => {
+    if (value !== undefined && value !== null && value !== "") {
+      url.searchParams.set(key, String(value));
+    }
+  });
+
+  return url.toString();
+}
+
+function getStripeAdminReturnUrl() {
+  return getStripeAdminPaymentsUrl({ stripe: "return" });
+}
+
+function getStripeAdminRefreshUrl() {
+  return getStripeAdminPaymentsUrl({ stripe: "refresh" });
 }
 
 function getStripeConnectClientId() {
@@ -48,6 +120,149 @@ function getStripeConnectClientId() {
   return clientId;
 }
 
+function formatStripeRequirementErrors(errors) {
+  if (!Array.isArray(errors)) {
+    return [];
+  }
+
+  return errors
+    .map((item) => ({
+      code: typeof item?.code === "string" ? item.code : "",
+      reason: typeof item?.reason === "string" ? item.reason : "",
+      requirement:
+        typeof item?.requirement === "string" ? item.requirement : "",
+    }))
+    .filter(
+      (item) => item.code || item.reason || item.requirement
+    );
+}
+
+function buildStripeAccountSnapshot(account, paymentsData = {}, extra = {}) {
+  const requirements = account.requirements || {};
+  const businessProfile = account.business_profile || {};
+  const dashboardSettings = account.settings?.dashboard || {};
+
+  const snapshot = {
+    provider: "stripe_connect",
+    accountType: "standard",
+    connectionMode: extra.connectionMode || "hosted_onboarding",
+    stripeAccountId: account.id,
+    accountEmail: account.email || paymentsData.accountEmail || "",
+    businessName:
+      businessProfile.name ||
+      dashboardSettings.display_name ||
+      paymentsData.businessName ||
+      "",
+    country: account.country || paymentsData.country || "",
+    currency: account.default_currency || paymentsData.currency || "",
+    chargesEnabled: Boolean(account.charges_enabled),
+    payoutsEnabled: Boolean(account.payouts_enabled),
+    detailsSubmitted: Boolean(account.details_submitted),
+    onboardingComplete: Boolean(
+      account.details_submitted &&
+        account.charges_enabled &&
+        account.payouts_enabled
+    ),
+    requirementsCurrentlyDue: Array.isArray(requirements.currently_due)
+      ? requirements.currently_due
+      : [],
+    requirementsEventuallyDue: Array.isArray(requirements.eventually_due)
+      ? requirements.eventually_due
+      : [],
+    requirementsPastDue: Array.isArray(requirements.past_due)
+      ? requirements.past_due
+      : [],
+    requirementsPendingVerification: Array.isArray(
+      requirements.pending_verification
+    )
+      ? requirements.pending_verification
+      : [],
+    requirementsDisabledReason:
+      typeof requirements.disabled_reason === "string"
+        ? requirements.disabled_reason
+        : "",
+    requirementsErrors: formatStripeRequirementErrors(requirements.errors),
+    updatedAt: FieldValue.serverTimestamp(),
+    pendingOauthState: FieldValue.delete(),
+    pendingOauthUserId: FieldValue.delete(),
+    oauthRedirectUri: FieldValue.delete(),
+  };
+
+  snapshot.requirementsCurrentDeadline =
+    typeof requirements.current_deadline === "number"
+      ? new Date(requirements.current_deadline * 1000)
+      : FieldValue.delete();
+
+  if (
+    typeof extra.livemode === "boolean" ||
+    typeof paymentsData.livemode === "boolean"
+  ) {
+    snapshot.livemode =
+      typeof extra.livemode === "boolean"
+        ? extra.livemode
+        : Boolean(paymentsData.livemode);
+  }
+
+  if (extra.scope) {
+    snapshot.scope = extra.scope;
+  }
+
+  if (paymentsData.connectedAt) {
+    snapshot.connectedAt = paymentsData.connectedAt;
+  } else if (account.details_submitted) {
+    snapshot.connectedAt = FieldValue.serverTimestamp();
+  }
+
+  return snapshot;
+}
+
+async function syncStripeAccountSettings({
+  stripe,
+  paymentsRef,
+  paymentsData = {},
+  stripeAccountId,
+  extra = {},
+}) {
+  const account = await stripe.accounts.retrieve(stripeAccountId);
+  const snapshot = buildStripeAccountSnapshot(account, paymentsData, extra);
+
+  await paymentsRef.set(snapshot, { merge: true });
+
+  return { account, snapshot };
+}
+
+async function loadStripePaymentsSettings() {
+  const paymentsRef = db.collection("settings").doc("payments");
+  const paymentsSnap = await paymentsRef.get();
+  const paymentsData = paymentsSnap.exists ? paymentsSnap.data() || {} : {};
+
+  return { paymentsRef, paymentsData };
+}
+
+async function getReadyStripeConnectedAccount() {
+  const { paymentsData } = await loadStripePaymentsSettings();
+  const stripeAccountId = String(paymentsData.stripeAccountId || "").trim();
+
+  if (!stripeAccountId) {
+    throw new HttpsError(
+      "failed-precondition",
+      "Stripe payments are not connected yet."
+    );
+  }
+
+  if (!paymentsData.chargesEnabled || !paymentsData.payoutsEnabled) {
+    throw new HttpsError(
+      "failed-precondition",
+      "Stripe onboarding is not complete yet."
+    );
+  }
+
+  return {
+    stripeAccountId,
+    paymentsData,
+  };
+}
+
 async function assertAdmin(auth) {
   if (!auth?.uid) {
     throw new HttpsError("unauthenticated", "Authentication is required.");
@@ -58,6 +273,24 @@ async function assertAdmin(auth) {
 
   if (role !== "admin") {
     throw new HttpsError("permission-denied", "Admin role required.");
+  }
+}
+
+async function assertClientUser(auth) {
+  if (!auth?.uid) {
+    throw new HttpsError("unauthenticated", "Authentication is required.");
+  }
+
+  const snap = await db.collection("users").doc(auth.uid).get();
+  const data = snap.exists ? snap.data() || {} : {};
+  const role = String(data.role || "user").trim();
+
+  if (data.status === "inactive") {
+    throw new HttpsError("permission-denied", "Inactive users cannot book.");
+  }
+
+  if (role && role !== "user") {
+    throw new HttpsError("permission-denied", "Client user role required.");
   }
 }
 
@@ -250,9 +483,41 @@ function addDays(date, days) {
   return `${yyyy}-${mm}-${dd}`;
 }
 
+function getTodayDateString() {
+  const now = new Date();
+  const yyyy = now.getUTCFullYear();
+  const mm = String(now.getUTCMonth() + 1).padStart(2, "0");
+  const dd = String(now.getUTCDate()).padStart(2, "0");
+  return `${yyyy}-${mm}-${dd}`;
+}
+
+function formatPublicDateLabel(date) {
+  if (!date) return "";
+
+  return toMiddayDate(date).toLocaleDateString("en-US", {
+    month: "short",
+    day: "numeric",
+  });
+}
+
+function formatPublicWeekLabel(startDate, endDate) {
+  const startLabel = formatPublicDateLabel(startDate);
+  const endLabel = formatPublicDateLabel(endDate);
+
+  if (!startLabel || !endLabel) {
+    return "";
+  }
+
+  return `${startLabel} - ${endLabel}`;
+}
+
 function normalizeBookingDuration(value) {
   const duration = Number(value);
   return duration === 2 || duration === 3 ? duration : 1;
+}
+
+function isValidEmailAddress(value) {
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(value || "").trim());
 }
 
 function getRemainingSpots(week) {
@@ -434,6 +699,216 @@ function validateBookingPayload(payload, selectedWeeks) {
       "Selected weeks are not available for this duration."
     );
   }
+}
+
+async function loadBookingPricing() {
+  const pricingSnap = await db.collection("settings").doc("bookingPricing").get();
+  const pricingData = pricingSnap.exists ? pricingSnap.data() || {} : {};
+  const currency =
+    String(pricingData.currency || "EUR").trim().toUpperCase() || "EUR";
+
+  return {
+    oneWeekPrice:
+      typeof pricingData.oneWeekPrice === "number" && pricingData.oneWeekPrice > 0
+        ? pricingData.oneWeekPrice
+        : null,
+    twoWeekPrice:
+      typeof pricingData.twoWeekPrice === "number" && pricingData.twoWeekPrice > 0
+        ? pricingData.twoWeekPrice
+        : null,
+    threeWeekPrice:
+      typeof pricingData.threeWeekPrice === "number" && pricingData.threeWeekPrice > 0
+        ? pricingData.threeWeekPrice
+        : null,
+    currency,
+  };
+}
+
+function getBookingPriceForDuration(pricing, durationWeeks) {
+  const amount =
+    durationWeeks === 3
+      ? pricing.threeWeekPrice
+      : durationWeeks === 2
+      ? pricing.twoWeekPrice
+      : pricing.oneWeekPrice;
+
+  if (typeof amount !== "number" || amount <= 0) {
+    throw new HttpsError(
+      "failed-precondition",
+      "Booking pricing is not configured for this duration yet."
+    );
+  }
+
+  return {
+    amount,
+    currency: pricing.currency || "EUR",
+  };
+}
+
+function toStripeUnitAmount(amount) {
+  const numericAmount = Number(amount || 0);
+
+  if (!Number.isFinite(numericAmount) || numericAmount <= 0) {
+    throw new HttpsError(
+      "invalid-argument",
+      "A valid positive amount is required for checkout."
+    );
+  }
+
+  return Math.round(numericAmount * 100);
+}
+
+function getBookingProductName(durationWeeks) {
+  return `Wild Atlantic Bootcamp · ${durationWeeks} week${
+    durationWeeks === 1 ? "" : "s"
+  }`;
+}
+
+async function sendBookingEntitlementEmail({
+  code,
+  customerEmail,
+  customerName = "",
+  durationWeeks,
+  amount,
+  currency = "EUR",
+}) {
+  const apiKey = getResendApiKey();
+  const fromEmail = getResendFromEmail();
+  const redeemUrl = `${getAppBaseUrl()}/login?next=${encodeURIComponent(
+    `/dashboard/book?code=${code}`
+  )}`;
+  const safeName = String(customerName || "").trim() || "there";
+  const formattedAmount = new Intl.NumberFormat("en-IE", {
+    style: "currency",
+    currency,
+    maximumFractionDigits: 2,
+  }).format(Number(amount || 0));
+  const plural = durationWeeks === 1 ? "" : "s";
+  const response = await fetch("https://api.resend.com/emails", {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${apiKey}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      from: fromEmail,
+      to: [customerEmail],
+      subject: `Your ${durationWeeks}-week booking code`,
+      html: `
+        <div style="font-family: Arial, sans-serif; color: #0f172a; line-height: 1.6;">
+          <p>Hi ${safeName},</p>
+          <p>Thanks for your purchase. Your ${durationWeeks}-week bootcamp credit is ready.</p>
+          <p><strong>Code:</strong> ${code}<br /><strong>Value:</strong> ${formattedAmount}</p>
+          <p>Create your account with this email or open the link below to redeem your stay.</p>
+          <p><a href="${redeemUrl}" style="display:inline-block;background:#0f172a;color:#ffffff;padding:12px 18px;border-radius:10px;text-decoration:none;">Redeem ${durationWeeks} week${plural}</a></p>
+          <p>If you already have an account with this same email, the credit can appear automatically in your Book section.</p>
+        </div>
+      `,
+    }),
+  });
+
+  const payload = await response.json().catch(() => ({}));
+
+  if (!response.ok) {
+    throw new Error(
+      typeof payload?.message === "string"
+        ? payload.message
+        : "Resend email request failed."
+    );
+  }
+
+  return payload;
+}
+
+function normalizeBookingEntitlementCode(value) {
+  const raw = String(value || "")
+    .toUpperCase()
+    .replace(/[^A-Z0-9]/g, "");
+  const withoutPrefix = raw.startsWith("WAB") ? raw.slice(3) : raw;
+  const core = withoutPrefix.slice(0, 12);
+
+  if (core.length !== 12) {
+    return "";
+  }
+
+  return `WAB-${core.slice(0, 4)}-${core.slice(4, 8)}-${core.slice(8, 12)}`;
+}
+
+function createBookingEntitlementCode() {
+  return normalizeBookingEntitlementCode(randomUUID());
+}
+
+async function generateUniqueBookingEntitlementCode() {
+  for (let attempt = 0; attempt < 5; attempt += 1) {
+    const code = createBookingEntitlementCode();
+    const snap = await db.collection("bookingEntitlements").doc(code).get();
+
+    if (!snap.exists) {
+      return code;
+    }
+  }
+
+  throw new HttpsError(
+    "internal",
+    "Could not generate a unique redemption code."
+  );
+}
+
+function isActiveBookingEntitlementStatus(status) {
+  return status === "issued" || status === "claimed";
+}
+
+function sanitizeBookingEntitlement(data = {}, docId = "") {
+  return {
+    id: docId,
+    code: String(data.code || docId || ""),
+    customerEmail: String(data.customerEmail || "").trim().toLowerCase(),
+    customerName: String(data.customerName || "").trim(),
+    durationWeeks: normalizeBookingDuration(data.durationWeeks),
+    amount: typeof data.amount === "number" ? data.amount : null,
+    currency: String(data.currency || "EUR").trim().toUpperCase() || "EUR",
+    status: String(data.status || "issued"),
+    notes: String(data.notes || "").trim(),
+    claimedByUid: String(data.claimedByUid || "").trim(),
+    claimedByEmail: String(data.claimedByEmail || "").trim().toLowerCase(),
+    bookingId: String(data.bookingId || "").trim(),
+    createdAt: data.createdAt || null,
+    redeemedAt: data.redeemedAt || null,
+  };
+}
+
+async function loadUserBookingEntitlements({ userId, email }) {
+  const normalizedEmail = String(email || "").trim().toLowerCase();
+
+  const [claimedSnap, emailSnap] = await Promise.all([
+    db.collection("bookingEntitlements").where("claimedByUid", "==", userId).get(),
+    normalizedEmail
+      ? db
+          .collection("bookingEntitlements")
+          .where("customerEmail", "==", normalizedEmail)
+          .get()
+      : Promise.resolve(null),
+  ]);
+
+  const merged = new Map();
+
+  [claimedSnap, emailSnap]
+    .filter(Boolean)
+    .forEach((snap) => {
+      snap.docs.forEach((doc) => {
+        merged.set(doc.id, sanitizeBookingEntitlement(doc.data() || {}, doc.id));
+      });
+    });
+
+  return [...merged.values()]
+    .filter((item) => isActiveBookingEntitlementStatus(item.status))
+    .filter(
+      (item) => !item.claimedByUid || item.claimedByUid === String(userId || "")
+    )
+    .sort(
+      (a, b) =>
+        Number(b.createdAt?.seconds || 0) - Number(a.createdAt?.seconds || 0)
+    );
 }
 
 function getRecipientAliases(userId, userData) {
@@ -663,6 +1138,830 @@ export const sendPushNotification = onCall(
       throw new HttpsError(
         "internal",
         error instanceof Error ? error.message : "Push failed."
+      );
+    }
+  }
+);
+
+export const getUserBookingCatalog = onCall(
+  { region: "us-central1" },
+  async (request) => {
+    try {
+      await assertClientUser(request.auth);
+
+      const [context, pricing, bookingUser, userBookingsSnap] = await Promise.all([
+        loadBookingContext(),
+        loadBookingPricing(),
+        resolveBookingUser(request.auth.uid),
+        db.collection("bookings").where("userId", "==", request.auth.uid).get(),
+      ]);
+      const entitlements = await loadUserBookingEntitlements({
+        userId: request.auth.uid,
+        email: bookingUser.customerEmail,
+      });
+
+      const userBookings = userBookingsSnap.docs
+        .map((doc) => {
+          const data = doc.data() || {};
+
+          return {
+            id: doc.id,
+            startWeekId: String(data.startWeekId || ""),
+            weekIds: Array.isArray(data.weekIds)
+              ? data.weekIds.map((value) => String(value || "")).filter(Boolean)
+              : [],
+            durationWeeks: normalizeBookingDuration(data.durationWeeks),
+            status: String(data.status || "pending"),
+            paymentStatus: String(data.paymentStatus || "pending"),
+            paymentMethod: String(data.paymentMethod || "stripe"),
+            customPrice:
+              typeof data.customPrice === "number" ? data.customPrice : null,
+            currency: String(data.currency || pricing.currency || "EUR"),
+            createdAt: data.createdAt || null,
+          };
+        })
+        .sort(
+          (a, b) =>
+            Number(b.createdAt?.seconds || 0) - Number(a.createdAt?.seconds || 0)
+        );
+
+      return {
+        weeks: context.weeks.map((week) => ({
+          id: week.id,
+          startDate: String(week.startDate || ""),
+          endDate: String(week.endDate || ""),
+          active: Boolean(week.active),
+          capacity: Number(week.capacity || 0),
+          booked: Number(week.booked || 0),
+          label: String(week.label || ""),
+          notes: String(week.notes || ""),
+        })),
+        pricing,
+        bookings: userBookings,
+        entitlements,
+      };
+    } catch (error) {
+      console.error("getUserBookingCatalog error:", error);
+      if (error instanceof HttpsError) throw error;
+      throw new HttpsError(
+        "internal",
+        error instanceof Error ? error.message : "Could not load booking catalog."
+      );
+    }
+  }
+);
+
+export const getPublicBookingAvailability = onRequest(
+  { region: "us-central1" },
+  async (req, res) => {
+    res.set("Access-Control-Allow-Origin", "*");
+    res.set("Access-Control-Allow-Methods", "GET, OPTIONS");
+    res.set("Access-Control-Allow-Headers", "Content-Type");
+
+    if (req.method === "OPTIONS") {
+      res.status(204).send("");
+      return;
+    }
+
+    if (req.method !== "GET") {
+      res.status(405).json({ error: "Method not allowed" });
+      return;
+    }
+
+    try {
+      const today = getTodayDateString();
+      const { weeks } = await loadBookingContext();
+      const availableWeeks = weeks
+        .filter((week) => {
+          if (!week.active) return false;
+          if (getRemainingSpots(week) <= 0) return false;
+          if (String(week.startDate || "") < today) return false;
+          return true;
+        })
+        .map((week) => ({
+          id: week.id,
+          startDate: String(week.startDate || ""),
+          endDate: String(week.endDate || ""),
+          label:
+            String(week.label || "").trim() ||
+            formatPublicWeekLabel(
+              String(week.startDate || ""),
+              String(week.endDate || "")
+            ),
+          remainingSpots: getRemainingSpots(week),
+        }));
+
+      res.set("Cache-Control", "public, max-age=300, s-maxage=300");
+      res.status(200).json({
+        weeks: availableWeeks,
+      });
+    } catch (error) {
+      console.error("getPublicBookingAvailability error:", error);
+      res.status(500).json({
+        error:
+          error instanceof Error
+            ? error.message
+            : "Could not load public booking availability.",
+      });
+    }
+  }
+);
+
+export const createBookingEntitlement = onCall(
+  { region: "us-central1" },
+  async (request) => {
+    try {
+      await assertAdmin(request.auth);
+
+      const customerEmail = String(request.data?.customerEmail || "")
+        .trim()
+        .toLowerCase();
+      const customerName = String(request.data?.customerName || "").trim();
+      const durationWeeks = normalizeBookingDuration(request.data?.durationWeeks);
+      const requestedAmount = Number(request.data?.amount || 0);
+      const requestedCurrency = String(request.data?.currency || "")
+        .trim()
+        .toUpperCase();
+      const notes = String(request.data?.notes || "").trim();
+
+      if (!isValidEmailAddress(customerEmail)) {
+        throw new HttpsError(
+          "invalid-argument",
+          "A valid customerEmail is required."
+        );
+      }
+
+      const pricing = await loadBookingPricing();
+      const fallbackPrice = getBookingPriceForDuration(pricing, durationWeeks);
+      const amount = requestedAmount > 0 ? requestedAmount : fallbackPrice.amount;
+      const currency = requestedCurrency || fallbackPrice.currency;
+      const code = await generateUniqueBookingEntitlementCode();
+
+      await db.collection("bookingEntitlements").doc(code).set({
+        code,
+        customerEmail,
+        customerName,
+        durationWeeks,
+        amount,
+        currency,
+        status: "issued",
+        source: "external",
+        notes,
+        createdBy: request.auth.uid,
+        createdAt: FieldValue.serverTimestamp(),
+        updatedAt: FieldValue.serverTimestamp(),
+      });
+
+      return {
+        id: code,
+        code,
+        customerEmail,
+        durationWeeks,
+        amount,
+        currency,
+      };
+    } catch (error) {
+      console.error("createBookingEntitlement error:", error);
+      if (error instanceof HttpsError) throw error;
+      throw new HttpsError(
+        "internal",
+        error instanceof Error
+          ? error.message
+          : "Could not create booking entitlement."
+      );
+    }
+  }
+);
+
+export const getPublicBookingPricing = onRequest(
+  { region: "us-central1" },
+  async (req, res) => {
+    res.set("Access-Control-Allow-Origin", "*");
+    res.set("Access-Control-Allow-Methods", "GET, OPTIONS");
+    res.set("Access-Control-Allow-Headers", "Content-Type");
+
+    if (req.method === "OPTIONS") {
+      res.status(204).send("");
+      return;
+    }
+
+    if (req.method !== "GET") {
+      res.status(405).json({ error: "Method not allowed" });
+      return;
+    }
+
+    try {
+      const pricing = await loadBookingPricing();
+
+      res.set("Cache-Control", "public, max-age=300, s-maxage=300");
+      res.status(200).json({
+        pricing: {
+          oneWeekPrice: pricing.oneWeekPrice,
+          twoWeekPrice: pricing.twoWeekPrice,
+          threeWeekPrice: pricing.threeWeekPrice,
+          currency: pricing.currency || "EUR",
+        },
+      });
+    } catch (error) {
+      console.error("getPublicBookingPricing error:", error);
+      res.status(500).json({
+        error:
+          error instanceof Error
+            ? error.message
+            : "Could not load public booking pricing.",
+      });
+    }
+  }
+);
+
+export const claimBookingEntitlementCode = onCall(
+  { region: "us-central1" },
+  async (request) => {
+    try {
+      await assertClientUser(request.auth);
+
+      const bookingUser = await resolveBookingUser(request.auth.uid);
+      const code = normalizeBookingEntitlementCode(request.data?.code);
+
+      if (!code) {
+        throw new HttpsError("invalid-argument", "A valid redemption code is required.");
+      }
+
+      const entitlementRef = db.collection("bookingEntitlements").doc(code);
+      const entitlementSnap = await entitlementRef.get();
+
+      if (!entitlementSnap.exists) {
+        throw new HttpsError("not-found", "Redemption code not found.");
+      }
+
+      const entitlementData = entitlementSnap.data() || {};
+      const status = String(entitlementData.status || "issued");
+      const claimedByUid = String(entitlementData.claimedByUid || "").trim();
+
+      if (status === "redeemed") {
+        throw new HttpsError(
+          "failed-precondition",
+          "This code has already been redeemed."
+        );
+      }
+
+      if (status === "cancelled" || status === "expired") {
+        throw new HttpsError(
+          "failed-precondition",
+          "This code is no longer active."
+        );
+      }
+
+      if (claimedByUid && claimedByUid !== request.auth.uid) {
+        throw new HttpsError(
+          "permission-denied",
+          "This code is already linked to another account."
+        );
+      }
+
+      const updates = {
+        claimedByUid: request.auth.uid,
+        claimedByEmail: bookingUser.customerEmail,
+        updatedAt: FieldValue.serverTimestamp(),
+      };
+
+      if (!claimedByUid) {
+        updates.claimedAt = FieldValue.serverTimestamp();
+        updates.status = status === "issued" ? "claimed" : status;
+      }
+
+      await entitlementRef.set(updates, { merge: true });
+
+      const latestSnap = await entitlementRef.get();
+
+      return {
+        entitlement: sanitizeBookingEntitlement(latestSnap.data() || {}, latestSnap.id),
+      };
+    } catch (error) {
+      console.error("claimBookingEntitlementCode error:", error);
+      if (error instanceof HttpsError) throw error;
+      throw new HttpsError(
+        "internal",
+        error instanceof Error ? error.message : "Could not claim redemption code."
+      );
+    }
+  }
+);
+
+export const redeemBookingEntitlement = onCall(
+  { region: "us-central1" },
+  async (request) => {
+    try {
+      await assertClientUser(request.auth);
+
+      const entitlementId = normalizeBookingEntitlementCode(
+        request.data?.entitlementId || request.data?.code
+      );
+      const startWeekId = String(request.data?.startWeekId || "").trim();
+
+      if (!entitlementId) {
+        throw new HttpsError(
+          "invalid-argument",
+          "A valid entitlementId is required."
+        );
+      }
+
+      if (!startWeekId) {
+        throw new HttpsError("invalid-argument", "startWeekId is required.");
+      }
+
+      const [context, bookingUser, pricing] = await Promise.all([
+        loadBookingContext(),
+        resolveBookingUser(request.auth.uid),
+        loadBookingPricing(),
+      ]);
+
+      const entitlementRef = db.collection("bookingEntitlements").doc(entitlementId);
+      const entitlementSnap = await entitlementRef.get();
+
+      if (!entitlementSnap.exists) {
+        throw new HttpsError("not-found", "Redemption code not found.");
+      }
+
+      const entitlementData = entitlementSnap.data() || {};
+      const entitlement = sanitizeBookingEntitlement(entitlementData, entitlementSnap.id);
+
+      if (entitlement.status === "redeemed") {
+        throw new HttpsError(
+          "failed-precondition",
+          "This code has already been redeemed."
+        );
+      }
+
+      if (entitlement.status === "cancelled" || entitlement.status === "expired") {
+        throw new HttpsError(
+          "failed-precondition",
+          "This code is no longer active."
+        );
+      }
+
+      if (entitlement.claimedByUid && entitlement.claimedByUid !== request.auth.uid) {
+        throw new HttpsError(
+          "permission-denied",
+          "This code is linked to another account."
+        );
+      }
+
+      const canUseByEmail =
+        entitlement.customerEmail &&
+        entitlement.customerEmail === bookingUser.customerEmail;
+
+      if (!entitlement.claimedByUid && !canUseByEmail) {
+        throw new HttpsError(
+          "permission-denied",
+          "Claim this code first from the account that will redeem it."
+        );
+      }
+
+      const durationWeeks = normalizeBookingDuration(entitlement.durationWeeks);
+      const selectedWeeks = getConsecutiveBookingWeeks(
+        context.weeks,
+        startWeekId,
+        durationWeeks
+      );
+
+      const hasOverlappingBooking = context.bookings.some((booking) => {
+        if (String(booking.userId || "") !== request.auth.uid) {
+          return false;
+        }
+
+        if (booking.status === "cancelled" || !Array.isArray(booking.weekIds)) {
+          return false;
+        }
+
+        return selectedWeeks.some((week) => booking.weekIds.includes(week.id));
+      });
+
+      if (hasOverlappingBooking) {
+        throw new HttpsError(
+          "failed-precondition",
+          "You already have a booking covering one or more of these weeks."
+        );
+      }
+
+      const fallbackPrice = getBookingPriceForDuration(pricing, durationWeeks);
+      const amount =
+        typeof entitlement.amount === "number" && entitlement.amount > 0
+          ? entitlement.amount
+          : fallbackPrice.amount;
+      const currency = entitlement.currency || fallbackPrice.currency;
+
+      const payload = {
+        startWeekId,
+        weekIds: selectedWeeks.map((week) => week.id),
+        durationWeeks,
+        status: "confirmed",
+        source: "public",
+        paymentStatus: "paid",
+        paymentMethod: "manual",
+        consumesCapacity: true,
+        customerName: bookingUser.customerName,
+        customerEmail: bookingUser.customerEmail,
+        userId: bookingUser.userId,
+        profileId: bookingUser.profileId || "",
+        shortStay: false,
+        shortStayNights: null,
+        customPrice: amount,
+        currency,
+        notes: [String(entitlement.notes || "").trim(), `Redeemed code ${entitlementId}`]
+          .filter(Boolean)
+          .join(" · "),
+      };
+
+      validateBookingPayload(payload, selectedWeeks);
+
+      const bookingRef = db.collection("bookings").doc();
+
+      await db.runTransaction(async (transaction) => {
+        const latestEntitlementSnap = await transaction.get(entitlementRef);
+
+        if (!latestEntitlementSnap.exists) {
+          throw new HttpsError("not-found", "Redemption code not found.");
+        }
+
+        const latestEntitlement = sanitizeBookingEntitlement(
+          latestEntitlementSnap.data() || {},
+          latestEntitlementSnap.id
+        );
+
+        if (latestEntitlement.status === "redeemed") {
+          throw new HttpsError(
+            "failed-precondition",
+            "This code has already been redeemed."
+          );
+        }
+
+        if (
+          latestEntitlement.claimedByUid &&
+          latestEntitlement.claimedByUid !== request.auth.uid
+        ) {
+          throw new HttpsError(
+            "permission-denied",
+            "This code is linked to another account."
+          );
+        }
+
+        transaction.set(bookingRef, {
+          ...payload,
+          entitlementId,
+          createdAt: FieldValue.serverTimestamp(),
+          updatedAt: FieldValue.serverTimestamp(),
+          createdBy: request.auth.uid,
+        });
+
+        transaction.set(
+          entitlementRef,
+          {
+            claimedByUid: request.auth.uid,
+            claimedByEmail: bookingUser.customerEmail,
+            claimedAt: latestEntitlement.claimedByUid
+              ? latestEntitlementSnap.get("claimedAt") || FieldValue.serverTimestamp()
+              : FieldValue.serverTimestamp(),
+            status: "redeemed",
+            bookingId: bookingRef.id,
+            redeemedByUid: request.auth.uid,
+            redeemedStartWeekId: startWeekId,
+            redeemedAt: FieldValue.serverTimestamp(),
+            updatedAt: FieldValue.serverTimestamp(),
+          },
+          { merge: true }
+        );
+      });
+
+      return {
+        id: bookingRef.id,
+        entitlementId,
+        weekIds: payload.weekIds,
+        amount: payload.customPrice,
+        currency: payload.currency,
+        durationWeeks: payload.durationWeeks,
+      };
+    } catch (error) {
+      console.error("redeemBookingEntitlement error:", error);
+      if (error instanceof HttpsError) throw error;
+      throw new HttpsError(
+        "internal",
+        error instanceof Error
+          ? error.message
+          : "Could not redeem booking entitlement."
+      );
+    }
+  }
+);
+
+export const createUserBookingCheckoutSession = onCall(
+  { region: "us-central1", secrets: ["STRIPE_SECRET_KEY"] },
+  async (request) => {
+    try {
+      await assertClientUser(request.auth);
+
+      const durationWeeks = normalizeBookingDuration(request.data?.durationWeeks);
+      const startWeekId = String(request.data?.startWeekId || "").trim();
+      const notes = String(request.data?.notes || "").trim();
+
+      if (!startWeekId) {
+        throw new HttpsError("invalid-argument", "startWeekId is required.");
+      }
+
+      const [context, bookingUser, pricing] = await Promise.all([
+        loadBookingContext(),
+        resolveBookingUser(request.auth.uid),
+        loadBookingPricing(),
+      ]);
+
+      const selectedWeeks = getConsecutiveBookingWeeks(
+        context.weeks,
+        startWeekId,
+        durationWeeks
+      );
+      const price = getBookingPriceForDuration(pricing, durationWeeks);
+
+      const hasOverlappingBooking = context.bookings.some((booking) => {
+        if (String(booking.userId || "") !== request.auth.uid) {
+          return false;
+        }
+
+        if (booking.status === "cancelled" || !Array.isArray(booking.weekIds)) {
+          return false;
+        }
+
+        return selectedWeeks.some((week) => booking.weekIds.includes(week.id));
+      });
+
+      if (hasOverlappingBooking) {
+        throw new HttpsError(
+          "failed-precondition",
+          "You already have a booking covering one or more of these weeks."
+        );
+      }
+
+      const payload = {
+        startWeekId,
+        weekIds: selectedWeeks.map((week) => week.id),
+        durationWeeks,
+        status: "pending",
+        source: "public",
+        paymentStatus: "pending",
+        paymentMethod: "stripe",
+        consumesCapacity: true,
+        customerName: bookingUser.customerName,
+        customerEmail: bookingUser.customerEmail,
+        userId: bookingUser.userId,
+        profileId: bookingUser.profileId || "",
+        shortStay: false,
+        shortStayNights: null,
+        customPrice: price.amount,
+        currency: price.currency,
+        notes,
+      };
+
+      validateBookingPayload(payload, selectedWeeks);
+
+      const bookingRef = await db.collection("bookings").add({
+        ...payload,
+        createdAt: FieldValue.serverTimestamp(),
+        updatedAt: FieldValue.serverTimestamp(),
+        createdBy: request.auth.uid,
+        checkoutStatus: "open",
+      });
+
+      const { stripeAccountId } = await getReadyStripeConnectedAccount();
+      const stripe = getStripeClient();
+      const session = await stripe.checkout.sessions.create({
+        mode: "payment",
+        customer_email: bookingUser.customerEmail,
+        client_reference_id: bookingRef.id,
+        metadata: {
+          flow: "internal_booking",
+          bookingId: bookingRef.id,
+          userId: request.auth.uid,
+          startWeekId,
+          durationWeeks: String(durationWeeks),
+          connectedAccountId: stripeAccountId,
+        },
+        success_url: resolveCheckoutReturnUrl(
+          "/dashboard/book?checkout=success",
+          "/dashboard/book?checkout=success"
+        ),
+        cancel_url: resolveCheckoutReturnUrl(
+          `/dashboard/book?checkout=cancel&bookingId=${encodeURIComponent(
+            bookingRef.id
+          )}`,
+          "/dashboard/book?checkout=cancel"
+        ),
+        line_items: [
+          {
+            quantity: 1,
+            price_data: {
+              currency: price.currency.toLowerCase(),
+              unit_amount: toStripeUnitAmount(price.amount),
+              product_data: {
+                name: getBookingProductName(durationWeeks),
+                description: `${selectedWeeks.length} consecutive bootcamp week${
+                  selectedWeeks.length === 1 ? "" : "s"
+                }`,
+              },
+            },
+          },
+        ],
+      }, {
+        stripeAccount: stripeAccountId,
+      });
+
+      await bookingRef.set(
+        {
+          stripeAccountId,
+          stripeCheckoutSessionId: session.id,
+          updatedAt: FieldValue.serverTimestamp(),
+        },
+        { merge: true }
+      );
+
+      return {
+        bookingId: bookingRef.id,
+        url: session.url || "",
+        sessionId: session.id,
+      };
+    } catch (error) {
+      console.error("createUserBookingCheckoutSession error:", error);
+      if (error instanceof HttpsError) throw error;
+      throw new HttpsError(
+        "internal",
+        error instanceof Error
+          ? error.message
+          : "Could not create booking checkout session."
+      );
+    }
+  }
+);
+
+export const createExternalBookingCheckoutSession = onCall(
+  { region: "us-central1", secrets: ["STRIPE_SECRET_KEY"] },
+  async (request) => {
+    try {
+      const customerEmail = String(request.data?.customerEmail || "")
+        .trim()
+        .toLowerCase();
+      const customerName = String(request.data?.customerName || "").trim();
+      const durationWeeks = normalizeBookingDuration(request.data?.durationWeeks);
+
+      if (!isValidEmailAddress(customerEmail)) {
+        throw new HttpsError(
+          "invalid-argument",
+          "A valid customerEmail is required."
+        );
+      }
+
+      const pricing = await loadBookingPricing();
+      const price = getBookingPriceForDuration(pricing, durationWeeks);
+      const { stripeAccountId } = await getReadyStripeConnectedAccount();
+      const stripe = getStripeClient();
+      const session = await stripe.checkout.sessions.create({
+        mode: "payment",
+        customer_email: customerEmail,
+        metadata: {
+          flow: "external_entitlement",
+          customerEmail,
+          customerName,
+          durationWeeks: String(durationWeeks),
+          connectedAccountId: stripeAccountId,
+        },
+        success_url: resolveCheckoutReturnUrl(
+          "/book?checkout=external-success",
+          "/book?checkout=external-success"
+        ),
+        cancel_url: resolveCheckoutReturnUrl(
+          "/book?checkout=external-cancel",
+          "/book?checkout=external-cancel"
+        ),
+        line_items: [
+          {
+            quantity: 1,
+            price_data: {
+              currency: price.currency.toLowerCase(),
+              unit_amount: toStripeUnitAmount(price.amount),
+              product_data: {
+                name: `${getBookingProductName(durationWeeks)} credit`,
+                description:
+                  "Redeemable stay credit for a later week selection inside the client portal.",
+              },
+            },
+          },
+        ],
+      }, {
+        stripeAccount: stripeAccountId,
+      });
+
+      return {
+        url: session.url || "",
+        sessionId: session.id,
+      };
+    } catch (error) {
+      console.error("createExternalBookingCheckoutSession error:", error);
+      if (error instanceof HttpsError) throw error;
+      throw new HttpsError(
+        "internal",
+        error instanceof Error
+          ? error.message
+          : "Could not create external booking checkout session."
+      );
+    }
+  }
+);
+
+export const createUserBooking = onCall(
+  { region: "us-central1" },
+  async (request) => {
+    try {
+      await assertClientUser(request.auth);
+
+      const durationWeeks = normalizeBookingDuration(request.data?.durationWeeks);
+      const startWeekId = String(request.data?.startWeekId || "").trim();
+      const notes = String(request.data?.notes || "").trim();
+
+      if (!startWeekId) {
+        throw new HttpsError("invalid-argument", "startWeekId is required.");
+      }
+
+      const [context, bookingUser, pricing] = await Promise.all([
+        loadBookingContext(),
+        resolveBookingUser(request.auth.uid),
+        loadBookingPricing(),
+      ]);
+
+      const selectedWeeks = getConsecutiveBookingWeeks(
+        context.weeks,
+        startWeekId,
+        durationWeeks
+      );
+      const price = getBookingPriceForDuration(pricing, durationWeeks);
+
+      const hasOverlappingBooking = context.bookings.some((booking) => {
+        if (String(booking.userId || "") !== request.auth.uid) {
+          return false;
+        }
+
+        if (booking.status === "cancelled" || !Array.isArray(booking.weekIds)) {
+          return false;
+        }
+
+        return selectedWeeks.some((week) => booking.weekIds.includes(week.id));
+      });
+
+      if (hasOverlappingBooking) {
+        throw new HttpsError(
+          "failed-precondition",
+          "You already have a booking covering one or more of these weeks."
+        );
+      }
+
+      const payload = {
+        startWeekId,
+        weekIds: selectedWeeks.map((week) => week.id),
+        durationWeeks,
+        status: "pending",
+        source: "public",
+        paymentStatus: "pending",
+        paymentMethod: "stripe",
+        consumesCapacity: true,
+        customerName: bookingUser.customerName,
+        customerEmail: bookingUser.customerEmail,
+        userId: bookingUser.userId,
+        profileId: bookingUser.profileId || "",
+        shortStay: false,
+        shortStayNights: null,
+        customPrice: price.amount,
+        currency: price.currency,
+        notes,
+      };
+
+      validateBookingPayload(payload, selectedWeeks);
+
+      const docRef = await db.collection("bookings").add({
+        ...payload,
+        createdAt: FieldValue.serverTimestamp(),
+        updatedAt: FieldValue.serverTimestamp(),
+        createdBy: request.auth.uid,
+      });
+
+      return {
+        id: docRef.id,
+        weekIds: payload.weekIds,
+        amount: payload.customPrice,
+        currency: payload.currency,
+        durationWeeks: payload.durationWeeks,
+      };
+    } catch (error) {
+      console.error("createUserBooking error:", error);
+      if (error instanceof HttpsError) throw error;
+      throw new HttpsError(
+        "internal",
+        error instanceof Error ? error.message : "Booking creation failed."
       );
     }
   }
@@ -903,36 +2202,267 @@ export const deleteAdminBooking = onCall(
   }
 );
 
+async function fulfillInternalBookingCheckoutSession(session) {
+  if (session.payment_status !== "paid") {
+    return;
+  }
+
+  const bookingId =
+    String(session.metadata?.bookingId || "").trim() ||
+    String(session.client_reference_id || "").trim();
+
+  if (!bookingId) {
+    throw new Error("Missing bookingId metadata on internal booking checkout session.");
+  }
+
+  const bookingRef = db.collection("bookings").doc(bookingId);
+  const bookingSnap = await bookingRef.get();
+
+  if (!bookingSnap.exists) {
+    throw new Error(`Booking ${bookingId} not found for checkout session ${session.id}.`);
+  }
+
+  const bookingData = bookingSnap.data() || {};
+
+  if (bookingData.paymentStatus === "paid" && bookingData.status === "confirmed") {
+    return;
+  }
+
+  await bookingRef.set(
+    {
+      status: "confirmed",
+      paymentStatus: "paid",
+      paymentMethod: "stripe",
+      checkoutStatus: "complete",
+      stripeCheckoutSessionId: session.id,
+      stripePaymentIntentId: String(session.payment_intent || "").trim(),
+      paidAt: FieldValue.serverTimestamp(),
+      updatedAt: FieldValue.serverTimestamp(),
+    },
+    { merge: true }
+  );
+}
+
+async function fulfillExternalEntitlementCheckoutSession(session) {
+  if (session.payment_status !== "paid") {
+    return;
+  }
+
+  const existingSnap = await db
+    .collection("bookingEntitlements")
+    .where("stripeCheckoutSessionId", "==", session.id)
+    .limit(1)
+    .get();
+
+  let entitlementRef;
+  let entitlementData;
+
+  if (existingSnap.empty) {
+    const durationWeeks = normalizeBookingDuration(session.metadata?.durationWeeks);
+    const customerEmail = String(
+      session.metadata?.customerEmail ||
+        session.customer_details?.email ||
+        session.customer_email ||
+        ""
+    )
+      .trim()
+      .toLowerCase();
+    const customerName = String(
+      session.metadata?.customerName || session.customer_details?.name || ""
+    ).trim();
+    const amountTotal =
+      typeof session.amount_total === "number" ? session.amount_total / 100 : null;
+    const currency =
+      String(session.currency || "eur").trim().toUpperCase() || "EUR";
+
+    if (!isValidEmailAddress(customerEmail)) {
+      throw new Error(
+        `Missing valid customer email for external entitlement session ${session.id}.`
+      );
+    }
+
+    const code = await generateUniqueBookingEntitlementCode();
+    entitlementRef = db.collection("bookingEntitlements").doc(code);
+    entitlementData = {
+      code,
+      customerEmail,
+      customerName,
+      durationWeeks,
+      amount: amountTotal,
+      currency,
+      status: "issued",
+      source: "external",
+      notes: "Created automatically from Stripe Checkout.",
+      stripeAccountId: String(session.metadata?.connectedAccountId || "").trim(),
+      stripeCheckoutSessionId: session.id,
+      stripePaymentIntentId: String(session.payment_intent || "").trim(),
+      emailDeliveryStatus: "pending",
+      createdAt: FieldValue.serverTimestamp(),
+      updatedAt: FieldValue.serverTimestamp(),
+    };
+
+    await entitlementRef.set(entitlementData);
+  } else {
+    entitlementRef = existingSnap.docs[0].ref;
+    entitlementData = existingSnap.docs[0].data() || {};
+  }
+
+  if (entitlementData.emailSentAt) {
+    return;
+  }
+
+  const code = String(entitlementData.code || entitlementRef.id || "");
+  const customerEmail = String(entitlementData.customerEmail || "").trim().toLowerCase();
+  const customerName = String(entitlementData.customerName || "").trim();
+  const durationWeeks = normalizeBookingDuration(entitlementData.durationWeeks);
+  const amount =
+    typeof entitlementData.amount === "number" ? entitlementData.amount : 0;
+  const currency = String(entitlementData.currency || "EUR").trim().toUpperCase();
+
+  const emailResult = await sendBookingEntitlementEmail({
+    code,
+    customerEmail,
+    customerName,
+    durationWeeks,
+    amount,
+    currency,
+  });
+
+  await entitlementRef.set(
+    {
+      emailDeliveryStatus: "sent",
+      emailMessageId: String(emailResult?.id || "").trim(),
+      emailSentAt: FieldValue.serverTimestamp(),
+      updatedAt: FieldValue.serverTimestamp(),
+    },
+    { merge: true }
+  );
+}
+
+export const stripeWebhook = onRequest(
+  {
+    region: "us-central1",
+    secrets: [
+      "STRIPE_SECRET_KEY",
+      "STRIPE_WEBHOOK_SECRET",
+      "RESEND_API_KEY",
+      "RESEND_FROM_EMAIL",
+    ],
+  },
+  async (req, res) => {
+    if (req.method !== "POST") {
+      res.status(405).send("Method not allowed");
+      return;
+    }
+
+    try {
+      const stripe = getStripeClient();
+      const signatureHeader = req.headers["stripe-signature"];
+      const signature = Array.isArray(signatureHeader)
+        ? signatureHeader[0]
+        : signatureHeader;
+
+      if (!signature) {
+        res.status(400).send("Missing Stripe-Signature header.");
+        return;
+      }
+
+      const event = stripe.webhooks.constructEvent(
+        req.rawBody,
+        signature,
+        getStripeWebhookSecret()
+      );
+
+      if (
+        event.type === "checkout.session.completed" ||
+        event.type === "checkout.session.async_payment_succeeded"
+      ) {
+        const session = event.data.object;
+        const flow = String(session.metadata?.flow || "").trim();
+
+        if (flow === "internal_booking") {
+          await fulfillInternalBookingCheckoutSession(session);
+        } else if (flow === "external_entitlement") {
+          await fulfillExternalEntitlementCheckoutSession(session);
+        }
+      }
+
+      res.status(200).json({ received: true });
+    } catch (error) {
+      console.error("stripeWebhook error:", error);
+      res.status(400).send(
+        error instanceof Error ? error.message : "Webhook handling failed."
+      );
+    }
+  }
+);
+
 export const createStripeConnectAuthorizeUrl = onCall(
-  { region: "us-central1" },
+  { region: "us-central1", secrets: ["STRIPE_SECRET_KEY"] },
   async (request) => {
     try {
       await assertAdmin(request.auth);
 
+      const stripe = getStripeClient();
       const paymentsRef = db.collection("settings").doc("payments");
-      const clientId = getStripeConnectClientId();
-      const state = randomUUID();
-      const redirectUri = getStripeAdminReturnUrl();
+      const paymentsSnap = await paymentsRef.get();
+      const paymentsData = paymentsSnap.exists ? paymentsSnap.data() || {} : {};
+      const existingAccountId = String(paymentsData.stripeAccountId || "").trim();
+
+      if (
+        paymentsData.connectionMode === "oauth" &&
+        existingAccountId
+      ) {
+        const clientId = getStripeConnectClientId();
+        const state = randomUUID();
+        const redirectUri = getStripeAdminPaymentsUrl();
+
+        await paymentsRef.set(
+          {
+            provider: "stripe_connect",
+            accountType: "standard",
+            connectionMode: "oauth",
+            pendingOauthState: state,
+            pendingOauthUserId: request.auth.uid,
+            oauthRedirectUri: redirectUri,
+            updatedAt: FieldValue.serverTimestamp(),
+          },
+          { merge: true }
+        );
+
+        return {
+          url:
+            "https://connect.stripe.com/oauth/authorize" +
+            `?response_type=code&client_id=${encodeURIComponent(clientId)}` +
+            `&scope=read_write&state=${encodeURIComponent(state)}` +
+            `&redirect_uri=${encodeURIComponent(redirectUri)}`,
+        };
+      }
+
+      const account = existingAccountId
+        ? await stripe.accounts.retrieve(existingAccountId)
+        : await stripe.accounts.create({
+            type: "standard",
+            metadata: {
+              platform: "bootcamp-platform",
+            },
+          });
 
       await paymentsRef.set(
-        {
-          provider: "stripe_connect",
-          accountType: "standard",
-          connectionMode: "oauth",
-          pendingOauthState: state,
-          pendingOauthUserId: request.auth.uid,
-          oauthRedirectUri: redirectUri,
-          updatedAt: FieldValue.serverTimestamp(),
-        },
+        buildStripeAccountSnapshot(account, paymentsData),
         { merge: true }
       );
 
+      const accountLink = await stripe.accountLinks.create({
+        account: account.id,
+        refresh_url: getStripeAdminRefreshUrl(),
+        return_url: getStripeAdminReturnUrl(),
+        type: "account_onboarding",
+      });
+
       return {
-        url:
-          "https://connect.stripe.com/oauth/authorize" +
-          `?response_type=code&client_id=${encodeURIComponent(clientId)}` +
-          `&scope=read_write&state=${encodeURIComponent(state)}` +
-          `&redirect_uri=${encodeURIComponent(redirectUri)}`,
+        url: accountLink.url,
+        stripeAccountId: account.id,
       };
     } catch (error) {
       console.error("createStripeConnectAuthorizeUrl error:", error);
@@ -946,7 +2476,7 @@ export const createStripeConnectAuthorizeUrl = onCall(
 );
 
 export const completeStripeConnectStandard = onCall(
-  { region: "us-central1" },
+  { region: "us-central1", secrets: ["STRIPE_SECRET_KEY"] },
   async (request) => {
     try {
       await assertAdmin(request.auth);
@@ -989,28 +2519,26 @@ export const completeStripeConnectStandard = onCall(
         code,
       });
 
-      await paymentsRef.set(
-        {
-          provider: "stripe_connect",
-          accountType: "standard",
+      const { account, snapshot } = await syncStripeAccountSettings({
+        stripe,
+        paymentsRef,
+        paymentsData,
+        stripeAccountId: tokenResponse.stripe_user_id,
+        extra: {
           connectionMode: "oauth",
-          stripeAccountId: tokenResponse.stripe_user_id,
-          scope: tokenResponse.scope || "read_write",
           livemode: Boolean(tokenResponse.livemode),
-          onboardingComplete: true,
-          pendingOauthState: FieldValue.delete(),
-          pendingOauthUserId: FieldValue.delete(),
-          oauthRedirectUri: FieldValue.delete(),
-          updatedAt: FieldValue.serverTimestamp(),
-          connectedAt: FieldValue.serverTimestamp(),
+          scope: tokenResponse.scope || "read_write",
         },
-        { merge: true }
-      );
+      });
 
       return {
         stripeAccountId: tokenResponse.stripe_user_id,
         livemode: Boolean(tokenResponse.livemode),
         scope: tokenResponse.scope || "read_write",
+        chargesEnabled: Boolean(account.charges_enabled),
+        payoutsEnabled: Boolean(account.payouts_enabled),
+        detailsSubmitted: Boolean(account.details_submitted),
+        onboardingComplete: Boolean(snapshot.onboardingComplete),
       };
     } catch (error) {
       console.error("completeStripeConnectStandard error:", error);
@@ -1024,7 +2552,7 @@ export const completeStripeConnectStandard = onCall(
 );
 
 export const refreshStripeConnectStatus = onCall(
-  { region: "us-central1" },
+  { region: "us-central1", secrets: ["STRIPE_SECRET_KEY"] },
   async (request) => {
     try {
       await assertAdmin(request.auth);
@@ -1050,32 +2578,24 @@ export const refreshStripeConnectStatus = onCall(
         );
       }
 
-      const account = await stripe.accounts.retrieve(stripeAccountId);
-
-      await paymentsRef.set(
-        {
-          provider: "stripe_connect",
-          stripeAccountId: account.id,
-          accountEmail: account.email || paymentsData.accountEmail || "",
-          country: account.country || "",
-          currency: account.default_currency || "",
-          chargesEnabled: Boolean(account.charges_enabled),
-          payoutsEnabled: Boolean(account.payouts_enabled),
-          detailsSubmitted: Boolean(account.details_submitted),
-          onboardingComplete: Boolean(
-            account.details_submitted &&
-              account.charges_enabled
-          ),
-          updatedAt: FieldValue.serverTimestamp(),
-        },
-        { merge: true }
-      );
+      const { account, snapshot } = await syncStripeAccountSettings({
+        stripe,
+        paymentsRef,
+        paymentsData,
+        stripeAccountId,
+      });
 
       return {
         stripeAccountId: account.id,
         chargesEnabled: Boolean(account.charges_enabled),
         payoutsEnabled: Boolean(account.payouts_enabled),
         detailsSubmitted: Boolean(account.details_submitted),
+        onboardingComplete: Boolean(snapshot.onboardingComplete),
+        requirementsCurrentlyDue: snapshot.requirementsCurrentlyDue,
+        requirementsPastDue: snapshot.requirementsPastDue,
+        requirementsPendingVerification:
+          snapshot.requirementsPendingVerification,
+        requirementsDisabledReason: snapshot.requirementsDisabledReason,
       };
     } catch (error) {
       console.error("refreshStripeConnectStatus error:", error);
