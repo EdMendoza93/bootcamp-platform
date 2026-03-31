@@ -6,21 +6,20 @@ import { useUnreadMessageCount } from "@/components/messages/useUnreadMessageCou
 
 const navItems = [
   { label: "Overview", href: "/admin" },
-  { label: "Staff", href: "/admin/staff" },
   { label: "Applications", href: "/admin/applications" },
-  { label: "Profiles", href: "/admin/profiles" },
-  { label: "Schedule", href: "/admin/schedule" },
-  { label: "Online Sessions", href: "/admin/online-sessions" },
   { label: "Availability", href: "/admin/availability" },
   { label: "Bookings", href: "/admin/bookings" },
   { label: "Messages", href: "/admin/messages" },
-  { label: "Payments", href: "/admin/payments" },
-  { label: "Templates", href: "/admin/templates" },
+  { label: "Profiles", href: "/admin/profiles" },
   { label: "Progress", href: "/admin/progress" },
+  { label: "Staff", href: "/admin/staff" },
+  { label: "Schedule", href: "/admin/schedule" },
+  { label: "Payments", href: "/admin/payments" },
   { label: "Training", href: "/admin/training" },
   { label: "Nutrition", href: "/admin/nutrition" },
   { label: "Activities", href: "/admin/activities" },
   { label: "Notifications", href: "/admin/notifications" },
+  { label: "Online Sessions", href: "/admin/online-sessions" },
 ];
 
 export default function AdminSideBar({
@@ -59,7 +58,7 @@ export default function AdminSideBar({
               Admin control center
             </p>
             <p className="mt-1 text-sm leading-6 text-slate-200">
-              Manage clients, schedule, templates, payments, and progress.
+              Manage clients, scheduling, content, payments, and progress.
             </p>
           </div>
         </div>

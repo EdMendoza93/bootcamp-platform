@@ -10,7 +10,6 @@ const navItems = [
   { label: "Schedule", href: "/staff/schedule" },
   { label: "Sessions", href: "/staff/sessions" },
   { label: "Messages", href: "/staff/messages" },
-  { label: "Templates", href: "/staff/templates" },
 ];
 
 export default function StaffSidebar({
