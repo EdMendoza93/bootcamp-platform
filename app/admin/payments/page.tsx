@@ -326,9 +326,7 @@ export default function AdminPaymentsPage() {
               Stripe Connect Setup
             </h1>
 
-            <p className="mt-3 max-w-3xl text-sm text-slate-600 md:text-base">
-              The bootcamp owner can complete Stripe-hosted onboarding directly from this area. They do not need to send you Stripe keys or touch Firebase.
-            </p>
+          
 
             <div className="mt-6 flex flex-wrap gap-3">
               <button
