@@ -23,8 +23,8 @@ export default function ClientSidebar({
   const unreadCount = useUnreadMessageCount();
 
   return (
-    <aside className="h-full border-r border-white/70 bg-[linear-gradient(180deg,rgba(255,255,255,0.9),rgba(245,250,255,0.86))] backdrop-blur-xl">
-      <div className="flex h-full flex-col p-6">
+    <aside className="h-full border-b border-white/70 bg-[linear-gradient(180deg,rgba(255,255,255,0.9),rgba(245,250,255,0.86))] backdrop-blur-xl md:min-h-screen md:w-[300px] md:border-b-0 md:border-r">
+      <div className="flex h-full min-h-0 flex-col p-6">
         <div className="mb-8">
           <div className="inline-flex items-center rounded-full border border-[#bfdbfe] bg-gradient-to-r from-white to-[#eff6ff] px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.2em] text-[#1d4ed8] shadow-sm">
             Client Area
@@ -47,7 +47,7 @@ export default function ClientSidebar({
           </p>
         </div>
 
-        <nav className="flex flex-col gap-2">
+        <nav className="flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto pr-1">
           {navItems.map((item) => {
             const isDashboard = item.href === "/dashboard";
 
@@ -88,7 +88,7 @@ export default function ClientSidebar({
           })}
         </nav>
 
-        <div className="mt-auto pt-8">
+        <div className="mt-8 md:mt-auto md:pt-8">
           <div className="overflow-hidden rounded-[24px] border border-emerald-100 bg-[radial-gradient(circle_at_top_right,rgba(16,185,129,0.12),transparent_30%),linear-gradient(135deg,#ffffff,#ecfdf5)] p-4 shadow-[0_16px_35px_rgba(16,185,129,0.08)]">
             <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[#1d4ed8]">
               Your journey

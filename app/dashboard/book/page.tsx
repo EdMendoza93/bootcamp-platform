@@ -489,11 +489,11 @@ export default function DashboardBookPage() {
 
   return (
     <div className="mx-auto max-w-6xl space-y-8 pb-28">
-      <section className="overflow-hidden rounded-[32px] border border-white/70 bg-white/90 shadow-[0_24px_80px_rgba(15,23,42,0.10)] backdrop-blur">
+      <section className="overflow-hidden rounded-[28px] border border-white/70 bg-white/90 shadow-[0_24px_80px_rgba(15,23,42,0.10)] backdrop-blur md:rounded-[32px]">
         <div className="bg-gradient-to-r from-[#071120] via-[#123b76] to-[#2EA0FF] p-[1px]">
           <div className="rounded-t-[31px] bg-transparent px-0 py-0" />
         </div>
-        <div className="relative overflow-hidden p-6 md:p-8">
+        <div className="relative overflow-hidden p-5 md:p-8">
           <div className="absolute right-0 top-0 h-40 w-40 rounded-full bg-[#2EA0FF]/10 blur-3xl" />
           <div className="absolute bottom-0 left-0 h-32 w-32 rounded-full bg-emerald-300/10 blur-3xl" />
 
@@ -501,7 +501,7 @@ export default function DashboardBookPage() {
             <div className="inline-flex items-center rounded-full border border-[#bfdbfe] bg-[#eff6ff] px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.2em] text-[#1d4ed8]">
               Book
             </div>
-            <h1 className="mt-4 text-3xl font-semibold tracking-tight text-slate-950 md:text-4xl">
+            <h1 className="mt-4 text-[1.9rem] font-semibold tracking-tight text-slate-950 md:text-4xl">
               Book Your Stay
             </h1>
             <p className="mt-3 max-w-3xl text-sm text-slate-600 md:text-base">
@@ -550,7 +550,7 @@ export default function DashboardBookPage() {
         <SummaryCard label="Currency" value={pricing.currency || "EUR"} />
       </section>
 
-      <section className="rounded-[28px] border border-white/70 bg-white/95 p-6 shadow-[0_18px_50px_rgba(15,23,42,0.07)] backdrop-blur">
+      <section className="rounded-[24px] border border-white/70 bg-white/95 p-5 shadow-[0_18px_50px_rgba(15,23,42,0.07)] backdrop-blur sm:p-6 md:rounded-[28px]">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
             <h2 className="text-xl font-semibold text-slate-950">
@@ -616,7 +616,7 @@ export default function DashboardBookPage() {
         )}
       </section>
 
-      <section className="rounded-[28px] border border-white/70 bg-white/95 p-6 shadow-[0_18px_50px_rgba(15,23,42,0.07)] backdrop-blur">
+      <section className="rounded-[24px] border border-white/70 bg-white/95 p-5 shadow-[0_18px_50px_rgba(15,23,42,0.07)] backdrop-blur sm:p-6 md:rounded-[28px]">
         <div>
           <h2 className="text-xl font-semibold text-slate-950">
             Upcoming weeks
@@ -633,7 +633,7 @@ export default function DashboardBookPage() {
         ) : (
           <div className="mt-6 space-y-6">
             <div className="rounded-[24px] border border-slate-100 bg-gradient-to-br from-white to-[#f8fbff] p-4 shadow-[0_12px_32px_rgba(15,23,42,0.05)]">
-              <div className="flex items-center justify-between gap-4">
+              <div className="flex flex-col items-start gap-3 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
                 <div>
                   <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#1d4ed8]">
                     Browse by month
@@ -656,7 +656,7 @@ export default function DashboardBookPage() {
                     key={month.key}
                     type="button"
                     onClick={() => setSelectedMonthKey(month.key)}
-                    className={`rounded-[18px] px-4 py-3 text-left text-sm font-medium transition ${
+                    className={`min-w-[170px] rounded-[18px] px-4 py-3 text-left text-sm font-medium transition sm:min-w-0 ${
                       active
                         ? "bg-slate-950 text-white shadow-[0_14px_28px_rgba(15,23,42,0.18)]"
                         : "border border-slate-200 bg-white text-slate-700 hover:bg-slate-50"
@@ -710,7 +710,7 @@ export default function DashboardBookPage() {
       </section>
 
       <section className="grid gap-4 lg:grid-cols-[1.05fr_0.95fr]">
-        <div className="rounded-[28px] border border-white/70 bg-white/95 p-6 shadow-[0_18px_50px_rgba(15,23,42,0.07)] backdrop-blur">
+        <div className="rounded-[24px] border border-white/70 bg-white/95 p-5 shadow-[0_18px_50px_rgba(15,23,42,0.07)] backdrop-blur sm:p-6 md:rounded-[28px]">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div>
               <h2 className="text-xl font-semibold text-slate-950">
@@ -762,7 +762,7 @@ export default function DashboardBookPage() {
 
         <div
           id="redeem-code"
-          className="rounded-[28px] border border-white/70 bg-white/95 p-6 shadow-[0_18px_50px_rgba(15,23,42,0.07)] backdrop-blur"
+          className="rounded-[24px] border border-white/70 bg-white/95 p-5 shadow-[0_18px_50px_rgba(15,23,42,0.07)] backdrop-blur sm:p-6 md:rounded-[28px]"
         >
           <h2 className="text-xl font-semibold text-slate-950">Redeem code</h2>
           <p className="mt-2 text-sm text-slate-600">
@@ -875,8 +875,8 @@ function BookingWeekCard({
   ];
 
   return (
-    <div className="overflow-hidden rounded-[26px] border border-slate-100 bg-gradient-to-br from-white via-[#fbfdff] to-[#f2f8ff] shadow-[0_18px_50px_rgba(15,23,42,0.07)]">
-      <div className="border-b border-slate-100/90 px-5 py-5 md:px-6">
+    <div className="overflow-hidden rounded-[22px] border border-slate-100 bg-gradient-to-br from-white via-[#fbfdff] to-[#f2f8ff] shadow-[0_18px_50px_rgba(15,23,42,0.07)] md:rounded-[26px]">
+      <div className="border-b border-slate-100/90 px-4 py-4 sm:px-5 sm:py-5 md:px-6">
         <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-center gap-2">
@@ -908,7 +908,7 @@ function BookingWeekCard({
       </div>
       </div>
 
-      <div className="bg-[linear-gradient(180deg,_rgba(248,251,255,0.78),_rgba(255,255,255,0.96))] px-5 py-5 md:px-6">
+      <div className="bg-[linear-gradient(180deg,_rgba(248,251,255,0.78),_rgba(255,255,255,0.96))] px-4 py-4 sm:px-5 sm:py-5 md:px-6">
         <div className="flex items-center justify-between gap-4">
           <div>
             <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#1d4ed8]">
@@ -932,7 +932,7 @@ function BookingWeekCard({
           return (
             <div
               key={`${week.id}-${option.duration}`}
-              className={`rounded-[20px] border p-4 ${
+              className={`rounded-[18px] border p-3.5 sm:rounded-[20px] sm:p-4 ${
                 disabled
                   ? "border-slate-200 bg-slate-50"
                   : "border-[#bfdbfe] bg-gradient-to-br from-[#eff6ff] via-white to-[#f8fbff] shadow-[0_12px_30px_rgba(37,99,235,0.05)]"
