@@ -71,6 +71,23 @@ function formatDateLabel(date: string) {
   });
 }
 
+function formatMonthLabel(date: string) {
+  if (!date) return "No month";
+
+  return new Date(`${date}T12:00:00`).toLocaleDateString("en-US", {
+    month: "long",
+    year: "numeric",
+  });
+}
+
+function formatMonthShort(date: string) {
+  if (!date) return "Month";
+
+  return new Date(`${date}T12:00:00`).toLocaleDateString("en-US", {
+    month: "short",
+  });
+}
+
 function formatMoney(amount?: number | null, currency = "EUR") {
   if (typeof amount !== "number" || Number.isNaN(amount)) {
     return "Price pending";
@@ -116,6 +133,7 @@ export default function DashboardBookPage() {
   const [redeemingKey, setRedeemingKey] = useState("");
   const [redeemCode, setRedeemCode] = useState("");
   const [claimingCode, setClaimingCode] = useState(false);
+  const [selectedMonthKey, setSelectedMonthKey] = useState("");
 
   const { showToast } = useToast();
 
@@ -284,6 +302,56 @@ export default function DashboardBookPage() {
     return counts;
   }, [availableEntitlements]);
 
+  const monthSections = useMemo(() => {
+    const buckets = new Map<
+      string,
+      {
+        key: string;
+        label: string;
+        items: typeof weekItems;
+      }
+    >();
+
+    weekItems.forEach((item) => {
+      const key = String(item.week.startDate || "").slice(0, 7);
+      const existing = buckets.get(key);
+
+      if (existing) {
+        existing.items.push(item);
+        return;
+      }
+
+      buckets.set(key, {
+        key,
+        label: formatMonthLabel(item.week.startDate),
+        items: [item],
+      });
+    });
+
+    return Array.from(buckets.values());
+  }, [weekItems]);
+
+  useEffect(() => {
+    if (monthSections.length === 0) {
+      if (selectedMonthKey) {
+        setSelectedMonthKey("");
+      }
+      return;
+    }
+
+    if (!selectedMonthKey || !monthSections.some((month) => month.key === selectedMonthKey)) {
+      setSelectedMonthKey(monthSections[0].key);
+    }
+  }, [monthSections, selectedMonthKey]);
+
+  const visibleWeekItems = useMemo(() => {
+    if (!selectedMonthKey) {
+      return weekItems;
+    }
+
+    return monthSections.find((month) => month.key === selectedMonthKey)?.items || [];
+  }, [monthSections, selectedMonthKey, weekItems]);
+
   const handleBooking = async (
     startWeekId: string,
     durationWeeks: BookingDurationWeeks
@@ -447,6 +515,21 @@ export default function DashboardBookPage() {
               <HeaderPill label="Pending payment" value={String(summary.pendingPayment)} />
               <HeaderPill label="Credits ready" value={String(summary.availableCredits)} />
             </div>
+
+            <div className="mt-5">
+              <button
+                type="button"
+                onClick={() =>
+                  document.getElementById("redeem-code")?.scrollIntoView({
+                    behavior: "smooth",
+                    block: "start",
+                  })
+                }
+                className="inline-flex rounded-full border border-[#bfdbfe] bg-white px-4 py-2 text-sm font-medium text-[#1d4ed8] transition hover:bg-[#eff6ff]"
+              >
+                Redeem code
+              </button>
+            </div>
           </div>
         </div>
       </section>
@@ -465,6 +548,165 @@ export default function DashboardBookPage() {
           value={formatMoney(pricing.threeWeekPrice, pricing.currency)}
         />
         <SummaryCard label="Currency" value={pricing.currency || "EUR"} />
+      </section>
+
+      <section className="rounded-[28px] border border-white/70 bg-white/95 p-6 shadow-[0_18px_50px_rgba(15,23,42,0.07)] backdrop-blur">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <h2 className="text-xl font-semibold text-slate-950">
+              My bookings
+            </h2>
+            <p className="mt-2 text-sm text-slate-600">
+              Keep track of bookings already created from your account.
+            </p>
+          </div>
+        </div>
+
+        {bookings.length === 0 ? (
+          <div className="mt-6 rounded-[22px] border border-dashed border-slate-200 p-8 text-center text-sm text-slate-500">
+            You do not have any bookings yet.
+          </div>
+        ) : (
+          <div className="mt-6 grid gap-4 md:grid-cols-2">
+            {bookings.map((booking) => (
+              <div
+                key={booking.id}
+                className="rounded-[24px] border border-slate-100 bg-gradient-to-br from-white via-[#fbfdff] to-[#f1f7ff] p-5 shadow-[0_14px_34px_rgba(15,23,42,0.06)]"
+              >
+                <div className="flex flex-wrap items-start justify-between gap-3">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <StatusTag
+                      label={booking.status || "pending"}
+                      tone={booking.status === "cancelled" ? "danger" : "blue"}
+                    />
+                    <StatusTag
+                      label={booking.paymentStatus || "pending"}
+                      tone={booking.paymentStatus === "paid" ? "success" : "warning"}
+                    />
+                  </div>
+                  <span className="rounded-full border border-slate-200 bg-white px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500">
+                    {booking.durationWeeks} week{booking.durationWeeks === 1 ? "" : "s"}
+                  </span>
+                </div>
+                <h3 className="mt-4 text-lg font-semibold text-slate-950">
+                  {booking.durationWeeks} week
+                  {booking.durationWeeks === 1 ? "" : "s"}
+                </h3>
+                <div className="mt-4 grid gap-3 sm:grid-cols-2">
+                  <div className="rounded-[18px] border border-slate-100 bg-white/80 px-4 py-3">
+                    <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">
+                      Price
+                    </p>
+                    <p className="mt-2 text-sm font-medium text-slate-900">
+                      {formatMoney(booking.customPrice, booking.currency || pricing.currency)}
+                    </p>
+                  </div>
+                  <div className="rounded-[18px] border border-slate-100 bg-white/80 px-4 py-3">
+                    <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">
+                      Start week
+                    </p>
+                    <p className="mt-2 text-sm font-medium text-slate-900">
+                      {weekLookup.get(booking.startWeekId) || "Pending assignment"}
+                    </p>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </section>
+
+      <section className="rounded-[28px] border border-white/70 bg-white/95 p-6 shadow-[0_18px_50px_rgba(15,23,42,0.07)] backdrop-blur">
+        <div>
+          <h2 className="text-xl font-semibold text-slate-950">
+            Upcoming weeks
+          </h2>
+          <p className="mt-2 text-sm text-slate-600">
+            Choose a month first, then open the weeks available within that month.
+          </p>
+        </div>
+
+        {weekItems.length === 0 ? (
+          <div className="mt-6 rounded-[22px] border border-dashed border-slate-200 p-10 text-center text-sm text-slate-500">
+            No upcoming bootcamp weeks are available yet.
+          </div>
+        ) : (
+          <div className="mt-6 space-y-6">
+            <div className="rounded-[24px] border border-slate-100 bg-gradient-to-br from-white to-[#f8fbff] p-4 shadow-[0_12px_32px_rgba(15,23,42,0.05)]">
+              <div className="flex items-center justify-between gap-4">
+                <div>
+                  <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#1d4ed8]">
+                    Browse by month
+                  </p>
+                  <p className="mt-1 text-sm text-slate-600">
+                    Select the month you want to explore first.
+                  </p>
+                </div>
+                <div className="rounded-full border border-slate-200 bg-white px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500">
+                  {visibleWeekItems.length} weeks shown
+                </div>
+              </div>
+
+            <div className="mt-4 flex flex-wrap gap-3">
+              {monthSections.map((month) => {
+                const active = month.key === selectedMonthKey;
+
+                return (
+                  <button
+                    key={month.key}
+                    type="button"
+                    onClick={() => setSelectedMonthKey(month.key)}
+                    className={`rounded-[18px] px-4 py-3 text-left text-sm font-medium transition ${
+                      active
+                        ? "bg-slate-950 text-white shadow-[0_14px_28px_rgba(15,23,42,0.18)]"
+                        : "border border-slate-200 bg-white text-slate-700 hover:bg-slate-50"
+                    }`}
+                  >
+                    <div className="flex items-center gap-3">
+                      <span
+                        className={`inline-flex h-10 w-10 items-center justify-center rounded-full text-[11px] font-semibold uppercase tracking-[0.14em] ${
+                          active ? "bg-white/10 text-white" : "bg-[#eff6ff] text-[#1d4ed8]"
+                        }`}
+                      >
+                        {formatMonthShort(`${month.key}-01`)}
+                      </span>
+                      <div>
+                        <p>{month.label}</p>
+                        <p
+                          className={`mt-1 text-xs ${
+                            active ? "text-white/65" : "text-slate-500"
+                          }`}
+                        >
+                          {month.items.length} available week
+                          {month.items.length === 1 ? "" : "s"}
+                        </p>
+                      </div>
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
+            </div>
+
+            <div className="grid gap-5">
+              {visibleWeekItems.map((item) => (
+                <BookingWeekCard
+                  key={item.week.id}
+                  week={item.week}
+                  pricing={pricing}
+                  entitlementCounts={entitlementCounts}
+                  startableOneWeek={item.startableOneWeek}
+                  startableTwoWeeks={item.startableTwoWeeks}
+                  startableThreeWeeks={item.startableThreeWeeks}
+                  bookingKey={bookingKey}
+                  redeemingKey={redeemingKey}
+                  onBook={handleBooking}
+                  onRedeem={handleRedeem}
+                />
+              ))}
+            </div>
+          </div>
+        )}
       </section>
 
       <section className="grid gap-4 lg:grid-cols-[1.05fr_0.95fr]">
@@ -489,7 +731,7 @@ export default function DashboardBookPage() {
               {availableEntitlements.map((item) => (
                 <div
                   key={item.id}
-                  className="rounded-[22px] border border-[#bfdbfe] bg-gradient-to-br from-[#eff6ff] to-white p-5"
+                  className="rounded-[22px] border border-[#bfdbfe] bg-gradient-to-br from-[#eff6ff] via-white to-[#f8fbff] p-5 shadow-[0_12px_30px_rgba(37,99,235,0.05)]"
                 >
                   <div className="flex flex-wrap items-center gap-2">
                     <StatusTag label={item.status} tone="blue" />
@@ -501,9 +743,14 @@ export default function DashboardBookPage() {
                   <p className="mt-4 text-lg font-semibold tracking-[0.06em] text-slate-950">
                     {item.code}
                   </p>
-                  <p className="mt-2 text-sm text-slate-600">
-                    Value: {formatMoney(item.amount, item.currency || pricing.currency)}
-                  </p>
+                  <div className="mt-4 rounded-[18px] border border-slate-100 bg-white/80 px-4 py-3">
+                    <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">
+                      Value
+                    </p>
+                    <p className="mt-2 text-sm font-medium text-slate-900">
+                      {formatMoney(item.amount, item.currency || pricing.currency)}
+                    </p>
+                  </div>
                   {item.notes ? (
                     <p className="mt-2 text-sm leading-6 text-slate-500">{item.notes}</p>
                   ) : null}
@@ -513,7 +760,10 @@ export default function DashboardBookPage() {
           )}
         </div>
 
-        <div className="rounded-[28px] border border-white/70 bg-white/95 p-6 shadow-[0_18px_50px_rgba(15,23,42,0.07)] backdrop-blur">
+        <div
+          id="redeem-code"
+          className="rounded-[28px] border border-white/70 bg-white/95 p-6 shadow-[0_18px_50px_rgba(15,23,42,0.07)] backdrop-blur"
+        >
           <h2 className="text-xl font-semibold text-slate-950">Redeem code</h2>
           <p className="mt-2 text-sm text-slate-600">
             Enter the code you received after an external purchase and it will unlock here instantly.
@@ -535,96 +785,11 @@ export default function DashboardBookPage() {
               {claimingCode ? "Adding code..." : "Add code"}
             </button>
 
-            <div className="rounded-[22px] border border-[#bfdbfe] bg-[#eff6ff] px-4 py-3 text-sm text-slate-700">
+            <div className="rounded-[22px] border border-[#bfdbfe] bg-[#eff6ff] px-4 py-3 text-sm leading-6 text-slate-700">
               If the same email was used during the external purchase, your credit can also appear automatically without typing the code.
             </div>
           </div>
         </div>
-      </section>
-
-      <section className="rounded-[28px] border border-white/70 bg-white/95 p-6 shadow-[0_18px_50px_rgba(15,23,42,0.07)] backdrop-blur">
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <div>
-            <h2 className="text-xl font-semibold text-slate-950">
-              My bookings
-            </h2>
-            <p className="mt-2 text-sm text-slate-600">
-              Keep track of bookings already created from your account.
-            </p>
-          </div>
-        </div>
-
-        {bookings.length === 0 ? (
-          <div className="mt-6 rounded-[22px] border border-dashed border-slate-200 p-8 text-center text-sm text-slate-500">
-            You do not have any bookings yet.
-          </div>
-        ) : (
-          <div className="mt-6 grid gap-4 md:grid-cols-2">
-            {bookings.map((booking) => (
-              <div
-                key={booking.id}
-                className="rounded-[24px] border border-slate-100 bg-gradient-to-br from-white to-[#f8fbff] p-5 shadow-sm"
-              >
-                <div className="flex flex-wrap items-center gap-2">
-                  <StatusTag
-                    label={booking.status || "pending"}
-                    tone={booking.status === "cancelled" ? "danger" : "blue"}
-                  />
-                  <StatusTag
-                    label={booking.paymentStatus || "pending"}
-                    tone={booking.paymentStatus === "paid" ? "success" : "warning"}
-                  />
-                </div>
-                <h3 className="mt-4 text-lg font-semibold text-slate-950">
-                  {booking.durationWeeks} week
-                  {booking.durationWeeks === 1 ? "" : "s"}
-                </h3>
-                <p className="mt-1 text-sm text-slate-600">
-                  Price: {formatMoney(booking.customPrice, booking.currency || pricing.currency)}
-                </p>
-                <p className="mt-1 text-sm text-slate-500">
-                  Start week: {weekLookup.get(booking.startWeekId) || "Pending assignment"}
-                </p>
-              </div>
-            ))}
-          </div>
-        )}
-      </section>
-
-      <section className="rounded-[28px] border border-white/70 bg-white/95 p-6 shadow-[0_18px_50px_rgba(15,23,42,0.07)] backdrop-blur">
-        <div>
-          <h2 className="text-xl font-semibold text-slate-950">
-            Upcoming weeks
-          </h2>
-          <p className="mt-2 text-sm text-slate-600">
-            Choose the week you want to start from. Each card shows which stay
-            lengths can begin there.
-          </p>
-        </div>
-
-        {weekItems.length === 0 ? (
-          <div className="mt-6 rounded-[22px] border border-dashed border-slate-200 p-10 text-center text-sm text-slate-500">
-            No upcoming bootcamp weeks are available yet.
-          </div>
-        ) : (
-          <div className="mt-6 grid gap-5">
-            {weekItems.map((item) => (
-              <BookingWeekCard
-                key={item.week.id}
-                week={item.week}
-                pricing={pricing}
-                entitlementCounts={entitlementCounts}
-                startableOneWeek={item.startableOneWeek}
-                startableTwoWeeks={item.startableTwoWeeks}
-                startableThreeWeeks={item.startableThreeWeeks}
-                bookingKey={bookingKey}
-                redeemingKey={redeemingKey}
-                onBook={handleBooking}
-                onRedeem={handleRedeem}
-              />
-            ))}
-          </div>
-        )}
       </section>
     </div>
   );
@@ -640,9 +805,11 @@ function HeaderPill({ label, value }: { label: string; value: string }) {
 
 function SummaryCard({ label, value }: { label: string; value: string }) {
   return (
-    <div className="rounded-[24px] border border-[#bfdbfe] bg-gradient-to-br from-[#eff6ff] to-white p-5 shadow-[0_14px_40px_rgba(15,23,42,0.07)]">
-      <p className="text-sm font-semibold text-[#1d4ed8]">{label}</p>
-      <p className="mt-2 text-2xl font-semibold tracking-tight text-slate-950">
+    <div className="rounded-[24px] border border-[#bfdbfe] bg-gradient-to-br from-[#eff6ff] via-white to-[#f8fbff] p-5 shadow-[0_14px_40px_rgba(15,23,42,0.07)]">
+      <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[#1d4ed8]">
+        {label}
+      </p>
+      <p className="mt-3 text-2xl font-semibold tracking-tight text-slate-950">
         {value}
       </p>
     </div>
@@ -708,8 +875,9 @@ function BookingWeekCard({
   ];
 
   return (
-    <div className="rounded-[24px] border border-slate-100 bg-gradient-to-br from-white to-[#f8fbff] p-5 shadow-sm">
-      <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+    <div className="overflow-hidden rounded-[26px] border border-slate-100 bg-gradient-to-br from-white via-[#fbfdff] to-[#f2f8ff] shadow-[0_18px_50px_rgba(15,23,42,0.07)]">
+      <div className="border-b border-slate-100/90 px-5 py-5 md:px-6">
+        <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-center gap-2">
             <StatusTag
@@ -738,8 +906,21 @@ function BookingWeekCard({
           ) : null}
         </div>
       </div>
+      </div>
 
-      <div className="mt-5 grid gap-3 md:grid-cols-3">
+      <div className="bg-[linear-gradient(180deg,_rgba(248,251,255,0.78),_rgba(255,255,255,0.96))] px-5 py-5 md:px-6">
+        <div className="flex items-center justify-between gap-4">
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#1d4ed8]">
+              Available formats
+            </p>
+            <p className="mt-1 text-sm text-slate-600">
+              Choose the stay length that can begin from this week.
+            </p>
+          </div>
+        </div>
+
+      <div className="mt-4 grid gap-3 md:grid-cols-3">
         {options.map((option) => {
           const price = getPriceForDuration(pricing, option.duration);
           const nextKey = `${week.id}-${option.duration}`;
@@ -754,13 +935,25 @@ function BookingWeekCard({
               className={`rounded-[20px] border p-4 ${
                 disabled
                   ? "border-slate-200 bg-slate-50"
-                  : "border-[#bfdbfe] bg-gradient-to-br from-[#eff6ff] to-white"
+                  : "border-[#bfdbfe] bg-gradient-to-br from-[#eff6ff] via-white to-[#f8fbff] shadow-[0_12px_30px_rgba(37,99,235,0.05)]"
               }`}
             >
-              <p className="text-sm font-semibold text-slate-950">
-                {option.duration} week{option.duration === 1 ? "" : "s"}
-              </p>
-              <p className="mt-2 text-lg font-semibold tracking-tight text-slate-950">
+              <div className="flex items-start justify-between gap-3">
+                <p className="text-sm font-semibold text-slate-950">
+                  {option.duration} week{option.duration === 1 ? "" : "s"}
+                </p>
+                {option.available ? (
+                  <span className="rounded-full border border-emerald-200 bg-emerald-50 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-emerald-700">
+                    Open
+                  </span>
+                ) : (
+                  <span className="rounded-full border border-slate-200 bg-white px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-500">
+                    Closed
+                  </span>
+                )}
+              </div>
+
+              <p className="mt-3 text-lg font-semibold tracking-tight text-slate-950">
                 {formatMoney(price, pricing.currency)}
               </p>
               <p className="mt-1 text-xs text-slate-500">
@@ -809,6 +1002,7 @@ function BookingWeekCard({
             </div>
           );
         })}
+      </div>
       </div>
     </div>
   );
