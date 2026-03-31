@@ -361,7 +361,7 @@ export default function AdminPaymentsPage() {
         </div>
       </section>
 
-      <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+      <section className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
         <SummaryCard
           label="Provider"
           value={settings?.provider === "stripe_connect" ? "Stripe Connect" : "Pending"}
@@ -570,9 +570,15 @@ function SummaryCard({
   };
 
   return (
-    <div className={`rounded-[24px] border p-5 shadow-[0_14px_40px_rgba(15,23,42,0.07)] ${styles[tone]}`}>
-      <p className={`text-sm font-semibold ${labelStyles[tone]}`}>{label}</p>
-      <p className="mt-2 text-3xl font-semibold tracking-tight text-slate-950">{value}</p>
+    <div
+      className={`rounded-[20px] border px-4 py-3 shadow-[0_10px_28px_rgba(15,23,42,0.06)] ${styles[tone]}`}
+    >
+      <p className={`text-[11px] font-semibold uppercase tracking-[0.14em] ${labelStyles[tone]}`}>
+        {label}
+      </p>
+      <p className="mt-1.5 text-base font-semibold tracking-tight text-slate-950">
+        {value}
+      </p>
     </div>
   );
 }

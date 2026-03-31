@@ -45,6 +45,19 @@ function getStripeWebhookSecret() {
   return webhookSecret;
 }
 
+function getStripeConnectWebhookSecret() {
+  const webhookSecret = process.env.STRIPE_CONNECT_WEBHOOK_SECRET;
+
+  if (!webhookSecret) {
+    throw new HttpsError(
+      "failed-precondition",
+      "Missing STRIPE_CONNECT_WEBHOOK_SECRET in functions environment."
+    );
+  }
+
+  return webhookSecret;
+}
+
 function getResendApiKey() {
   const apiKey = process.env.RESEND_API_KEY;
 
@@ -79,6 +92,15 @@ function resolveCheckoutReturnUrl(path, fallbackPath) {
       : fallbackPath;
 
   return `${appBaseUrl}${safePath}`;
+}
+
+function getFunctionsBaseUrl() {
+  const projectId =
+    process.env.GCLOUD_PROJECT ||
+    process.env.GCP_PROJECT ||
+    "bootcamp-platform-27d16";
+
+  return `https://us-central1-${projectId}.cloudfunctions.net`;
 }
 
 function getStripeAdminPaymentsUrl(params = {}) {
@@ -762,6 +784,69 @@ function getBookingProductName(durationWeeks) {
   return `Wild Atlantic Bootcamp · ${durationWeeks} week${
     durationWeeks === 1 ? "" : "s"
   }`;
+}
+
+async function createExternalCheckoutSession({
+  customerEmail,
+  customerName = "",
+  durationWeeks,
+}) {
+  if (!isValidEmailAddress(customerEmail)) {
+    throw new HttpsError(
+      "invalid-argument",
+      "A valid customerEmail is required."
+    );
+  }
+
+  const pricing = await loadBookingPricing();
+  const price = getBookingPriceForDuration(pricing, durationWeeks);
+  const { stripeAccountId } = await getReadyStripeConnectedAccount();
+  const stripe = getStripeClient();
+  const finalizeUrl = new URL(
+    `${getFunctionsBaseUrl()}/finalizeExternalBookingCheckout`
+  );
+  finalizeUrl.searchParams.set("account_id", stripeAccountId);
+  const session = await stripe.checkout.sessions.create(
+    {
+      mode: "payment",
+      customer_email: customerEmail,
+      metadata: {
+        flow: "external_entitlement",
+        customerEmail,
+        customerName,
+        durationWeeks: String(durationWeeks),
+        connectedAccountId: stripeAccountId,
+      },
+      success_url: `${finalizeUrl.toString()}&session_id={CHECKOUT_SESSION_ID}`,
+      cancel_url: resolveCheckoutReturnUrl(
+        "/book?checkout=external-cancel",
+        "/book?checkout=external-cancel"
+      ),
+      line_items: [
+        {
+          quantity: 1,
+          price_data: {
+            currency: price.currency.toLowerCase(),
+            unit_amount: toStripeUnitAmount(price.amount),
+            product_data: {
+              name: `${getBookingProductName(durationWeeks)} credit`,
+              description:
+                "Redeemable stay credit for a later week selection inside the client portal.",
+            },
+          },
+        },
+      ],
+    },
+    {
+      stripeAccount: stripeAccountId,
+    }
+  );
+
+  return {
+    url: session.url || "",
+    sessionId: session.id,
+    stripeAccountId,
+  };
 }
 
 async function sendBookingEntitlementEmail({
@@ -1810,56 +1895,15 @@ export const createExternalBookingCheckoutSession = onCall(
       const customerName = String(request.data?.customerName || "").trim();
       const durationWeeks = normalizeBookingDuration(request.data?.durationWeeks);
 
-      if (!isValidEmailAddress(customerEmail)) {
-        throw new HttpsError(
-          "invalid-argument",
-          "A valid customerEmail is required."
-        );
-      }
-
-      const pricing = await loadBookingPricing();
-      const price = getBookingPriceForDuration(pricing, durationWeeks);
-      const { stripeAccountId } = await getReadyStripeConnectedAccount();
-      const stripe = getStripeClient();
-      const session = await stripe.checkout.sessions.create({
-        mode: "payment",
-        customer_email: customerEmail,
-        metadata: {
-          flow: "external_entitlement",
-          customerEmail,
-          customerName,
-          durationWeeks: String(durationWeeks),
-          connectedAccountId: stripeAccountId,
-        },
-        success_url: resolveCheckoutReturnUrl(
-          "/book?checkout=external-success",
-          "/book?checkout=external-success"
-        ),
-        cancel_url: resolveCheckoutReturnUrl(
-          "/book?checkout=external-cancel",
-          "/book?checkout=external-cancel"
-        ),
-        line_items: [
-          {
-            quantity: 1,
-            price_data: {
-              currency: price.currency.toLowerCase(),
-              unit_amount: toStripeUnitAmount(price.amount),
-              product_data: {
-                name: `${getBookingProductName(durationWeeks)} credit`,
-                description:
-                  "Redeemable stay credit for a later week selection inside the client portal.",
-              },
-            },
-          },
-        ],
-      }, {
-        stripeAccount: stripeAccountId,
+      const session = await createExternalCheckoutSession({
+        customerEmail,
+        customerName,
+        durationWeeks,
       });
 
       return {
-        url: session.url || "",
-        sessionId: session.id,
+        url: session.url,
+        sessionId: session.sessionId,
       };
     } catch (error) {
       console.error("createExternalBookingCheckoutSession error:", error);
@@ -1869,6 +1913,108 @@ export const createExternalBookingCheckoutSession = onCall(
         error instanceof Error
           ? error.message
           : "Could not create external booking checkout session."
+      );
+    }
+  }
+);
+
+export const startExternalBookingCheckout = onRequest(
+  { region: "us-central1", secrets: ["STRIPE_SECRET_KEY"] },
+  async (req, res) => {
+    res.set("Access-Control-Allow-Origin", "*");
+    res.set("Access-Control-Allow-Methods", "GET, OPTIONS");
+    res.set("Access-Control-Allow-Headers", "Content-Type");
+
+    if (req.method === "OPTIONS") {
+      res.status(204).send("");
+      return;
+    }
+
+    if (req.method !== "GET") {
+      res.status(405).send("Method not allowed");
+      return;
+    }
+
+    try {
+      const customerEmail = String(req.query.email || "")
+        .trim()
+        .toLowerCase();
+      const customerName = String(req.query.name || "").trim();
+      const durationWeeks = normalizeBookingDuration(req.query.durationWeeks);
+
+      const session = await createExternalCheckoutSession({
+        customerEmail,
+        customerName,
+        durationWeeks,
+      });
+
+      if (!session.url) {
+        throw new Error("Stripe Checkout URL was not returned.");
+      }
+
+      res.redirect(303, session.url);
+    } catch (error) {
+      console.error("startExternalBookingCheckout error:", error);
+      res.status(400).json({
+        error:
+          error instanceof Error
+            ? error.message
+            : "Could not create external booking checkout.",
+      });
+    }
+  }
+);
+
+export const finalizeExternalBookingCheckout = onRequest(
+  {
+    region: "us-central1",
+    secrets: ["STRIPE_SECRET_KEY", "RESEND_API_KEY", "RESEND_FROM_EMAIL"],
+  },
+  async (req, res) => {
+    if (req.method !== "GET") {
+      res.status(405).send("Method not allowed");
+      return;
+    }
+
+    try {
+      const sessionId = String(req.query.session_id || "").trim();
+      const stripeAccountId = String(req.query.account_id || "").trim();
+
+      if (!sessionId || !stripeAccountId) {
+        res.status(400).send("Missing session_id or account_id.");
+        return;
+      }
+
+      const stripe = getStripeClient();
+      const session = await stripe.checkout.sessions.retrieve(
+        sessionId,
+        {},
+        {
+          stripeAccount: stripeAccountId,
+        }
+      );
+
+      const flow = String(session.metadata?.flow || "").trim();
+
+      if (flow === "external_entitlement" && session.payment_status === "paid") {
+        await fulfillExternalEntitlementCheckoutSession(session);
+      }
+
+      res.redirect(
+        303,
+        resolveCheckoutReturnUrl(
+          "/book?checkout=external-success",
+          "/book?checkout=external-success"
+        )
+      );
+    } catch (error) {
+      console.error("finalizeExternalBookingCheckout error:", error);
+      res.redirect(
+        303,
+        resolveCheckoutReturnUrl(
+          "/book?checkout=external-error",
+          "/book?checkout=external-error"
+        )
       );
     }
   }
@@ -2339,6 +2485,53 @@ async function fulfillExternalEntitlementCheckoutSession(session) {
   );
 }
 
+async function handleStripeWebhookRequest(req, res, webhookSecret) {
+  if (req.method !== "POST") {
+    res.status(405).send("Method not allowed");
+    return;
+  }
+
+  try {
+    const stripe = getStripeClient();
+    const signatureHeader = req.headers["stripe-signature"];
+    const signature = Array.isArray(signatureHeader)
+      ? signatureHeader[0]
+      : signatureHeader;
+
+    if (!signature) {
+      res.status(400).send("Missing Stripe-Signature header.");
+      return;
+    }
+
+    const event = stripe.webhooks.constructEvent(
+      req.rawBody,
+      signature,
+      webhookSecret
+    );
+
+    if (
+      event.type === "checkout.session.completed" ||
+      event.type === "checkout.session.async_payment_succeeded"
+    ) {
+      const session = event.data.object;
+      const flow = String(session.metadata?.flow || "").trim();
+
+      if (flow === "internal_booking") {
+        await fulfillInternalBookingCheckoutSession(session);
+      } else if (flow === "external_entitlement") {
+        await fulfillExternalEntitlementCheckoutSession(session);
+      }
+    }
+
+    res.status(200).json({ received: true });
+  } catch (error) {
+    console.error("stripe webhook error:", error);
+    res.status(400).send(
+      error instanceof Error ? error.message : "Webhook handling failed."
+    );
+  }
+}
+
 export const stripeWebhook = onRequest(
   {
     region: "us-central1",
@@ -2349,52 +2542,21 @@ export const stripeWebhook = onRequest(
       "RESEND_FROM_EMAIL",
     ],
   },
-  async (req, res) => {
-    if (req.method !== "POST") {
-      res.status(405).send("Method not allowed");
-      return;
-    }
+  async (req, res) => handleStripeWebhookRequest(req, res, getStripeWebhookSecret())
+);
 
-    try {
-      const stripe = getStripeClient();
-      const signatureHeader = req.headers["stripe-signature"];
-      const signature = Array.isArray(signatureHeader)
-        ? signatureHeader[0]
-        : signatureHeader;
-
-      if (!signature) {
-        res.status(400).send("Missing Stripe-Signature header.");
-        return;
-      }
-
-      const event = stripe.webhooks.constructEvent(
-        req.rawBody,
-        signature,
-        getStripeWebhookSecret()
-      );
-
-      if (
-        event.type === "checkout.session.completed" ||
-        event.type === "checkout.session.async_payment_succeeded"
-      ) {
-        const session = event.data.object;
-        const flow = String(session.metadata?.flow || "").trim();
-
-        if (flow === "internal_booking") {
-          await fulfillInternalBookingCheckoutSession(session);
-        } else if (flow === "external_entitlement") {
-          await fulfillExternalEntitlementCheckoutSession(session);
-        }
-      }
-
-      res.status(200).json({ received: true });
-    } catch (error) {
-      console.error("stripeWebhook error:", error);
-      res.status(400).send(
-        error instanceof Error ? error.message : "Webhook handling failed."
-      );
-    }
-  }
+export const stripeConnectWebhook = onRequest(
+  {
+    region: "us-central1",
+    secrets: [
+      "STRIPE_SECRET_KEY",
+      "STRIPE_CONNECT_WEBHOOK_SECRET",
+      "RESEND_API_KEY",
+      "RESEND_FROM_EMAIL",
+    ],
+  },
+  async (req, res) =>
+    handleStripeWebhookRequest(req, res, getStripeConnectWebhookSecret())
 );
 
 export const createStripeConnectAuthorizeUrl = onCall(
@@ -2408,36 +2570,6 @@ export const createStripeConnectAuthorizeUrl = onCall(
       const paymentsSnap = await paymentsRef.get();
       const paymentsData = paymentsSnap.exists ? paymentsSnap.data() || {} : {};
       const existingAccountId = String(paymentsData.stripeAccountId || "").trim();
-
-      if (
-        paymentsData.connectionMode === "oauth" &&
-        existingAccountId
-      ) {
-        const clientId = getStripeConnectClientId();
-        const state = randomUUID();
-        const redirectUri = getStripeAdminPaymentsUrl();
-
-        await paymentsRef.set(
-          {
-            provider: "stripe_connect",
-            accountType: "standard",
-            connectionMode: "oauth",
-            pendingOauthState: state,
-            pendingOauthUserId: request.auth.uid,
-            oauthRedirectUri: redirectUri,
-            updatedAt: FieldValue.serverTimestamp(),
-          },
-          { merge: true }
-        );
-
-        return {
-          url:
-            "https://connect.stripe.com/oauth/authorize" +
-            `?response_type=code&client_id=${encodeURIComponent(clientId)}` +
-            `&scope=read_write&state=${encodeURIComponent(state)}` +
-            `&redirect_uri=${encodeURIComponent(redirectUri)}`,
-        };
-      }
 
       const account = existingAccountId
         ? await stripe.accounts.retrieve(existingAccountId)

@@ -726,9 +726,9 @@ export default function AdminBookingsPage() {
               <SegmentedTabs<BookingTab>
                 items={[
                   { id: "overview", label: "Overview" },
+                  { id: "list", label: "Bookings" },
                   { id: "create", label: editingBookingId ? "Edit booking" : "Create booking" },
                   { id: "codes", label: "Redeem codes" },
-                  { id: "list", label: "Bookings" },
                 ]}
                 value={activeTab}
                 onChange={setActiveTab}
