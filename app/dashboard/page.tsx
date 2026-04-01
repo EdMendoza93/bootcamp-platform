@@ -14,6 +14,7 @@ import {
 } from "firebase/firestore";
 import PushNotificationsCard from "@/components/dashboard/PushNotificationsCard";
 import SegmentedTabs from "@/components/ui/SegmentedTabs";
+import NutritionMealPlan from "@/components/nutrition/NutritionMealPlan";
 import { getHomeRouteForRole, normalizeRole } from "@/lib/roles";
 import {
   formatThreadTimestamp,
@@ -32,6 +33,12 @@ import {
   OnlineSessionRecord,
   sortSessions,
 } from "@/lib/online-sessions";
+import {
+  MealItem,
+  NutritionTemplateSnapshot,
+  NutritionTotals,
+  hasStructuredMealItems,
+} from "@/lib/nutrition";
 
 type ApplicationStatus = "none" | "pending" | "approved" | "rejected";
 type OnboardingStatus = "none" | "incomplete" | "active";
@@ -44,6 +51,7 @@ type ScheduleItem = {
   endTime?: string;
   type: ScheduleType;
   templateId?: string;
+  templateSnapshot?: NutritionTemplateSnapshot;
   title?: string;
   details?: string;
   displayTitle: string;
@@ -70,6 +78,8 @@ type ScheduleModalData = {
   type: ScheduleType | "";
   content: string;
   description: string;
+  mealItems: MealItem[];
+  totals?: NutritionTotals;
 };
 
 type PhotoModalData = {
@@ -81,7 +91,7 @@ type PhotoModalData = {
   photoDate: string;
 };
 
-type DashboardTab = "overview" | "support" | "plan";
+type DashboardTab = "overview" | "support" | "progress";
 
 function getPhotoSortValue(photo: ProgressPhoto) {
   if (photo.photoDate) {
@@ -165,6 +175,7 @@ export default function DashboardPage() {
     type: "",
     content: "",
     description: "",
+    mealItems: [],
   });
   const [scheduleModalLoading, setScheduleModalLoading] = useState(false);
 
@@ -294,7 +305,11 @@ export default function DashboardPage() {
 
           return {
             ...item,
-            displayTitle: item.title?.trim() || templateTitle || "Session",
+            displayTitle:
+              item.title?.trim() ||
+              item.templateSnapshot?.title?.trim() ||
+              templateTitle ||
+              "Session",
           } as ScheduleItem;
         })
       );
@@ -408,16 +423,38 @@ export default function DashboardPage() {
       type: item.type,
       content: "",
       description: "",
+      mealItems: [],
     });
 
     try {
-      if (!item.templateId) {
+      if (!item.templateId && !item.templateSnapshot) {
         setScheduleModalData({
           open: true,
           title: item.displayTitle,
           type: item.type,
           content: item.details || "No details available.",
           description: "Custom schedule item",
+          mealItems: [],
+        });
+        return;
+      }
+
+      const templateId = item.templateId;
+
+      if (item.templateSnapshot) {
+        const snapshotContent = item.templateSnapshot.content || "";
+        const combinedContent = item.details?.trim()
+          ? `${snapshotContent}${snapshotContent ? "\n\n" : ""}Extra notes:\n${item.details}`
+          : snapshotContent;
+
+        setScheduleModalData({
+          open: true,
+          title: item.templateSnapshot.title || item.displayTitle,
+          type: item.type,
+          description: item.templateSnapshot.description || "",
+          content: combinedContent || "No details available.",
+          mealItems: item.templateSnapshot.mealItems || [],
+          totals: item.templateSnapshot.totals,
         });
         return;
       }
@@ -434,11 +471,24 @@ export default function DashboardPage() {
           type: item.type,
           content: "Unsupported item type.",
           description: "",
+          mealItems: [],
         });
         return;
       }
 
-      const snap = await getDoc(doc(db, collectionName, item.templateId));
+      if (!templateId) {
+        setScheduleModalData({
+          open: true,
+          title: item.displayTitle,
+          type: item.type,
+          content: item.details || "No details available.",
+          description: "",
+          mealItems: [],
+        });
+        return;
+      }
+
+      const snap = await getDoc(doc(db, collectionName, templateId));
 
       if (!snap.exists()) {
         setScheduleModalData({
@@ -447,6 +497,7 @@ export default function DashboardPage() {
           type: item.type,
           content: item.details || "Linked template not found.",
           description: "",
+          mealItems: [],
         });
         return;
       }
@@ -455,6 +506,8 @@ export default function DashboardPage() {
         title?: string;
         description?: string;
         content?: string;
+        mealItems?: MealItem[];
+        totals?: NutritionTotals;
       };
 
       const baseContent = data.content || "No details available.";
@@ -468,6 +521,8 @@ export default function DashboardPage() {
         type: item.type,
         description: data.description || "",
         content: combinedContent,
+        mealItems: data.mealItems || [],
+        totals: data.totals,
       });
     } catch (error) {
       console.error("Open schedule modal error:", error);
@@ -477,6 +532,7 @@ export default function DashboardPage() {
         type: item.type,
         content: "Failed to load details.",
         description: "",
+        mealItems: [],
       });
     } finally {
       setScheduleModalLoading(false);
@@ -490,6 +546,7 @@ export default function DashboardPage() {
       type: "",
       content: "",
       description: "",
+      mealItems: [],
     });
   };
 
@@ -648,7 +705,7 @@ export default function DashboardPage() {
           </div>
         </section>
 
-        <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+        <section className="grid gap-2.5 sm:grid-cols-2 xl:grid-cols-4">
           {statusCards.map((card) => (
             <StatusCard
               key={card.label}
@@ -664,7 +721,7 @@ export default function DashboardPage() {
               <h2 className="text-2xl font-semibold tracking-tight text-slate-950">
                 Your focus
               </h2>
-              <p className="mt-1 text-sm text-slate-500">
+                <p className="mt-1 text-sm text-slate-500">
                 Open one lane at a time to keep the dashboard calm.
               </p>
             </div>
@@ -672,7 +729,7 @@ export default function DashboardPage() {
               items={[
                 { id: "overview", label: "Overview" },
                 { id: "support", label: "Support" },
-                { id: "plan", label: "Plan" },
+                { id: "progress", label: "Progress" },
               ]}
               value={activeTab}
               onChange={setActiveTab}
@@ -904,6 +961,71 @@ export default function DashboardPage() {
             </section>
           )}
 
+        {activeTab === "overview" && canSeeItinerary && scheduleItems.length > 0 && (
+          <section className="rounded-[28px] border border-white/70 bg-white/90 p-6 shadow-[0_18px_50px_rgba(15,23,42,0.07)] backdrop-blur">
+            <div className="mb-4 flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
+              <div>
+                <h2 className="text-2xl font-semibold tracking-tight text-slate-950">
+                  Your Itinerary
+                </h2>
+                <p className="mt-1 text-sm text-slate-600">
+                  Your next schedule items are shown first. Tap a card to expand it.
+                </p>
+              </div>
+              <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-2 text-sm font-medium text-slate-700">
+                {scheduleItems.length} item{scheduleItems.length === 1 ? "" : "s"}
+              </div>
+            </div>
+
+            <div className="space-y-5">
+              {Object.entries(groupedSchedule).map(([date, items]) => (
+                <div key={date}>
+                  <div className="mb-3 flex items-center gap-3">
+                    <span className="rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">
+                      {formatDateLabel(date)}
+                    </span>
+                    <p className="text-sm font-medium text-slate-600">{date}</p>
+                  </div>
+
+                  <div className="grid gap-2.5 sm:grid-cols-2 xl:grid-cols-3">
+                    {items.map((item) => (
+                      <button
+                        key={item.id}
+                        onClick={() => openScheduleModal(item)}
+                        className="rounded-[16px] border border-slate-100 bg-white px-3 py-2.5 text-left shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:border-[#bfdbfe] hover:shadow-md"
+                      >
+                        <div className="flex items-start justify-between gap-2.5">
+                          <div className="min-w-0">
+                            <TypeBadge type={item.type} />
+                            <p className="mt-1.5 line-clamp-2 text-[13px] font-semibold leading-5 text-slate-900">
+                              {item.displayTitle}
+                            </p>
+                          </div>
+                          <p className="shrink-0 text-[12px] font-medium text-slate-500">
+                            {item.startTime}
+                            {item.endTime ? ` - ${item.endTime}` : ""}
+                          </p>
+                        </div>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </section>
+        )}
+
+        {activeTab === "overview" && canSeeItinerary && scheduleItems.length === 0 && (
+          <section className="rounded-[28px] border border-white/70 bg-white/90 p-6 shadow-[0_18px_50px_rgba(15,23,42,0.07)] backdrop-blur">
+            <h2 className="text-xl font-semibold text-slate-950">
+              Your Itinerary
+            </h2>
+            <p className="mt-2 text-slate-600">
+              Your schedule has not been added yet.
+            </p>
+          </section>
+        )}
+
         {activeTab === "overview" && canSeeProgramContent && (
           <section className="rounded-[28px] border border-white/70 bg-white/90 p-6 shadow-[0_18px_50px_rgba(15,23,42,0.07)] backdrop-blur">
             <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
@@ -951,78 +1073,7 @@ export default function DashboardPage() {
           </section>
         )}
 
-        {activeTab === "plan" && canSeeItinerary && scheduleItems.length > 0 && (
-          <section className="rounded-[28px] border border-white/70 bg-white/90 p-6 shadow-[0_18px_50px_rgba(15,23,42,0.07)] backdrop-blur">
-            <div className="mb-4 flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
-              <div>
-                <h2 className="text-2xl font-semibold tracking-tight text-slate-950">
-                  Your Itinerary
-                </h2>
-                <p className="mt-2 text-slate-600">
-                  Tap any item to see the full details.
-                </p>
-              </div>
-            </div>
-
-            <div className="space-y-6">
-              {Object.entries(groupedSchedule).map(([date, items]) => (
-                <div
-                  key={date}
-                  className="rounded-[24px] border border-slate-100 bg-gradient-to-br from-white to-[#f8fbff] p-5"
-                >
-                  <div className="border-b border-slate-100 pb-4">
-                    <p className="text-sm font-semibold uppercase tracking-[0.18em] text-slate-500">
-                      {formatDateLabel(date)}
-                    </p>
-                    <h3 className="mt-2 text-2xl font-semibold tracking-tight text-slate-950">
-                      {date}
-                    </h3>
-                  </div>
-
-                  <div className="mt-6 grid gap-3 lg:grid-cols-2">
-                    {items.map((item) => (
-                      <button
-                        key={item.id}
-                        onClick={() => openScheduleModal(item)}
-                        className="rounded-[22px] border border-slate-100 bg-white p-4 text-left shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:border-[#bfdbfe] hover:shadow-md"
-                      >
-                        <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-                          <div>
-                            <TypeBadge type={item.type} />
-                            <p className="mt-3 text-base font-semibold text-slate-900">
-                              {item.displayTitle}
-                            </p>
-                            <p className="mt-1 text-xs uppercase tracking-[0.14em] text-slate-500">
-                              Tap to open details
-                            </p>
-                          </div>
-
-                          <p className="text-sm font-medium text-slate-600">
-                            {item.startTime}
-                            {item.endTime ? ` - ${item.endTime}` : ""}
-                          </p>
-                        </div>
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              ))}
-            </div>
-          </section>
-        )}
-
-        {activeTab === "plan" && canSeeItinerary && scheduleItems.length === 0 && (
-          <section className="rounded-[28px] border border-white/70 bg-white/90 p-6 shadow-[0_18px_50px_rgba(15,23,42,0.07)] backdrop-blur">
-            <h2 className="text-xl font-semibold text-slate-950">
-              Your Itinerary
-            </h2>
-            <p className="mt-2 text-slate-600">
-              Your schedule has not been added yet.
-            </p>
-          </section>
-        )}
-
-        {activeTab === "plan" && canSeeProgress && recentProgressPhotos.length > 0 && (
+        {activeTab === "progress" && canSeeProgress && recentProgressPhotos.length > 0 && (
           <section className="rounded-[28px] border border-white/70 bg-white/90 p-6 shadow-[0_18px_50px_rgba(15,23,42,0.07)] backdrop-blur">
             <div className="mb-4 flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
               <div>
@@ -1121,7 +1172,17 @@ export default function DashboardPage() {
                 )}
 
                 <div className="whitespace-pre-line rounded-[22px] border border-slate-100 bg-gradient-to-br from-slate-50 to-white p-4 text-sm text-slate-800">
-                  {scheduleModalData.content}
+                  {hasStructuredMealItems({
+                    mealItems: scheduleModalData.mealItems,
+                  }) ? (
+                    <NutritionMealPlan
+                      mealItems={scheduleModalData.mealItems}
+                      totals={scheduleModalData.totals}
+                      showLegacyContent={scheduleModalData.content}
+                    />
+                  ) : (
+                    scheduleModalData.content
+                  )}
                 </div>
               </div>
             )}
@@ -1218,9 +1279,9 @@ function StatusCard({
   value: string;
 }) {
   return (
-    <div className="rounded-[18px] border border-white/80 bg-gradient-to-br from-white to-slate-50 px-4 py-3.5 shadow-[0_10px_24px_rgba(15,23,42,0.06)]">
-      <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">{label}</p>
-      <p className="mt-1.5 text-lg font-semibold capitalize text-slate-950">
+    <div className="rounded-[16px] border border-white/80 bg-gradient-to-br from-white to-slate-50 px-3.5 py-2.5 shadow-[0_8px_18px_rgba(15,23,42,0.05)]">
+      <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-slate-500">{label}</p>
+      <p className="mt-1 text-base font-semibold capitalize leading-none text-slate-950">
         {value}
       </p>
     </div>

@@ -2,10 +2,14 @@
 
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
-import { addDoc, collection, deleteDoc, doc, getDoc, getDocs, query, serverTimestamp, updateDoc, where } from "firebase/firestore";
+import { addDoc, collection, deleteField, deleteDoc, doc, getDoc, getDocs, query, serverTimestamp, updateDoc, where } from "firebase/firestore";
 import { auth, db } from "@/lib/firebase";
 import { AppRole, getRoleLabel, normalizeRole } from "@/lib/roles";
 import { useToast } from "@/components/ui/ToastProvider";
+import {
+  NutritionTemplateSnapshot,
+  createNutritionTemplateSnapshot,
+} from "@/lib/nutrition";
 
 type ScheduleType = "training" | "nutrition" | "activity";
 
@@ -19,6 +23,10 @@ type Profile = {
 type TemplateItem = {
   id: string;
   title: string;
+  description?: string;
+  content?: string;
+  mealItems?: NutritionTemplateSnapshot["mealItems"];
+  totals?: NutritionTemplateSnapshot["totals"];
 };
 
 type ScheduleItem = {
@@ -29,6 +37,7 @@ type ScheduleItem = {
   endTime?: string;
   type: ScheduleType;
   templateId?: string;
+  templateSnapshot?: NutritionTemplateSnapshot;
   title?: string;
   details?: string;
 };
@@ -197,6 +206,9 @@ export default function StaffSchedulePage() {
 
   const activeTemplates = form.type === "nutrition" ? nutritionTemplates : trainingTemplates;
 
+  const selectedTemplate =
+    activeTemplates.find((item) => item.id === form.templateId) || null;
+
   const resetForm = () => {
     setEditingItemId(null);
     setForm({
@@ -216,6 +228,11 @@ export default function StaffSchedulePage() {
 
     setSaving(true);
     try {
+      const templateSnapshot =
+        form.type === "nutrition"
+          ? createNutritionTemplateSnapshot(selectedTemplate)
+          : undefined;
+
       const payload = {
         profileId: selectedProfileId,
         date: form.date,
@@ -228,10 +245,14 @@ export default function StaffSchedulePage() {
       };
 
       if (editingItemId) {
-        await updateDoc(doc(db, "scheduleItems", editingItemId), payload);
+        await updateDoc(doc(db, "scheduleItems", editingItemId), {
+          ...payload,
+          templateSnapshot: templateSnapshot || deleteField(),
+        });
       } else {
         await addDoc(collection(db, "scheduleItems"), {
           ...payload,
+          ...(templateSnapshot ? { templateSnapshot } : {}),
           createdAt: serverTimestamp(),
         });
       }
@@ -535,7 +556,7 @@ export default function StaffSchedulePage() {
                         className="rounded-[24px] border border-slate-100 bg-gradient-to-br from-white to-[#f8fbff] p-4 shadow-sm"
                       >
                         <p className="text-base font-semibold text-slate-900">
-                          {item.title?.trim() || "Session"}
+                          {item.title?.trim() || item.templateSnapshot?.title?.trim() || "Session"}
                         </p>
                         <div className="mt-2">
                           <span className="rounded-full border border-[#dbeafe] bg-[#eff6ff] px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.16em] text-[#1d4ed8]">

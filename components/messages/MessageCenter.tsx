@@ -19,6 +19,7 @@ import { getRoleLabel } from "@/lib/roles";
 import SegmentedTabs from "@/components/ui/SegmentedTabs";
 import CollapsiblePanel from "@/components/ui/CollapsiblePanel";
 import {
+  canManageThreadStatus,
   canRoleAccessThread,
   formatThreadTimestamp,
   getAllowedThreadCategories,
@@ -350,6 +351,14 @@ export default function MessageCenter({
 
   const toggleThreadStatus = async () => {
     if (!selectedThread) return;
+    if (!canManageThreadStatus(role)) {
+      showToast({
+        title: "Action not allowed",
+        description: "Only admin, coach, and nutrition can change thread status.",
+        type: "error",
+      });
+      return;
+    }
 
     const nextStatus: MessageThreadStatus =
       selectedThread.status === "open" ? "closed" : "open";
@@ -731,13 +740,15 @@ export default function MessageCenter({
                   </p>
                 </div>
                 <div className="flex flex-wrap gap-3">
-                  <button
-                    type="button"
-                    onClick={toggleThreadStatus}
-                    className="rounded-2xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-medium text-slate-700 transition hover:bg-slate-50"
-                  >
-                    {selectedThread.status === "open" ? "Close thread" : "Reopen thread"}
-                  </button>
+                  {canManageThreadStatus(role) ? (
+                    <button
+                      type="button"
+                      onClick={toggleThreadStatus}
+                      className="rounded-2xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-medium text-slate-700 transition hover:bg-slate-50"
+                    >
+                      {selectedThread.status === "open" ? "Close thread" : "Reopen thread"}
+                    </button>
+                  ) : null}
                   <button
                     type="button"
                     onClick={deleteThread}

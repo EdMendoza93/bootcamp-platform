@@ -358,7 +358,7 @@ export default function AdminApplicationsPage() {
         </div>
       </section>
 
-      <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
+      <section className="grid gap-2.5 sm:grid-cols-2 xl:grid-cols-5">
         <SummaryCard label="Total" value={String(summary.total)} tone="light" />
         <SummaryCard label="Pending" value={String(summary.pending)} tone="blue" />
         <SummaryCard
@@ -614,13 +614,13 @@ function SummaryCard({
 
   return (
     <div
-      className={`rounded-[18px] border px-4 py-3.5 shadow-[0_10px_24px_rgba(15,23,42,0.06)] ${styles[tone].card}`}
+      className={`rounded-[16px] border px-3.5 py-2.5 shadow-[0_8px_18px_rgba(15,23,42,0.05)] ${styles[tone].card}`}
     >
-      <p className={`text-[11px] font-semibold uppercase tracking-[0.16em] ${styles[tone].label}`}>
+      <p className={`text-[10px] font-semibold uppercase tracking-[0.18em] ${styles[tone].label}`}>
         {label}
       </p>
       <p
-        className={`mt-1.5 text-2xl font-semibold tracking-tight ${styles[tone].value}`}
+        className={`mt-1 text-xl font-semibold leading-none tracking-tight ${styles[tone].value}`}
       >
         {value}
       </p>

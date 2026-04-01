@@ -230,7 +230,7 @@ export default function AdminStaffPage() {
         </div>
       </section>
 
-      <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
+      <section className="grid gap-2.5 sm:grid-cols-2 xl:grid-cols-5">
         <SummaryCard label="Staff" value={String(summary.total)} tone="light" />
         <SummaryCard label="Active" value={String(summary.active)} tone="success" />
         <SummaryCard label="Inactive" value={String(summary.inactive)} tone="warning" />
@@ -416,9 +416,9 @@ function SummaryCard({
   };
 
   return (
-    <div className={`rounded-[18px] border px-4 py-3.5 shadow-[0_10px_24px_rgba(15,23,42,0.06)] ${styles[tone]}`}>
-      <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">{label}</p>
-      <p className="mt-1.5 text-2xl font-semibold tracking-tight">{value}</p>
+    <div className={`rounded-[16px] border px-3.5 py-2.5 shadow-[0_8px_18px_rgba(15,23,42,0.05)] ${styles[tone]}`}>
+      <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-slate-500">{label}</p>
+      <p className="mt-1 text-xl font-semibold leading-none tracking-tight">{value}</p>
     </div>
   );
 }

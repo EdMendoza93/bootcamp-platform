@@ -5,6 +5,7 @@ import { db } from "@/lib/firebase";
 import {
   addDoc,
   collection,
+  deleteField,
   deleteDoc,
   doc,
   getDocs,
@@ -14,6 +15,12 @@ import {
   where,
 } from "firebase/firestore";
 import { useToast } from "@/components/ui/ToastProvider";
+import NutritionMealPlan from "@/components/nutrition/NutritionMealPlan";
+import {
+  NutritionTemplateSnapshot,
+  createNutritionTemplateSnapshot,
+  hasStructuredMealItems,
+} from "@/lib/nutrition";
 
 type ScheduleType = "training" | "nutrition" | "activity";
 
@@ -29,6 +36,9 @@ type TemplateItem = {
   title: string;
   description?: string;
   content?: string;
+  mealItems?: NutritionTemplateSnapshot["mealItems"];
+  totals?: NutritionTemplateSnapshot["totals"];
+  updatedAt?: unknown;
 };
 
 type ScheduleItem = {
@@ -39,6 +49,7 @@ type ScheduleItem = {
   endTime?: string;
   type: ScheduleType;
   templateId?: string;
+  templateSnapshot?: NutritionTemplateSnapshot;
   title?: string;
   details?: string;
   createdAt?: unknown;
@@ -243,6 +254,7 @@ export default function AdminSchedulePage() {
   const getDisplayTitle = (item: ScheduleItem) => {
     return (
       item.title?.trim() ||
+      item.templateSnapshot?.title?.trim() ||
       getTemplateTitle(item.type, item.templateId) ||
       "Session"
     );
@@ -279,7 +291,12 @@ export default function AdminSchedulePage() {
     setSaving(true);
 
     try {
-      const payload = {
+      const templateSnapshot =
+        form.type === "nutrition"
+          ? createNutritionTemplateSnapshot(selectedTemplate)
+          : undefined;
+
+      const basePayload = {
         profileId: selectedProfileId,
         date: form.date,
         startTime: form.startTime,
@@ -291,7 +308,10 @@ export default function AdminSchedulePage() {
       };
 
       if (editingItemId) {
-        await updateDoc(doc(db, "scheduleItems", editingItemId), payload);
+        await updateDoc(doc(db, "scheduleItems", editingItemId), {
+          ...basePayload,
+          templateSnapshot: templateSnapshot || deleteField(),
+        });
 
         showToast({
           title: "Schedule item updated",
@@ -300,7 +320,8 @@ export default function AdminSchedulePage() {
         });
       } else {
         await addDoc(collection(db, "scheduleItems"), {
-          ...payload,
+          ...basePayload,
+          ...(templateSnapshot ? { templateSnapshot } : {}),
           createdAt: serverTimestamp(),
         });
 
@@ -562,9 +583,27 @@ export default function AdminSchedulePage() {
                   </p>
                 ) : null}
                 {selectedTemplate.content ? (
-                  <p className="mt-3 whitespace-pre-wrap text-sm leading-6 text-slate-700">
-                    {selectedTemplate.content}
-                  </p>
+                  hasStructuredMealItems(selectedTemplate) ? (
+                    <div className="mt-3">
+                      <NutritionMealPlan
+                        mealItems={selectedTemplate.mealItems || []}
+                        totals={selectedTemplate.totals}
+                        showLegacyContent={selectedTemplate.content}
+                      />
+                    </div>
+                  ) : (
+                    <p className="mt-3 whitespace-pre-wrap text-sm leading-6 text-slate-700">
+                      {selectedTemplate.content}
+                    </p>
+                  )
+                ) : null}
+                {!selectedTemplate.content && hasStructuredMealItems(selectedTemplate) ? (
+                  <div className="mt-3">
+                    <NutritionMealPlan
+                      mealItems={selectedTemplate.mealItems || []}
+                      totals={selectedTemplate.totals}
+                    />
+                  </div>
                 ) : null}
               </div>
             ) : null}

@@ -71,6 +71,10 @@ export function canRoleAccessThread(
   return allowed.includes(thread.category);
 }
 
+export function canManageThreadStatus(role: AppRole) {
+  return role === "admin" || role === "coach" || role === "nutritionist";
+}
+
 export function formatThreadTimestamp(
   timestamp?: { seconds?: number; nanoseconds?: number }
 ) {
