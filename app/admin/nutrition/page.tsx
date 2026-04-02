@@ -12,6 +12,7 @@ import {
   updateDoc,
 } from "firebase/firestore";
 import { useToast } from "@/components/ui/ToastProvider";
+import { fetchForzabyNutritionLibrary, type ForzabyFood, type ForzabyNutritionTemplate } from "@/lib/forzaby";
 import NutritionMealPlan from "@/components/nutrition/NutritionMealPlan";
 import {
   FoodEntry,
@@ -55,6 +56,8 @@ export default function AdminNutritionPage() {
   const [builderLoading, setBuilderLoading] = useState(false);
   const [items, setItems] = useState<NutritionTemplateRecord[]>([]);
   const [foods, setFoods] = useState<FoodEntry[]>([]);
+  const [forzabyFoods, setForzabyFoods] = useState<ForzabyFood[]>([]);
+  const [forzabyMenus, setForzabyMenus] = useState<ForzabyNutritionTemplate[]>([]);
   const [search, setSearch] = useState("");
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editingMealIndex, setEditingMealIndex] = useState<number | null>(null);
@@ -63,13 +66,30 @@ export default function AdminNutritionPage() {
   const [builderInput, setBuilderInput] = useState("");
   const [builderQuery, setBuilderQuery] = useState("");
   const [suggestions, setSuggestions] = useState<FoodSearchResult[]>([]);
-  const [suggestionSource, setSuggestionSource] = useState<"internal" | "fdc" | "manual" | "">("");
+  const [suggestionSource, setSuggestionSource] = useState<"internal" | "manual" | "">("");
   const [selectedFood, setSelectedFood] = useState<FoodSearchResult | null>(null);
   const [draft, setDraft] = useState<BuilderDraft | null>(null);
+  const [expandedForzabyMenuId, setExpandedForzabyMenuId] = useState<string | null>(null);
 
   const { showToast } = useToast();
 
   const totals = useMemo(() => calculateTotals(form.mealItems), [form.mealItems]);
+
+const groupedForzabyMenus = useMemo(() => {
+  const groups: Record<"breakfast" | "snack" | "lunch" | "dinner", ForzabyNutritionTemplate[]> = {
+    breakfast: [],
+    snack: [],
+    lunch: [],
+    dinner: [],
+  };
+
+  for (const menu of forzabyMenus) {
+    const mealGroup = classifyForzabyMenu(menu);
+    groups[mealGroup].push(menu);
+  }
+
+  return groups;
+}, [forzabyMenus]);
 
   const loadItems = async () => {
     const snapshot = await getDocs(collection(db, "nutritionTemplates"));
@@ -98,7 +118,9 @@ export default function AdminNutritionPage() {
   useEffect(() => {
     const init = async () => {
       try {
-        await Promise.all([loadItems(), loadFoods()]);
+        const [, , forzabyLibrary] = await Promise.all([loadItems(), loadFoods(), fetchForzabyNutritionLibrary()]);
+        setForzabyFoods(forzabyLibrary.data?.foods || []);
+        setForzabyMenus(forzabyLibrary.data?.templates || []);
       } catch (error) {
         console.error("Load nutrition items error:", error);
         showToast({
@@ -284,37 +306,19 @@ export default function AdminNutritionPage() {
     setDraft(null);
 
     try {
-      const internalMatches = searchFoods(foods, query).slice(0, 8);
+      const internalMatches = searchFoods([...foods, ...forzabyFoods], query).slice(0, 8);
 
       if (internalMatches.length > 0) {
         setSuggestions(internalMatches);
         setSuggestionSource("internal");
         return;
       }
-
-      const response = await fetch(`/api/fdc/search?q=${encodeURIComponent(query)}`, {
-        cache: "no-store",
+      beginManualDraft(query);
+      showToast({
+        title: "No food match found",
+        description: "Create a manual custom food or refine the search.",
+        type: "info",
       });
-      const data = (await response.json()) as {
-        foods?: FoodSearchResult[];
-        error?: string;
-      };
-
-      if (!response.ok) {
-        throw new Error(data.error || "FDC search failed.");
-      }
-
-      setSuggestions(data.foods || []);
-      setSuggestionSource((data.foods || []).length > 0 ? "fdc" : "manual");
-
-      if (!data.foods?.length) {
-        beginManualDraft(query);
-        showToast({
-          title: "No food match found",
-          description: "Create a manual custom food or refine the search.",
-          type: "info",
-        });
-      }
     } catch (error) {
       console.error("Search food suggestions error:", error);
       setSuggestions([]);
@@ -322,7 +326,7 @@ export default function AdminNutritionPage() {
       beginManualDraft(query);
       showToast({
         title: "Search unavailable",
-        description: "FDC search could not be completed. You can still create a manual food.",
+        description: "Forzaby nutrition suggestions could not be completed. You can still create a manual food.",
         type: "error",
       });
     } finally {
@@ -390,65 +394,69 @@ export default function AdminNutritionPage() {
     }
   };
 
-  const persistFoodIfNeeded = async (item: BuilderDraft) => {
-    if (selectedFood?.id) {
-      return selectedFood.id;
+const persistFoodIfNeeded = async (item: BuilderDraft) => {
+  const existingBootcampFoodById = selectedFood?.id
+    ? foods.find((food) => food.id === selectedFood.id)
+    : null;
+
+  if (existingBootcampFoodById?.id) {
+    return existingBootcampFoodById.id;
+  }
+
+  if (selectedFood) {
+    const existingFood = foods.find(
+      (food) => food.normalizedName === selectedFood.normalizedName
+    );
+
+    if (existingFood?.id) {
+      return existingFood.id;
     }
 
-    if (selectedFood?.source === "fdc") {
-      const existingFood = foods.find(
-        (food) => food.fdcId && food.fdcId === selectedFood.fdcId
-      );
+    const docRef = await addDoc(collection(db, "foods"), {
+      ...selectedFood,
+      updatedAt: serverTimestamp(),
+      createdAt: serverTimestamp(),
+    });
 
-      if (existingFood?.id) {
-        return existingFood.id;
-      }
+    return docRef.id;
+  }
 
-      const docRef = await addDoc(collection(db, "foods"), {
-        ...selectedFood,
-        updatedAt: serverTimestamp(),
-        createdAt: serverTimestamp(),
-      });
+  if (item.source === "manual") {
+    const manualFood = buildFoodEntryFromMealItem({
+      name: item.label,
+      quantity: item.quantity,
+      unit: item.unit,
+      measure: normalizeMeasure({
+        calories: item.calories,
+        protein: item.protein,
+        carbs: item.carbs,
+        fat: item.fat,
+      }),
+      source: "manual",
+    });
 
-      return docRef.id;
-    }
+    const existingManualFood = foods.find(
+      (food) => food.normalizedName === manualFood.normalizedName
+    );
 
-    if (item.source === "manual") {
-      const manualFood = buildFoodEntryFromMealItem({
-        name: item.label,
-        quantity: item.quantity,
-        unit: item.unit,
-        measure: normalizeMeasure({
-          calories: item.calories,
-          protein: item.protein,
-          carbs: item.carbs,
-          fat: item.fat,
-        }),
-        source: "manual",
-      });
-
-      const existingManualFood = foods.find(
-        (food) => food.normalizedName === manualFood.normalizedName
-      );
-
-      if (existingManualFood?.id) {
-        await updateDoc(doc(db, "foods", existingManualFood.id), {
-          ...manualFood,
-          updatedAt: serverTimestamp(),
-        });
-        return existingManualFood.id;
-      }
-
-      const docRef = await addDoc(collection(db, "foods"), {
+    if (existingManualFood?.id) {
+      await updateDoc(doc(db, "foods", existingManualFood.id), {
         ...manualFood,
-        createdAt: serverTimestamp(),
         updatedAt: serverTimestamp(),
       });
-      return docRef.id;
+      return existingManualFood.id;
     }
 
-    return item.foodId;
-  };
+    const docRef = await addDoc(collection(db, "foods"), {
+      ...manualFood,
+      createdAt: serverTimestamp(),
+      updatedAt: serverTimestamp(),
+    });
+    return docRef.id;
+  }
+
+  return item.foodId;
+};
 
   const saveMealItemToTemplate = async () => {
     if (!draft) {
@@ -554,6 +562,145 @@ export default function AdminNutritionPage() {
         </div>
       </section>
 
+<section className="rounded-[28px] border border-white/70 bg-white/90 p-6 shadow-[0_18px_50px_rgba(15,23,42,0.07)] backdrop-blur md:p-8">
+  <div className="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
+    <div>
+      <p className="text-sm font-semibold uppercase tracking-[0.18em] text-[#1d4ed8]">
+        Forzaby suggestions
+      </p>
+      <h2 className="mt-2 text-2xl font-semibold tracking-tight text-slate-950">
+        Premade menu gallery
+      </h2>
+      <p className="mt-2 text-sm text-slate-600">
+        Browse small premade menu cards by meal slot. Open one to preview it, then import a local editable copy into Bootcamp.
+      </p>
+    </div>
+
+    <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-700">
+      {forzabyMenus.length} menus
+    </div>
+  </div>
+
+  <div className="mt-6 space-y-5">
+    {([
+      ["breakfast", "Breakfast", "🍳"],
+      ["snack", "Snack", "🍎"],
+      ["lunch", "Lunch", "🥗"],
+      ["dinner", "Dinner", "🍽️"],
+    ] as const).map(([key, label, emoji]) => {
+      const menus = groupedForzabyMenus[key];
+      if (!menus.length) return null;
+
+      return (
+        <div key={key}>
+          <div className="mb-3 flex items-center gap-3">
+            <div className="flex h-10 w-10 items-center justify-center rounded-2xl border border-slate-200 bg-slate-50 text-lg">
+              {emoji}
+            </div>
+            <div>
+              <p className="text-sm font-semibold text-slate-950">{label}</p>
+              <p className="text-xs text-slate-500">{menus.length} premade menu{menus.length === 1 ? "" : "s"}</p>
+            </div>
+          </div>
+
+          <div className="grid gap-3 lg:grid-cols-2 xl:grid-cols-3">
+            {menus.slice(0, 6).map((menu) => {
+              const isOpen = expandedForzabyMenuId === menu.id;
+              return (
+                <div
+                  key={menu.id}
+                  className="overflow-hidden rounded-[22px] border border-slate-100 bg-gradient-to-br from-white to-[#f8fbff] shadow-sm"
+                >
+                  <button
+                    type="button"
+                    onClick={() => setExpandedForzabyMenuId((prev) => (prev === menu.id ? null : menu.id))}
+                    className="w-full px-4 py-4 text-left transition hover:bg-slate-50/80"
+                  >
+                    <div className="flex items-start justify-between gap-3">
+                      <div>
+                        <p className="font-semibold text-slate-950">{menu.title || "Untitled menu"}</p>
+                        {menu.description ? (
+                          <p className="mt-1 line-clamp-2 text-sm text-slate-600">{menu.description}</p>
+                        ) : null}
+                      </div>
+                      <span className="rounded-full border border-slate-200 bg-white px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.16em] text-slate-500">
+                        {isOpen ? "Open" : "Preview"}
+                      </span>
+                    </div>
+                  </button>
+
+                  {isOpen ? (
+                    <div className="border-t border-slate-100 px-4 py-4">
+                      {menu.mealItems?.length ? (
+                        <div className="space-y-2">
+                          {menu.mealItems.slice(0, 6).map((item, index) => (
+                            <div key={`${menu.id}-${item.label}-${index}`} className="rounded-2xl border border-slate-100 bg-white px-3 py-3 text-sm text-slate-700">
+                              <div className="flex items-center justify-between gap-3">
+                                <p className="font-medium text-slate-900">{item.label}</p>
+                                <span className="text-xs text-slate-500">{item.calories} kcal</span>
+                              </div>
+                              <p className="mt-1 text-xs text-slate-500">{item.quantity} {item.unit}</p>
+                            </div>
+                          ))}
+                        </div>
+                      ) : menu.content ? (
+                        <p className="whitespace-pre-wrap text-sm leading-6 text-slate-700">{menu.content}</p>
+                      ) : (
+                        <p className="text-sm text-slate-500">No preview content available.</p>
+                      )}
+
+                      <div className="mt-4 flex items-center justify-between gap-3">
+                        <div className="rounded-2xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-600">
+                          {menu.totals?.calories || 0} kcal total
+                        </div>
+                        <button
+                          type="button"
+                          onClick={async () => {
+                            try {
+                              await addDoc(collection(db, "nutritionTemplates"), {
+                                title: menu.title || "Untitled menu",
+                                description: menu.description || "Imported from Forzaby",
+                                content: menu.content || "",
+                                mealItems: menu.mealItems || [],
+                                totals: menu.totals,
+                                source: "forzaby",
+                                forzabyMenuId: menu.id,
+                                forzabySnapshot: menu,
+                                createdAt: serverTimestamp(),
+                                updatedAt: serverTimestamp(),
+                              });
+                              await loadItems();
+                              showToast({
+                                title: "Menu imported",
+                                description: `${menu.title || "Menu"} is now editable inside Bootcamp.`,
+                                type: "success",
+                              });
+                            } catch (error) {
+                              console.error("Import Forzaby menu error:", error);
+                              showToast({
+                                title: "Import failed",
+                                description: "Could not import the Forzaby menu.",
+                                type: "error",
+                              });
+                            }
+                          }}
+                          className="rounded-2xl bg-gradient-to-r from-[#2EA0FF] to-[#1B6EDC] px-4 py-2 text-xs font-medium text-white shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md"
+                        >
+                          Import to Bootcamp
+                        </button>
+                      </div>
+                    </div>
+                  ) : null}
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      );
+    })}
+  </div>
+</section>
+
       <section className="rounded-[28px] border border-white/70 bg-white/90 p-6 shadow-[0_18px_50px_rgba(15,23,42,0.07)] backdrop-blur md:p-8">
         <div className="max-w-2xl">
           <p className="text-sm font-semibold uppercase tracking-[0.18em] text-[#1d4ed8]">
@@ -603,7 +750,7 @@ export default function AdminNutritionPage() {
                 Meal Items
               </h3>
               <p className="mt-1 text-sm text-slate-600">
-                Search internal foods first. USDA FoodData Central is only used when no internal match is found.
+                Search Bootcamp foods first, then fall back to Forzaby suggestions.
               </p>
             </div>
 
@@ -663,7 +810,7 @@ export default function AdminNutritionPage() {
                   <div className="min-w-0">
                     <p className="truncate font-medium text-slate-900">{food.name}</p>
                     <p className="mt-0.5 text-xs text-slate-500">
-                      {food.source === "fdc" ? "USDA FoodData Central" : "Internal food library"}
+                      {foods.some((item) => item.id === food.id) ? "Bootcamp food library" : "Forzaby library"}
                     </p>
                   </div>
                   <span className="shrink-0 text-xs font-medium text-slate-400">
@@ -1026,3 +1173,30 @@ function MacroBadge({
     </div>
   );
 }
+
+function classifyForzabyMenu(menu: ForzabyNutritionTemplate) {
+  const haystack = [
+    menu.title,
+    menu.description,
+    ...(menu.tags || []),
+    ...(menu.mealItems || []).map((item) => item.label),
+  ]
+    .filter(Boolean)
+    .join(" ")
+    .toLowerCase();
+
+  if (haystack.includes("breakfast") || haystack.includes("omelet") || haystack.includes("egg") || haystack.includes("morning")) {
+    return "breakfast" as const;
+  }
+
+  if (haystack.includes("snack") || haystack.includes("yogurt") || haystack.includes("bar") || haystack.includes("fruit")) {
+    return "snack" as const;
+  }
+
+  if (haystack.includes("dinner") || haystack.includes("evening") || haystack.includes("supper") || haystack.includes("salmon") || haystack.includes("steak")) {
+    return "dinner" as const;
+  }
+
+  return "lunch" as const;
+}
+

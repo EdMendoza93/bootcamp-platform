@@ -19,6 +19,8 @@ type TemplateItem = {
   title: string;
   description?: string;
   content?: string;
+  source?: "bootcamp" | "forzaby";
+  importedAt?: number;
 };
 
 const collectionMap: Record<TemplateType, string> = {
@@ -306,9 +308,16 @@ export default function AdminTemplatesPage() {
                 >
                   <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
                     <div className="min-w-0 flex-1">
-                      <h3 className="text-lg font-semibold text-slate-950">
-                        {item.title}
-                      </h3>
+                      <div className="flex flex-wrap items-center gap-2">
+                        <h3 className="text-lg font-semibold text-slate-950">
+                          {item.title}
+                        </h3>
+                        {item.source === "forzaby" ? (
+                          <span className="rounded-full border border-[#bfdbfe] bg-[#eff6ff] px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.16em] text-[#1d4ed8]">
+                            Imported from Forzaby
+                          </span>
+                        ) : null}
+                      </div>
 
                       {item.description ? (
                         <p className="mt-2 text-sm text-slate-600">
