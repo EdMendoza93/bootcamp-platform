@@ -55,6 +55,25 @@ type ScheduleItem = {
   createdAt?: unknown;
 };
 
+function roundTimeToQuarterHour(value: string) {
+  const match = value.match(/^(\d{2}):(\d{2})$/);
+
+  if (!match) return value;
+
+  let hours = Number(match[1]);
+  let minutes = Number(match[2]);
+  const roundedMinutes = Math.round(minutes / 15) * 15;
+
+  if (roundedMinutes === 60) {
+    hours = (hours + 1) % 24;
+    minutes = 0;
+  } else {
+    minutes = roundedMinutes;
+  }
+
+  return `${String(hours).padStart(2, "0")}:${String(minutes).padStart(2, "0")}`;
+}
+
 export default function AdminSchedulePage() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -299,8 +318,10 @@ export default function AdminSchedulePage() {
       const basePayload = {
         profileId: selectedProfileId,
         date: form.date,
-        startTime: form.startTime,
-        endTime: form.endTime.trim(),
+        startTime: roundTimeToQuarterHour(form.startTime),
+        endTime: form.endTime.trim()
+          ? roundTimeToQuarterHour(form.endTime.trim())
+          : "",
         type: form.type,
         templateId: form.templateId || "",
         title: form.title.trim(),
@@ -532,6 +553,7 @@ export default function AdminSchedulePage() {
               <FieldGroup label="Start time">
                 <input
                   type="time"
+                  step={900}
                   value={form.startTime}
                   onChange={(e) =>
                     setForm((prev) => ({ ...prev, startTime: e.target.value }))
@@ -543,6 +565,7 @@ export default function AdminSchedulePage() {
               <FieldGroup label="End time">
                 <input
                   type="time"
+                  step={900}
                   value={form.endTime}
                   onChange={(e) =>
                     setForm((prev) => ({ ...prev, endTime: e.target.value }))

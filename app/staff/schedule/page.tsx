@@ -42,6 +42,25 @@ type ScheduleItem = {
   details?: string;
 };
 
+function roundTimeToQuarterHour(value: string) {
+  const match = value.match(/^(\d{2}):(\d{2})$/);
+
+  if (!match) return value;
+
+  let hours = Number(match[1]);
+  let minutes = Number(match[2]);
+  const roundedMinutes = Math.round(minutes / 15) * 15;
+
+  if (roundedMinutes === 60) {
+    hours = (hours + 1) % 24;
+    minutes = 0;
+  } else {
+    minutes = roundedMinutes;
+  }
+
+  return `${String(hours).padStart(2, "0")}:${String(minutes).padStart(2, "0")}`;
+}
+
 export default function StaffSchedulePage() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -236,8 +255,10 @@ export default function StaffSchedulePage() {
       const payload = {
         profileId: selectedProfileId,
         date: form.date,
-        startTime: form.startTime,
-        endTime: form.endTime.trim(),
+        startTime: roundTimeToQuarterHour(form.startTime),
+        endTime: form.endTime.trim()
+          ? roundTimeToQuarterHour(form.endTime.trim())
+          : "",
         type: form.type,
         templateId: form.templateId,
         title: form.title.trim(),
@@ -457,6 +478,7 @@ export default function StaffSchedulePage() {
               <Input label="Start time">
                 <input
                   type="time"
+                  step={900}
                   value={form.startTime}
                   onChange={(e) => setForm((prev) => ({ ...prev, startTime: e.target.value }))}
                   className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-[#93c5fd] focus:ring-4 focus:ring-[#dbeafe]"
@@ -465,6 +487,7 @@ export default function StaffSchedulePage() {
               <Input label="End time">
                 <input
                   type="time"
+                  step={900}
                   value={form.endTime}
                   onChange={(e) => setForm((prev) => ({ ...prev, endTime: e.target.value }))}
                   className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-[#93c5fd] focus:ring-4 focus:ring-[#dbeafe]"

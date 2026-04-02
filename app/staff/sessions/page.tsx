@@ -37,6 +37,25 @@ type Profile = {
   assignedProgram?: string;
 };
 
+function roundTimeToQuarterHour(value: string) {
+  const match = value.match(/^(\d{2}):(\d{2})$/);
+
+  if (!match) return value;
+
+  let hours = Number(match[1]);
+  let minutes = Number(match[2]);
+  const roundedMinutes = Math.round(minutes / 15) * 15;
+
+  if (roundedMinutes === 60) {
+    hours = (hours + 1) % 24;
+    minutes = 0;
+  } else {
+    minutes = roundedMinutes;
+  }
+
+  return `${String(hours).padStart(2, "0")}:${String(minutes).padStart(2, "0")}`;
+}
+
 export default function StaffSessionsPage() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -219,7 +238,7 @@ export default function StaffSessionsPage() {
         profileId: form.profileId,
         providerRole: form.providerRole,
         scheduledDate: form.scheduledDate,
-        startTime: form.startTime,
+        startTime: roundTimeToQuarterHour(form.startTime),
         durationMinutes,
         deliveryMethod: form.deliveryMethod,
         meetingLink: form.meetingLink.trim(),
@@ -427,6 +446,7 @@ export default function StaffSessionsPage() {
               <Field label="Start time">
                 <input
                   type="time"
+                  step={900}
                   value={form.startTime}
                   onChange={(e) =>
                     setForm((prev) => ({ ...prev, startTime: e.target.value }))
