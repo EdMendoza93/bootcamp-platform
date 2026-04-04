@@ -9,7 +9,7 @@
   "scripts": {
     "serve": "firebase emulators:start --only functions",
     "deploy": "firebase deploy --only functions",
-    "lint": "echo 'No lint configured for functions'"
+    "lint": "node --check index.mjs"
   },
   "dependencies": {
     "firebase-admin": "^13.4.0",

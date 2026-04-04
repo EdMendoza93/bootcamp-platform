@@ -89,6 +89,14 @@ Validación básica:
 ```bash
 npm run lint
 npm run build
+npm run test:e2e:smoke
+```
+
+Pruebas por rol con cuentas QA:
+
+```bash
+node scripts/create-qa-users.mjs
+npm run test:e2e:roles
 ```
 
 Functions en local:
@@ -156,15 +164,21 @@ https://us-central1-YOUR_FIREBASE_PROJECT.cloudfunctions.net/stripeWebhook
 - probar checkout interno y externo con webhook real
 - probar envío de email de entitlement
 - probar permisos por rol: `admin`, `staff`, `client`
-- revisar si `/test-external-checkout` debe existir en producción o quedarse solo para operaciones internas
+- desplegar Cloud Functions cuando cambie backend sensible
 
 ## Estado actual del repo
 
-En este momento la aplicación compila y pasa `lint`:
+En este momento la aplicación compila y tiene validación automatizada básica:
 
 ```bash
 npm run lint
 npm run build
+npm run test:e2e:smoke
 ```
 
-No hay suite de tests automatizados todavía, así que el siguiente salto de calidad recomendable es agregar smoke tests para auth, pagos y permisos por rol.
+Además existe una suite separada para roles con cuentas QA reales:
+
+```bash
+node scripts/create-qa-users.mjs
+npm run test:e2e:roles
+```

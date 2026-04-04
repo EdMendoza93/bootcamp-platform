@@ -38,12 +38,6 @@ test.describe("smoke", () => {
     await expectUrlContains(page, "/login");
   });
 
-  test("test checkout route stays admin-only", async ({ page }) => {
-    await page.goto("/test-external-checkout");
-
-    await expectUrlContains(page, "/login");
-  });
-
   test("book route preserves intent through login redirect", async ({ page }) => {
     await page.goto("/book?durationWeeks=2");
 

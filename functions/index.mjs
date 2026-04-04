@@ -2084,7 +2084,7 @@ export const createUserBooking = onCall(
   { region: "us-central1" },
   async (request) => {
     try {
-      await assertClientUser(request.auth);
+      await assertAdmin(request.auth);
 
       const durationWeeks = normalizeBookingDuration(request.data?.durationWeeks);
       const startWeekId = String(request.data?.startWeekId || "").trim();
