@@ -4,7 +4,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useParams } from "next/navigation";
-import { db, storage } from "@/lib/firebase";
+import { auth, db, storage } from "@/lib/firebase";
 import {
   addDoc,
   collection,
@@ -27,6 +27,7 @@ import { useToast } from "@/components/ui/ToastProvider";
 import SegmentedTabs from "@/components/ui/SegmentedTabs";
 import { BookingRecord } from "@/lib/bookings";
 import {
+  filterVisibleThreads,
   formatThreadTimestamp,
   getMessageCategoryClasses,
   getMessageCategoryLabel,
@@ -434,18 +435,27 @@ export default function AdminProfileDetailPage() {
   }, []);
 
   const loadMessageThreads = useCallback(async (targetProfileId: string) => {
+    const currentUser = auth.currentUser;
+    if (!currentUser) return;
+
     const q = query(
       collection(db, "messageThreads"),
       where("clientProfileId", "==", targetProfileId)
     );
 
-    const snapshot = await getDocs(q);
+    const [snapshot, hiddenThreadsSnap] = await Promise.all([
+      getDocs(q),
+      getDocs(collection(db, "users", currentUser.uid, "hiddenThreads")),
+    ]);
 
     const data = sortThreads(
-      snapshot.docs.map((docItem) => ({
+      filterVisibleThreads(
+        snapshot.docs.map((docItem) => ({
         id: docItem.id,
         ...(docItem.data() as Omit<MessageThreadRecord, "id">),
-      })) as MessageThreadRecord[]
+        })) as MessageThreadRecord[],
+        new Set(hiddenThreadsSnap.docs.map((docItem) => docItem.id))
+      )
     );
 
     setMessageThreads(data);

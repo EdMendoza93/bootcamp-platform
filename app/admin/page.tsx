@@ -8,6 +8,7 @@ import { collection, doc, getDoc, getDocs } from "firebase/firestore";
 import { useToast } from "@/components/ui/ToastProvider";
 import SegmentedTabs from "@/components/ui/SegmentedTabs";
 import {
+  filterVisibleThreads,
   formatThreadTimestamp,
   getMessageCategoryClasses,
   getMessageCategoryLabel,
@@ -135,7 +136,15 @@ export default function AdminPage() {
         setAllowed(true);
         setCurrentUserId(currentUser.uid);
 
-        const [appsSnap, profilesSnap, scheduleSnap, progressSnap, sessionsSnap, threadsSnap] =
+        const [
+          appsSnap,
+          profilesSnap,
+          scheduleSnap,
+          progressSnap,
+          sessionsSnap,
+          threadsSnap,
+          hiddenThreadsSnap,
+        ] =
           await Promise.all([
             getDocs(collection(db, "applications")),
             getDocs(collection(db, "profiles")),
@@ -143,6 +152,7 @@ export default function AdminPage() {
             getDocs(collection(db, "progressPhotos")),
             getDocs(collection(db, "onlineSessions")),
             getDocs(collection(db, "messageThreads")),
+            getDocs(collection(db, "users", currentUser.uid, "hiddenThreads")),
           ]);
 
         const appData = appsSnap.docs.map((docItem) => ({
@@ -175,10 +185,13 @@ export default function AdminPage() {
         );
 
         const threadData = sortThreads(
-          threadsSnap.docs.map((docItem) => ({
+          filterVisibleThreads(
+            threadsSnap.docs.map((docItem) => ({
             id: docItem.id,
             ...(docItem.data() as Omit<MessageThreadRecord, "id">),
-          })) as MessageThreadRecord[]
+            })) as MessageThreadRecord[],
+            new Set(hiddenThreadsSnap.docs.map((docItem) => docItem.id))
+          )
         );
 
         scheduleData.sort((a, b) => {

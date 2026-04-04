@@ -4,7 +4,11 @@ import { useEffect, useMemo, useState } from "react";
 import { collection, getDocs } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { useAuth } from "@/components/providers/AuthProvider";
-import { canRoleAccessThread, MessageThreadRecord } from "@/lib/messages";
+import {
+  canRoleAccessThread,
+  filterVisibleThreads,
+  MessageThreadRecord,
+} from "@/lib/messages";
 
 export function useUnreadMessageCount() {
   const { firebaseUser, appUser, authLoading, profileLoading } = useAuth();
@@ -24,11 +28,18 @@ export function useUnreadMessageCount() {
       }
 
       try {
-        const snap = await getDocs(collection(db, "messageThreads"));
-        const threads = snap.docs.map((docItem) => ({
+        const [threadsSnap, hiddenThreadsSnap] = await Promise.all([
+          getDocs(collection(db, "messageThreads")),
+          getDocs(collection(db, "users", uid, "hiddenThreads")),
+        ]);
+        const hiddenThreadIds = new Set(hiddenThreadsSnap.docs.map((docItem) => docItem.id));
+        const threads = filterVisibleThreads(
+          threadsSnap.docs.map((docItem) => ({
           id: docItem.id,
           ...(docItem.data() as Omit<MessageThreadRecord, "id">),
-        })) as MessageThreadRecord[];
+          })) as MessageThreadRecord[],
+          hiddenThreadIds
+        );
 
         const unreadCount = threads.filter((thread) => {
           if (!canRoleAccessThread(thread, role, uid)) return false;

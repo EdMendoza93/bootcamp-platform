@@ -1,0 +1,396 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function signedIn() {
+      return request.auth != null;
+    }
+
+    function userDoc() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid));
+    }
+
+    function userExists() {
+      return signedIn() &&
+        exists(/databases/$(database)/documents/users/$(request.auth.uid));
+    }
+
+    function userData() {
+      return userDoc().data;
+    }
+
+    function role() {
+      return userExists() ? userData().role : "user";
+    }
+
+    function isAdmin() {
+      return signedIn() && role() == "admin";
+    }
+
+    function isCoach() {
+      return signedIn() && role() == "coach";
+    }
+
+    function isNutritionist() {
+      return signedIn() && role() == "nutritionist";
+    }
+
+    function isStaff() {
+      return isAdmin() || isCoach() || isNutritionist();
+    }
+
+    function isSelf(userId) {
+      return signedIn() && request.auth.uid == userId;
+    }
+
+    function ownProfile(profileId) {
+      return signedIn() &&
+        exists(/databases/$(database)/documents/profiles/$(profileId)) &&
+        get(/databases/$(database)/documents/profiles/$(profileId)).data.userId == request.auth.uid;
+    }
+
+    function hasOnlyAllowedKeys(keys) {
+      return request.resource.data.keys().hasOnly(keys);
+    }
+
+    function changedOnly(keys) {
+      return request.resource.data.diff(resource.data).changedKeys().hasOnly(keys);
+    }
+
+    function inviteDoc(email) {
+      return get(/databases/$(database)/documents/staffInvites/$(email));
+    }
+
+    function inviteExists(email) {
+      return exists(/databases/$(database)/documents/staffInvites/$(email));
+    }
+
+    function isInviteOwner(inviteId) {
+      return signedIn() &&
+        request.auth.token.email != null &&
+        request.auth.token.email == inviteId;
+    }
+
+    function canAccessProfileDoc() {
+      return isAdmin() || isStaff() || (signedIn() && resource.data.userId == request.auth.uid);
+    }
+
+    function canAccessProgressPhoto(data) {
+      return isAdmin() || (signedIn() && ownProfile(data.profileId));
+    }
+
+    function canAccessMessageThread(data) {
+      return isAdmin() ||
+        (signedIn() && data.clientUserId == request.auth.uid) ||
+        (isCoach() && (data.category in ["general", "coach", "sessions"])) ||
+        (isNutritionist() && (data.category in ["general", "nutrition", "sessions"]));
+    }
+
+    function isValidSelfUserCreate(userId) {
+      return isSelf(userId) &&
+        hasOnlyAllowedKeys([
+          "email",
+          "name",
+          "role",
+          "status",
+          "createdAt",
+          "updatedAt"
+        ]) &&
+        request.resource.data.email == request.auth.token.email &&
+        request.resource.data.status == "active" &&
+        (
+          request.resource.data.role == "user" ||
+          (
+            inviteExists(request.resource.data.email) &&
+            inviteDoc(request.resource.data.email).data.status == "invited" &&
+            inviteDoc(request.resource.data.email).data.email == request.auth.token.email &&
+            request.resource.data.role == inviteDoc(request.resource.data.email).data.role
+          )
+        );
+    }
+
+    function isValidSelfUserUpdate() {
+      return changedOnly(["name", "email", "updatedAt"]) &&
+        request.resource.data.email == resource.data.email &&
+        request.resource.data.role == resource.data.role &&
+        request.resource.data.status == resource.data.status &&
+        request.resource.data.createdAt == resource.data.createdAt;
+    }
+
+    function isValidOwnProfileUpdate() {
+      return changedOnly([
+          "fullName",
+          "age",
+          "goal",
+          "height",
+          "weight",
+          "allergies",
+          "injuries",
+          "notes",
+          "onboardingStatus",
+          "chest",
+          "hips",
+          "waist",
+          "thighs",
+          "calves",
+          "arms"
+        ]) &&
+        request.resource.data.userId == resource.data.userId &&
+        request.resource.data.email == resource.data.email &&
+        request.resource.data.clientStatus == resource.data.clientStatus &&
+        request.resource.data.paymentStatus == resource.data.paymentStatus &&
+        request.resource.data.progressPhotosEnabled == resource.data.progressPhotosEnabled &&
+        request.resource.data.approvalStatus == resource.data.approvalStatus;
+    }
+
+    function isValidApplicationCreate() {
+      return signedIn() &&
+        request.resource.data.userId == request.auth.uid &&
+        request.resource.data.status == "pending" &&
+        hasOnlyAllowedKeys([
+          "userId",
+          "fullName",
+          "age",
+          "phone",
+          "goal",
+          "experience",
+          "medicalNotes",
+          "status",
+          "createdAt"
+        ]);
+    }
+
+    function isValidClientProgressPhotoCreate() {
+      return signedIn() &&
+        ownProfile(request.resource.data.profileId) &&
+        request.resource.data.uploadedByRole == "user" &&
+        hasOnlyAllowedKeys([
+          "profileId",
+          "imageUrl",
+          "storagePath",
+          "title",
+          "note",
+          "photoDate",
+          "milestone",
+          "measurements",
+          "uploadedByRole",
+          "createdAt"
+        ]);
+    }
+
+    function isValidClientProgressPhotoUpdate() {
+      return canAccessProgressPhoto(resource.data) &&
+        resource.data.uploadedByRole == "user" &&
+        changedOnly(["title", "note", "photoDate", "milestone", "measurements"]) &&
+        request.resource.data.profileId == resource.data.profileId &&
+        request.resource.data.imageUrl == resource.data.imageUrl &&
+        request.resource.data.storagePath == resource.data.storagePath &&
+        request.resource.data.uploadedByRole == resource.data.uploadedByRole &&
+        request.resource.data.createdAt == resource.data.createdAt;
+    }
+
+    function isValidMessageThreadCreate() {
+      return signedIn() &&
+        hasOnlyAllowedKeys([
+          "clientProfileId",
+          "clientUserId",
+          "clientName",
+          "category",
+          "subject",
+          "status",
+          "participantRoles",
+          "participantUserIds",
+          "createdByUid",
+          "createdByRole",
+          "createdAt",
+          "lastMessageAt",
+          "lastMessagePreview",
+          "lastSenderRole",
+          "readByUserIds"
+        ]) &&
+        request.resource.data.createdByUid == request.auth.uid &&
+        request.resource.data.createdByRole == role() &&
+        request.resource.data.status == "open" &&
+        (
+          isAdmin() ||
+          (
+            role() == "user" &&
+            ownProfile(request.resource.data.clientProfileId) &&
+            request.resource.data.clientUserId == request.auth.uid
+          ) ||
+          (
+            isCoach() &&
+            request.resource.data.category in ["general", "coach", "sessions"]
+          ) ||
+          (
+            isNutritionist() &&
+            request.resource.data.category in ["general", "nutrition", "sessions"]
+          )
+        );
+    }
+
+    function isValidMessageThreadUpdate() {
+      return canAccessMessageThread(resource.data) &&
+        changedOnly(["lastMessageAt", "lastMessagePreview", "lastSenderRole", "status", "readByUserIds"]) &&
+        request.resource.data.clientProfileId == resource.data.clientProfileId &&
+        request.resource.data.clientUserId == resource.data.clientUserId &&
+        request.resource.data.clientName == resource.data.clientName &&
+        request.resource.data.category == resource.data.category &&
+        request.resource.data.subject == resource.data.subject &&
+        request.resource.data.participantRoles == resource.data.participantRoles &&
+        request.resource.data.participantUserIds == resource.data.participantUserIds &&
+        request.resource.data.createdByUid == resource.data.createdByUid &&
+        request.resource.data.createdByRole == resource.data.createdByRole &&
+        request.resource.data.createdAt == resource.data.createdAt &&
+        (
+          request.resource.data.status == resource.data.status ||
+          request.resource.data.status == "open" ||
+          isStaff()
+        );
+    }
+
+    match /users/{userId} {
+      allow read: if isSelf(userId) || isAdmin();
+      allow create: if isAdmin() || isValidSelfUserCreate(userId);
+      allow update: if isAdmin() || (isSelf(userId) && isValidSelfUserUpdate());
+      allow delete: if isAdmin();
+
+      match /pushTokens/{tokenId} {
+        allow read, write: if isSelf(userId) || isAdmin();
+      }
+
+      match /pushState/{stateId} {
+        allow read, write: if isSelf(userId) || isAdmin();
+      }
+
+      match /hiddenThreads/{threadId} {
+        allow read, delete: if isSelf(userId) || isAdmin();
+        allow create, update: if (isSelf(userId) || isAdmin()) &&
+          request.resource.data.keys().hasOnly(["threadId", "hiddenAt"]) &&
+          request.resource.data.threadId == threadId;
+      }
+    }
+
+    match /staffInvites/{inviteId} {
+      allow read: if isAdmin() || isInviteOwner(inviteId) || (
+        signedIn() &&
+        request.auth.token.email != null &&
+        resource.data.email == request.auth.token.email
+      );
+      allow create, delete: if isAdmin();
+      allow update: if isAdmin() || (
+        signedIn() &&
+        request.auth.token.email != null &&
+        resource.data.email == request.auth.token.email &&
+        changedOnly(["status", "acceptedByUid", "acceptedAt"]) &&
+        request.resource.data.status == "accepted" &&
+        request.resource.data.acceptedByUid == request.auth.uid &&
+        request.resource.data.email == resource.data.email &&
+        request.resource.data.fullName == resource.data.fullName &&
+        request.resource.data.role == resource.data.role &&
+        request.resource.data.createdAt == resource.data.createdAt
+      );
+    }
+
+    match /profiles/{profileId} {
+      allow read: if canAccessProfileDoc();
+      allow create, delete: if isAdmin();
+      allow update: if isAdmin() || (signedIn() && resource.data.userId == request.auth.uid && isValidOwnProfileUpdate());
+    }
+
+    match /applications/{applicationId} {
+      allow read: if isAdmin() || (signedIn() && resource.data.userId == request.auth.uid);
+      allow create: if isValidApplicationCreate();
+      allow update, delete: if isAdmin();
+    }
+
+    match /progressPhotos/{photoId} {
+      allow read: if canAccessProgressPhoto(resource.data);
+      allow create: if isAdmin() || isValidClientProgressPhotoCreate();
+      allow update: if isAdmin() || isValidClientProgressPhotoUpdate();
+      allow delete: if isAdmin() || canAccessProgressPhoto(resource.data);
+    }
+
+    match /messageThreads/{threadId} {
+      allow read: if canAccessMessageThread(resource.data);
+      allow create: if isValidMessageThreadCreate();
+      allow update: if isValidMessageThreadUpdate();
+      allow delete: if false;
+
+      match /messages/{messageId} {
+        allow read: if canAccessMessageThread(get(/databases/$(database)/documents/messageThreads/$(threadId)).data);
+        allow create: if signedIn() &&
+          canAccessMessageThread(get(/databases/$(database)/documents/messageThreads/$(threadId)).data) &&
+          request.resource.data.senderUid == request.auth.uid &&
+          request.resource.data.senderRole == role() &&
+          request.resource.data.keys().hasOnly([
+            "body",
+            "senderUid",
+            "senderRole",
+            "senderName",
+            "createdAt"
+          ]);
+        allow delete: if false;
+        allow update: if false;
+      }
+    }
+
+    match /onlineSessions/{sessionId} {
+      allow read: if isAdmin() || isStaff() || (signedIn() && ownProfile(resource.data.profileId));
+      allow create, update, delete: if isAdmin() || isStaff();
+    }
+
+    match /scheduleItems/{itemId} {
+      allow read: if isAdmin() || isStaff() || (signedIn() && ownProfile(resource.data.profileId));
+      allow create, update, delete: if isAdmin() || isStaff();
+    }
+
+    match /trainingTemplates/{id} {
+      allow read: if isAdmin() || isStaff();
+      allow write: if isAdmin() || isCoach();
+    }
+
+    match /nutritionTemplates/{id} {
+      allow read: if isAdmin() || isStaff();
+      allow write: if isAdmin() || isNutritionist();
+    }
+
+    match /activityTemplates/{id} {
+      allow read: if isAdmin() || isStaff();
+      allow write: if isAdmin();
+    }
+
+    match /foods/{id} {
+      allow read: if isAdmin();
+      allow write: if isAdmin();
+    }
+
+    match /bootcampWeeks/{id} {
+      allow read: if isAdmin() || isStaff();
+      allow write: if isAdmin();
+    }
+
+    match /bookings/{id} {
+      allow read: if isAdmin() || isStaff();
+      allow write: if false;
+    }
+
+    match /bookingEntitlements/{id} {
+      allow read: if isAdmin() || isStaff();
+      allow write: if false;
+    }
+
+    match /settings/{id} {
+      allow read: if isAdmin();
+      allow write: if isAdmin();
+    }
+
+    match /pushLogs/{id} {
+      allow read, write: if isAdmin();
+    }
+
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

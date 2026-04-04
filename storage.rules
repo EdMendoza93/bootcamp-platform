@@ -1,0 +1,58 @@
+rules_version = '2';
+
+service firebase.storage {
+  match /b/{bucket}/o {
+    function signedIn() {
+      return request.auth != null;
+    }
+
+    function userDoc() {
+      return firestore.get(/databases/(default)/documents/users/$(request.auth.uid));
+    }
+
+    function userExists() {
+      return signedIn() &&
+        firestore.exists(/databases/(default)/documents/users/$(request.auth.uid));
+    }
+
+    function role() {
+      return userExists() ? userDoc().data.role : "user";
+    }
+
+    function isAdmin() {
+      return signedIn() && role() == "admin";
+    }
+
+    function isStaff() {
+      return signedIn() && (role() == "admin" || role() == "coach" || role() == "nutritionist");
+    }
+
+    function ownsProfile(profileId) {
+      return signedIn() &&
+        firestore.exists(/databases/(default)/documents/profiles/$(profileId)) &&
+        firestore.get(/databases/(default)/documents/profiles/$(profileId)).data.userId == request.auth.uid;
+    }
+
+    function isImageUpload() {
+      return request.resource != null &&
+        request.resource.contentType.matches('image/.*') &&
+        request.resource.size < 10 * 1024 * 1024;
+    }
+
+    match /progress/{profileId}/{fileName=**} {
+      allow read: if isAdmin() || isStaff() || ownsProfile(profileId);
+      allow write: if (isAdmin() || isStaff() || ownsProfile(profileId)) && isImageUpload();
+      allow delete: if isAdmin() || isStaff() || ownsProfile(profileId);
+    }
+
+    match /progressPhotos/{profileId}/{fileName=**} {
+      allow read: if isAdmin() || isStaff() || ownsProfile(profileId);
+      allow write: if (isAdmin() || isStaff() || ownsProfile(profileId)) && isImageUpload();
+      allow delete: if isAdmin() || isStaff() || ownsProfile(profileId);
+    }
+
+    match /{allPaths=**} {
+      allow read, write: if false;
+    }
+  }
+}

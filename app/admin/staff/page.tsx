@@ -1,10 +1,11 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { addDoc, collection, deleteDoc, doc, getDocs, orderBy, query, serverTimestamp, updateDoc } from "firebase/firestore";
+import { collection, deleteDoc, doc, getDocs, orderBy, query, serverTimestamp, setDoc, updateDoc } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { useToast } from "@/components/ui/ToastProvider";
 import { AppRole, getRoleLabel } from "@/lib/roles";
+import { getStaffInviteId, normalizeInviteEmail } from "@/lib/staff-invites";
 
 type StaffInvite = {
   id: string;
@@ -149,7 +150,7 @@ export default function AdminStaffPage() {
 
   const createInvite = async () => {
     const fullName = form.fullName.trim();
-    const email = form.email.trim().toLowerCase();
+    const email = normalizeInviteEmail(form.email);
 
     if (!fullName || !email) {
       showToast({
@@ -163,7 +164,7 @@ export default function AdminStaffPage() {
     setSaving(true);
 
     try {
-      await addDoc(collection(db, "staffInvites"), {
+      await setDoc(doc(db, "staffInvites", getStaffInviteId(email)), {
         fullName,
         email,
         role: form.role,

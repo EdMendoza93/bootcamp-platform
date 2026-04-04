@@ -4,10 +4,10 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   addDoc,
   collection,
-  deleteDoc,
   doc,
   getDocs,
   serverTimestamp,
+  setDoc,
   updateDoc,
   where,
   query,
@@ -23,6 +23,7 @@ import {
   canRoleAccessThread,
   formatThreadTimestamp,
   getAllowedThreadCategories,
+  isThreadVisibleToUser,
   getMessageCategoryClasses,
   getMessageCategoryLabel,
   getThreadStatusClasses,
@@ -93,11 +94,12 @@ export default function MessageCenter({
   const loadData = useCallback(async () => {
     if (!firebaseUser || !appUser) return;
 
-    const [threadsSnap, profilesSnap] = await Promise.all([
+    const [threadsSnap, profilesSnap, hiddenThreadsSnap] = await Promise.all([
       getDocs(collection(db, "messageThreads")),
       scope === "client"
         ? getDocs(query(collection(db, "profiles"), where("userId", "==", firebaseUser.uid)))
         : getDocs(collection(db, "profiles")),
+      getDocs(collection(db, "users", firebaseUser.uid, "hiddenThreads")),
     ]);
 
     const profileRows = profilesSnap.docs
@@ -107,12 +109,15 @@ export default function MessageCenter({
       }))
       .sort((a, b) => (a.fullName || "").localeCompare(b.fullName || "")) as ProfileOption[];
 
+    const hiddenThreadIds = new Set(hiddenThreadsSnap.docs.map((docItem) => docItem.id));
+
     const threadRows = sortThreads(
       (threadsSnap.docs.map((docItem) => ({
         id: docItem.id,
         ...(docItem.data() as Omit<MessageThreadRecord, "id">),
       })) as MessageThreadRecord[]).filter((thread) =>
-        canRoleAccessThread(thread, role, firebaseUser.uid)
+        canRoleAccessThread(thread, role, firebaseUser.uid) &&
+        isThreadVisibleToUser(thread, hiddenThreadIds)
       )
     );
 
@@ -387,10 +392,10 @@ export default function MessageCenter({
   };
 
   const deleteThread = async () => {
-    if (!selectedThread) return;
+    if (!selectedThread || !firebaseUser) return;
 
     const confirmed = window.confirm(
-      "Delete this thread permanently? This will remove the full conversation history."
+      "Remove this thread from your inbox? The other participant will still keep the full conversation."
     );
 
     if (!confirmed) return;
@@ -398,34 +403,33 @@ export default function MessageCenter({
     setDeleting(true);
 
     try {
-      const messagesSnap = await getDocs(
-        collection(db, "messageThreads", selectedThread.id, "messages")
+      const hiddenThreadRef = doc(
+        db,
+        "users",
+        firebaseUser.uid,
+        "hiddenThreads",
+        selectedThread.id
       );
 
-      await Promise.all(messagesSnap.docs.map((docItem) => deleteDoc(docItem.ref)));
-      await deleteDoc(doc(db, "messageThreads", selectedThread.id));
+      await setDoc(hiddenThreadRef, {
+        threadId: selectedThread.id,
+        hiddenAt: serverTimestamp(),
+      });
 
-      const deletedThreadId = selectedThread.id;
-
+      await loadData();
       setSelectedThreadId("");
       setMessages([]);
       setReplyBody("");
 
-      await loadData();
-
       showToast({
-        title: "Thread deleted",
-        description: "The conversation was removed from the inbox.",
+        title: "Thread removed",
+        description: "The conversation was removed from your inbox only.",
         type: "success",
       });
-
-      if (selectedThreadId === deletedThreadId) {
-        setSelectedThreadId("");
-      }
     } catch (error) {
       console.error("Delete thread error:", error);
       showToast({
-        title: "Could not delete thread",
+        title: "Could not remove thread",
         description: "Please try again.",
         type: "error",
       });
@@ -755,7 +759,7 @@ export default function MessageCenter({
                     disabled={deleting}
                     className="rounded-2xl border border-rose-200 bg-rose-50 px-4 py-2.5 text-sm font-medium text-rose-700 transition hover:bg-rose-100 disabled:opacity-60"
                   >
-                    {deleting ? "Deleting..." : "Delete thread"}
+                    {deleting ? "Removing..." : "Remove from inbox"}
                   </button>
                 </div>
               </div>

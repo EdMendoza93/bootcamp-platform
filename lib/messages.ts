@@ -22,6 +22,20 @@ export type MessageThreadRecord = {
   readByUserIds?: string[];
 };
 
+export function isThreadVisibleToUser(
+  thread: MessageThreadRecord,
+  hiddenThreadIds: Set<string>
+) {
+  return !hiddenThreadIds.has(thread.id);
+}
+
+export function filterVisibleThreads(
+  threads: MessageThreadRecord[],
+  hiddenThreadIds: Set<string>
+) {
+  return threads.filter((thread) => isThreadVisibleToUser(thread, hiddenThreadIds));
+}
+
 export type ThreadMessageRecord = {
   id: string;
   body: string;

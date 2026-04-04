@@ -6,7 +6,15 @@ import { useParams } from "next/navigation";
 import { collection, doc, getDoc, getDocs, query, where } from "firebase/firestore";
 import { auth, db } from "@/lib/firebase";
 import { useToast } from "@/components/ui/ToastProvider";
-import { canRoleAccessThread, formatThreadTimestamp, getMessageCategoryClasses, getMessageCategoryLabel, MessageThreadRecord, sortThreads } from "@/lib/messages";
+import {
+  canRoleAccessThread,
+  filterVisibleThreads,
+  formatThreadTimestamp,
+  getMessageCategoryClasses,
+  getMessageCategoryLabel,
+  MessageThreadRecord,
+  sortThreads,
+} from "@/lib/messages";
 import { BookingRecord } from "@/lib/bookings";
 import { AppRole, getRoleLabel, normalizeRole } from "@/lib/roles";
 import {
@@ -108,12 +116,13 @@ export default function StaffClientWorkspacePage() {
           ...(profileSnap.data() as Omit<Profile, "id">),
         } as Profile;
 
-        const [bookingsSnap, scheduleSnap, sessionsSnap, threadsSnap] =
+        const [bookingsSnap, scheduleSnap, sessionsSnap, threadsSnap, hiddenThreadsSnap] =
           await Promise.all([
             getDocs(query(collection(db, "bookings"), where("profileId", "==", profileId))),
             getDocs(query(collection(db, "scheduleItems"), where("profileId", "==", profileId))),
             getDocs(query(collection(db, "onlineSessions"), where("profileId", "==", profileId))),
             getDocs(query(collection(db, "messageThreads"), where("clientProfileId", "==", profileId))),
+            getDocs(collection(db, "users", currentUserId, "hiddenThreads")),
           ]);
 
         const allowedScheduleType =
@@ -154,11 +163,14 @@ export default function StaffClientWorkspacePage() {
         );
         setThreads(
           sortThreads(
-            (threadsSnap.docs.map((docItem) => ({
+            filterVisibleThreads(
+              (threadsSnap.docs.map((docItem) => ({
               id: docItem.id,
               ...(docItem.data() as Omit<MessageThreadRecord, "id">),
             })) as MessageThreadRecord[]).filter((thread) =>
               canRoleAccessThread(thread, nextRole, currentUserId)
+              ),
+              new Set(hiddenThreadsSnap.docs.map((docItem) => docItem.id))
             )
           )
         );

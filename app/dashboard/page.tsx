@@ -17,6 +17,7 @@ import SegmentedTabs from "@/components/ui/SegmentedTabs";
 import NutritionMealPlan from "@/components/nutrition/NutritionMealPlan";
 import { getHomeRouteForRole, normalizeRole } from "@/lib/roles";
 import {
+  filterVisibleThreads,
   formatThreadTimestamp,
   getMessageCategoryClasses,
   getMessageCategoryLabel,
@@ -328,7 +329,7 @@ export default function DashboardPage() {
         )
       );
 
-      const [sessionsSnap, threadsSnap] = await Promise.all([
+      const [sessionsSnap, threadsSnap, hiddenThreadsSnap] = await Promise.all([
         getDocs(
           query(collection(db, "onlineSessions"), where("profileId", "==", profileDoc.id))
         ),
@@ -338,6 +339,7 @@ export default function DashboardPage() {
             where("clientUserId", "==", currentUser.uid)
           )
         ),
+        getDocs(collection(db, "users", currentUser.uid, "hiddenThreads")),
       ]);
 
       const progressData = progressQuery.docs
@@ -358,10 +360,13 @@ export default function DashboardPage() {
       );
       setMessageThreads(
         sortThreads(
+          filterVisibleThreads(
           threadsSnap.docs.map((docItem) => ({
             id: docItem.id,
             ...(docItem.data() as Omit<MessageThreadRecord, "id">),
-          })) as MessageThreadRecord[]
+          })) as MessageThreadRecord[],
+          new Set(hiddenThreadsSnap.docs.map((docItem) => docItem.id))
+          )
         )
       );
     } else {

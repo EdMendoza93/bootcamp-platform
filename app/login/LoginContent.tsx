@@ -17,17 +17,14 @@ import {
 } from "firebase/auth";
 import { auth, db } from "@/lib/firebase";
 import {
-  collection,
   doc,
   getDoc,
-  getDocs,
-  query,
   serverTimestamp,
   setDoc,
   updateDoc,
-  where,
 } from "firebase/firestore";
 import { getHomeRouteForRole, normalizeRole } from "@/lib/roles";
+import { getStaffInviteId, normalizeInviteEmail } from "@/lib/staff-invites";
 
 const MIN_PASSWORD_LENGTH = 8;
 
@@ -46,19 +43,20 @@ function resolveNextPath(value?: string | null) {
 }
 
 async function findPendingInvite(email?: string | null) {
-  const normalizedEmail = String(email || "").trim().toLowerCase();
+  const normalizedEmail = normalizeInviteEmail(email);
   if (!normalizedEmail) return null;
 
-  const invitesSnap = await getDocs(
-    query(
-      collection(db, "staffInvites"),
-      where("email", "==", normalizedEmail),
-      where("status", "==", "invited")
-    )
-  );
+  const directInviteRef = doc(db, "staffInvites", getStaffInviteId(normalizedEmail));
+  const directInviteSnap = await getDoc(directInviteRef);
 
-  if (invitesSnap.empty) return null;
-  return invitesSnap.docs[0];
+  if (directInviteSnap.exists()) {
+    const directInviteData = directInviteSnap.data() as { status?: string } | undefined;
+    if (directInviteData?.status === "invited") {
+      return directInviteSnap;
+    }
+  }
+  
+  return null;
 }
 
 async function ensureUserDoc(

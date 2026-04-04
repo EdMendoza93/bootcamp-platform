@@ -13,6 +13,7 @@ import {
 } from "@/lib/roles";
 import {
   canRoleAccessThread,
+  filterVisibleThreads,
   formatThreadTimestamp,
   getMessageCategoryClasses,
   getMessageCategoryLabel,
@@ -88,12 +89,13 @@ export default function StaffOverviewPage() {
           return;
         }
 
-        const [profilesSnap, scheduleSnap, sessionsSnap, threadsSnap] =
+        const [profilesSnap, scheduleSnap, sessionsSnap, threadsSnap, hiddenThreadsSnap] =
           await Promise.all([
             getDocs(collection(db, "profiles")),
             getDocs(collection(db, "scheduleItems")),
             getDocs(collection(db, "onlineSessions")),
             getDocs(collection(db, "messageThreads")),
+            getDocs(collection(db, "users", currentUser.uid, "hiddenThreads")),
           ]);
 
         const profileRows = profilesSnap.docs
@@ -128,11 +130,14 @@ export default function StaffOverviewPage() {
         );
 
         const threadRows = sortThreads(
-          (threadsSnap.docs.map((docItem) => ({
+          filterVisibleThreads(
+            (threadsSnap.docs.map((docItem) => ({
             id: docItem.id,
             ...(docItem.data() as Omit<MessageThreadRecord, "id">),
           })) as MessageThreadRecord[]).filter((item) =>
             canRoleAccessThread(item, nextRole, currentUser.uid)
+            ),
+            new Set(hiddenThreadsSnap.docs.map((docItem) => docItem.id))
           )
         );
 
